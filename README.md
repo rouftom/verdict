@@ -297,6 +297,8 @@ The workspace has:
 - one **Models** block in two columns: **six evaluators** on the left, the
   **two verifiers** and the run **options** on the right, each agent slot
   carrying its own model and reasoning select;
+- grouped, searchable selects for models, reasoning effort and language, whose
+  search field sits flush next to the search icon with no border of its own;
 - collapsible **Inputs** and **Models** sections, so a long run does not push
   the controls around;
 - a React Flow pipeline, shown once a run starts, where harvest fans out to **one node per evaluator**
@@ -321,7 +323,10 @@ The workspace has:
 - a run bar pinned to the bottom of the viewport, which stays there even when
   every section is collapsed;
 - an installable PWA: a Workbox service worker caches the shell and an offline
-  fallback page, and never caches API or SSE traffic.
+  fallback page, and never caches API or SSE traffic;
+- a pulsing dot on the tab favicon while a run is active, with the original
+  icons restored once the run settles, so a long pipeline stays visible from
+  another tab.
 
 The Meta fallback catalog always includes `muse-spark-1.3` and
 `muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.

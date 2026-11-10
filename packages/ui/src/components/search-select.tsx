@@ -207,7 +207,7 @@ export function SearchSelect({
                 }}
                 placeholder="Search…"
                 aria-label={ariaLabel ? `Search ${ariaLabel}` : 'Search'}
-                className="h-7 w-full min-w-0 bg-transparent text-[11px] text-foreground outline-none placeholder:text-muted-foreground/70"
+                className="h-7 w-full min-w-0 border-0 bg-transparent text-[11px] text-foreground outline-none placeholder:text-muted-foreground/70"
               />
               {query ? (
                 <button

@@ -50,6 +50,7 @@ import {
 } from '@/lib/api'
 import { deleteRun, listRuns, loadSettings, saveRun, saveSettings, type StoredRun } from '@/lib/idb'
 import { formatDate } from '@/lib/format'
+import { useProcessingFavicon } from '@/hooks/use-processing-favicon'
 import { UploadCard } from './upload-card'
 import { ModelSlots } from './model-slots'
 import { PipelineGraph, StatusPill } from './pipeline-graph'
@@ -171,6 +172,10 @@ export function VerdictWorkspace() {
   const unsubscribe = React.useRef<(() => void) | null>(null)
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const running = status !== undefined && RUNNING.includes(status)
+
+  // A pulsing dot on the tab favicon while the pipeline is active, so a long
+  // run stays visible from another tab.
+  useProcessingFavicon(running)
 
   // Providers
   React.useEffect(() => {
