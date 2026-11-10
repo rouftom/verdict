@@ -40,6 +40,16 @@ export function resolveCornerStyle(preferred?: string | null): CornerStyle {
   return preferred === 'rounded' ? 'rounded' : DEFAULT_CORNER_STYLE
 }
 
+/** Global border treatment: every 1px hairline in the console follows it. */
+export type BorderStyle = 'solid' | 'dashed' | 'dotted'
+export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted']
+export const DEFAULT_BORDER_STYLE: BorderStyle = 'solid'
+export const BORDER_STORAGE_KEY = 'sps.border-style'
+
+export function resolveBorderStyle(preferred?: string | null): BorderStyle {
+  return preferred === 'dashed' || preferred === 'dotted' ? preferred : DEFAULT_BORDER_STYLE
+}
+
 export * from './types'
 export * from './maturity'
 export * from './generate-css'

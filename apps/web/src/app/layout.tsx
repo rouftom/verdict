@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import {
+  BORDER_STORAGE_KEY,
+  DEFAULT_BORDER_STYLE,
   DEFAULT_CORNER_STYLE,
   DEFAULT_THEME_PACK_ID,
   MODE_STORAGE_KEY,
@@ -19,6 +21,8 @@ const themeBootstrap = buildChromeBootstrapScript({
   themes: THEME_PACKS,
   radiusStorageKey: RADIUS_STORAGE_KEY,
   defaultRadius: DEFAULT_CORNER_STYLE,
+  borderStorageKey: BORDER_STORAGE_KEY,
+  defaultBorder: DEFAULT_BORDER_STYLE,
 })
 
 const themeCss = buildThemePackCss(THEME_PACKS)
