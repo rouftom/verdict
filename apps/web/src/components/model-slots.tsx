@@ -82,6 +82,19 @@ function withReasoning(provider: ModelRef['provider'], model: string, effort: st
   return { provider, model, reasoningEffort: value }
 }
 
+function shuffled<T>(values: readonly T[]): T[] {
+  const copy = [...values]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1))
+    ;[copy[index], copy[swap]] = [copy[swap]!, copy[index]!]
+  }
+  return copy
+}
+
+function assignmentKey(models: ModelRef[]): string {
+  return models.map((model) => `${model.provider}:${model.model}:${model.reasoningEffort ?? ''}`).join('|')
+}
+
 export function ModelSlots({ providers, value, slots, onChange, idPrefix, compact = false }: ModelSlotsProps) {
   const { t } = useTranslation()
   const flat = React.useMemo(() => flatten(providers), [providers])
@@ -111,12 +124,21 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
 
   const cycle = () => {
     if (flat.length === 0) return
-    onChange(
-      Array.from({ length: slots }, (_, index) => {
-        const entry = flat[index % flat.length]!
-        return { provider: entry.provider, model: entry.model }
-      }),
-    )
+    const current = Array.from({ length: slots }, (_, index) => value[index]).filter((entry): entry is ModelRef => Boolean(entry))
+    const previous = assignmentKey(current)
+    let next: ModelRef[] = []
+    // Shuffle on every click. Retry when the draw happens to match the current
+    // assignment, so the button always changes something when it can.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const pool = shuffled(flat)
+      next = Array.from({ length: slots }, (_, index) => {
+        // Distinct models while the pool is large enough, rotation otherwise.
+        const entry = pool[flat.length >= slots ? index : index % flat.length]!
+        return withReasoning(entry.provider, entry.model, value[index]?.reasoningEffort)
+      })
+      if (assignmentKey(next) !== previous) break
+    }
+    onChange(next)
   }
 
   if (flat.length === 0) {
