@@ -141,13 +141,19 @@ export function parseManifestText(text: string): ManifestParseResult {
   }
 
   const perTrack = new Map<string, Set<number>>()
+  let duplicateRanks = 0
   for (const project of projects) {
     if (project.rank === undefined) continue
     const track = project.track ?? 'default'
     const ranks = perTrack.get(track) ?? new Set<number>()
-    if (ranks.has(project.rank)) warnings.push(`Duplicate rank ${project.rank} in track "${track}". Ranks are per track; comparison must stay per track.`)
+    if (ranks.has(project.rank)) duplicateRanks += 1
     ranks.add(project.rank)
     perTrack.set(track, ranks)
+  }
+  // One generic line, never one per affected project: a large manifest can
+  // repeat a rank many times and naming every entry would drown the warnings.
+  if (duplicateRanks > 0) {
+    warnings.push('Duplicate supplied ranks were found. Ranks are per track and comparison stays per track; duplicates never change a criterion score.')
   }
 
   return { projects, warnings }

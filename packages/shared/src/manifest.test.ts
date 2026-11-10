@@ -73,4 +73,24 @@ describe('multi-track manifests', () => {
     expect(aInStartup?.providedRank).toBe(2)
     expect(aInCreative?.providedRank).toBeUndefined()
   })
+
+  test('collapses duplicate supplied ranks into one generic warning', () => {
+    const { warnings } = parseManifestText(
+      JSON.stringify([
+        { name: 'First entry', rank: 1, track: 'indie', github: 'https://github.com/a/first' },
+        { name: 'Second entry', rank: 1, track: 'indie', github: 'https://github.com/a/second' },
+        { name: 'Third entry', rank: 1, track: 'indie', github: 'https://github.com/a/third' },
+        { name: 'Other track', rank: 1, track: 'startup', github: 'https://github.com/a/other' },
+      ]),
+    )
+
+    const duplicates = warnings.filter((warning) => warning.toLowerCase().includes('duplicate'))
+    expect(duplicates).toHaveLength(1)
+    expect(duplicates[0]).toBe(
+      'Duplicate supplied ranks were found. Ranks are per track and comparison stays per track; duplicates never change a criterion score.',
+    )
+    for (const name of ['First entry', 'Second entry', 'Third entry', 'indie', 'startup']) {
+      expect(duplicates[0]).not.toContain(name)
+    }
+  })
 })
