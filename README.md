@@ -66,7 +66,8 @@ supports the usual browser profiles.
 ## Setup
 
 ```bash
-cd apps/verdict
+git clone https://github.com/rouftom/verdict.git
+cd verdict
 cp .env.example .env        # then fill in the providers you use
 chmod 600 .env
 
@@ -242,7 +243,7 @@ reports it has seen.
 ## Repository layout
 
 ```
-apps/verdict
+verdict
 ├── apps/api        Fastify + SSE, in-memory run store
 ├── apps/web        Next.js 16 single-screen workspace
 ├── packages/shared types, zod schemas, manifest + rubric parsers, consensus
