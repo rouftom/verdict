@@ -21,7 +21,7 @@
     "projectCount_other": "{{count}} projects",
     "ruleChars": "{{count}} rule chars",
     "manifestLabel": "Project manifest",
-    "manifestHint": "JSON or YAML. Accepts an array or { projects: [] }. Ranks optional and per track.",
+    "manifestHint": "JSON or YAML. Accepts an array or { projects: [] }. Ranks optional and per track. Use tracks: [] to rank a project in several tracks at once.",
     "rulesLabel": "Evaluation rules",
     "rulesHint": "Markdown or TXT. Passed to every agent verbatim, as untrusted context.",
     "rubricLabel": "Rubric",
@@ -140,6 +140,8 @@
     "refresh": "Refresh run",
     "export": "Export report",
     "log": "Run log",
+    "showPipeline": "Show pipeline",
+    "showResults": "Show results",
     "reportReady": "report ready · {{date}}",
     "failed": "Run failed."
   },

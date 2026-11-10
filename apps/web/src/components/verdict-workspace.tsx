@@ -4,9 +4,11 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
+  BarChart3,
   Download,
   History,
   Layers,
+  Network,
   Play,
   RefreshCw,
   Settings2,
@@ -163,6 +165,7 @@ export function VerdictWorkspace() {
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [view, setView] = React.useState<'pipeline' | 'results'>('pipeline')
   const [restored, setRestored] = React.useState(false)
 
   const unsubscribe = React.useRef<(() => void) | null>(null)
@@ -358,6 +361,7 @@ export function VerdictWorkspace() {
     setEvents([])
     setLive(EMPTY_LIVE)
     setStatus('queued')
+    setView('pipeline')
     unsubscribe.current?.()
     try {
       const payload: RunRequest = {
@@ -462,6 +466,7 @@ export function VerdictWorkspace() {
   const criteria = preview?.rubric.criteria ?? live.report?.criteria ?? []
   const hasResults =
     Boolean(live.report) || live.consensus.length > 0 || live.evaluations.length > 0 || live.verifications.length > 0
+  const canToggleView = Boolean(runId) && hasResults
   const toggleAnchor = (id: string) => {
     setAnchors((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : current.length >= 3 ? current : [...current, id]))
   }
@@ -472,7 +477,7 @@ export function VerdictWorkspace() {
         <div className="flex items-center gap-2">
           <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
           <div className="leading-none">
-            <p className="text-[13px] font-bold tracking-tight">verdict</p>
+            <p className="text-[13px] font-bold tracking-tight">Verdict</p>
             <p className="mt-0.5 text-[10px] text-muted-foreground">{t('app.tagline')}</p>
           </div>
         </div>
@@ -710,7 +715,7 @@ export function VerdictWorkspace() {
           ) : null}
         </SectionCard>
 
-        {runId ? (
+        {runId && view === 'pipeline' ? (
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center justify-between gap-1 px-1">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.title')}</span>
@@ -733,7 +738,7 @@ export function VerdictWorkspace() {
           </div>
         ) : null}
 
-        {hasResults ? (
+        {hasResults && view === 'results' ? (
           <div className="h-[min(72vh,780px)] min-h-[540px]">
             <ResultsPanel
               report={live.report}
@@ -777,6 +782,17 @@ export function VerdictWorkspace() {
             onClick={() => setLogOpen((value) => !value)}
           >
             <Terminal className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant={view === 'results' ? 'secondary' : 'outline'}
+            size="icon"
+            aria-label={view === 'pipeline' ? t('run.showResults') : t('run.showPipeline')}
+            title={view === 'pipeline' ? t('run.showResults') : t('run.showPipeline')}
+            disabled={!canToggleView}
+            onClick={() => setView((current) => (current === 'pipeline' ? 'results' : 'pipeline'))}
+          >
+            {view === 'pipeline' ? <BarChart3 className="h-4 w-4" /> : <Network className="h-4 w-4" />}
           </Button>
           <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
             <StatusPill status={status} />

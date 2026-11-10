@@ -20,7 +20,7 @@
     "projectCount_other": "{{count}} 个项目",
     "ruleChars": "{{count}} 个规则字符",
     "manifestLabel": "项目清单",
-    "manifestHint": "JSON 或 YAML。接受数组或 { projects: [] }。名次可选，按赛道计算。",
+    "manifestHint": "JSON 或 YAML。接受数组或 { projects: [] }。名次可选，按赛道计算。使用 tracks: [] 可让项目同时参与多条赛道的排名。",
     "rulesLabel": "评估规则",
     "rulesHint": "Markdown 或 TXT。原文传给每个智能体，作为不可信上下文。",
     "rubricLabel": "评分标准",
@@ -134,6 +134,8 @@
     "refresh": "刷新运行",
     "export": "导出报告",
     "log": "运行日志",
+    "showPipeline": "显示流水线",
+    "showResults": "显示结果",
     "reportReady": "报告已就绪 · {{date}}",
     "failed": "运行失败。"
   },

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   title: 'Verdict · multi-agent project evaluation',
   description:
     'Evidence-grounded scoring of hackathon projects: six evaluators, one cross-review round, two verifiers, per-track ranking.',
-  applicationName: 'verdict',
+  applicationName: 'Verdict',
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [

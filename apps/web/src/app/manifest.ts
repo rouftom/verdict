@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'verdict · multi-agent project evaluation',
-    short_name: 'verdict',
+    name: 'Verdict',
+    short_name: 'Verdict',
     description:
       'Evidence-grounded scoring of hackathon projects: six evaluators, one cross-review round, two verifiers, per-track ranking.',
     start_url: '/',

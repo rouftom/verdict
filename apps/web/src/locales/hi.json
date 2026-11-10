@@ -21,7 +21,7 @@
     "projectCount_other": "{{count}} परियोजनाएँ",
     "ruleChars": "{{count}} नियम अक्षर",
     "manifestLabel": "परियोजना मैनिफ़ेस्ट",
-    "manifestHint": "JSON या YAML. सरणी या { projects: [] } स्वीकार करता है. रैंक वैकल्पिक और प्रति ट्रैक हैं।",
+    "manifestHint": "JSON या YAML. सरणी या { projects: [] } स्वीकार करता है. रैंक वैकल्पिक और प्रति ट्रैक हैं. tracks: [] से परियोजना एक साथ कई ट्रैक में रैंक होती है।",
     "rulesLabel": "मूल्यांकन नियम",
     "rulesHint": "Markdown या TXT. हर एजेंट को अविश्वसनीय संदर्भ के रूप में शब्दशः भेजा जाता है।",
     "rubricLabel": "रूब्रिक",
@@ -140,6 +140,8 @@
     "refresh": "रन रीफ़्रेश करें",
     "export": "रिपोर्ट निर्यात करें",
     "log": "रन लॉग",
+    "showPipeline": "पाइपलाइन दिखाएँ",
+    "showResults": "परिणाम दिखाएँ",
     "reportReady": "रिपोर्ट तैयार · {{date}}",
     "failed": "रन विफल रहा।"
   },

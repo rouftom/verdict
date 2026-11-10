@@ -21,7 +21,7 @@
     "projectCount_other": "{{count}} projets",
     "ruleChars": "{{count}} caractères de règles",
     "manifestLabel": "Manifeste des projets",
-    "manifestHint": "JSON ou YAML. Accepte un tableau ou { projects: [] }. Rangs facultatifs et par piste.",
+    "manifestHint": "JSON ou YAML. Accepte un tableau ou { projects: [] }. Rangs facultatifs et par piste. Utilisez tracks: [] pour classer un projet dans plusieurs pistes à la fois.",
     "rulesLabel": "Règles d'évaluation",
     "rulesHint": "Markdown ou TXT. Transmis mot pour mot à chaque agent, comme contexte non fiable.",
     "rubricLabel": "Rubrique",
@@ -140,6 +140,8 @@
     "refresh": "Rafraîchir l'exécution",
     "export": "Exporter le rapport",
     "log": "Journal d'exécution",
+    "showPipeline": "Afficher le pipeline",
+    "showResults": "Afficher les résultats",
     "reportReady": "rapport prêt · {{date}}",
     "failed": "L'exécution a échoué."
   },
