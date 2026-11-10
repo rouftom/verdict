@@ -134,7 +134,7 @@ export function ResultsPanel({
   const sourceOfRanks = report ? 'final' : 'provisional'
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+    <div className="grid h-full min-h-0 grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
       <Card className="flex min-h-0 flex-col overflow-hidden">
         <CardHeader className="border-b border-border">
           <Trophy className="h-3.5 w-3.5 text-brand-primary" />

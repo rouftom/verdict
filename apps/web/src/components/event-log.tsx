@@ -20,7 +20,7 @@ export function EventLog({ events }: { events: RunEvent[] }) {
   }, [events.length])
 
   return (
-    <Card className="flex min-h-0 flex-col overflow-hidden">
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden">
       <CardHeader className="border-b border-border">
         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
         <CardTitle>Run log</CardTitle>

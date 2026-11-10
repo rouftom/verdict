@@ -228,8 +228,10 @@ the box:
   Technical Depth & Execution 20%, Demo 25%).
 - `apps/web/public/rules/meta-ai-developer-hackathon.md` — example rules
   upload.
-- `apps/web/public/samples/winners.json` — example manifest with per-track
-  ranks.
+
+The example manifest (`winners.json`) is deliberately kept **outside** this
+repository, next to the organiser rubric, so frequent edits to it never cause a
+merge conflict. Load it with *Choose file* when you need it.
 
 The built-in default is the generic neutral rubric. The organiser's exact
 rubric wording is deliberately **not** part of this repository: pass it as a
@@ -243,24 +245,33 @@ original text.
   comparative ranking pass, **after** every criterion score is fixed, as
   context that must not change a score.
 - The report always shows a supplied-rank delta, compared **per track**. Ranks
-  in `winners.json` restart at 1 in each track.
+  supplied in a manifest restart at 1 in each track.
 - Up to three projects can be selected as calibration anchors. Anchors are
   ranked normally, get no bonus, and may come from another track (their
   dossier is passed to the ranking pass as calibration only).
 
 ## Workspace
 
-The single screen has:
+The workspace has:
 
-- an inputs column (manifest, rules, rubric, presets);
-- a live preview (project count, criteria and weights, warnings, anchors);
-- six evaluator slots and two verifier slots;
-- options (ranks, video cap, temperature);
-- a React Flow pipeline graph (harvest → evaluate → review → consensus → rank
-  → verify → report);
+- inputs in **three responsive columns** — project manifest, evaluation rules,
+  rubric — with a live validation strip underneath (project count, criteria and
+  weights, warnings, anchors);
+- **models (3/5) and options (2/5)** side by side on wide screens, stacked on
+  narrow ones; each agent slot carries its own model and reasoning select;
+- a React Flow pipeline where harvest fans out to **one node per evaluator**
+  (six in parallel), converges on cross-review, consensus and ranking, then fans
+  out to **one node per verifier** before the report. Click any agent node for a
+  live synthesis popover: model, effort, project, per-criterion scores,
+  confidence, summary, red flags, revisions and verifier adjustments;
 - a per-track ranking with a project detail table (consensus, spread, final
   scores, evaluator matrix, verifier adjustments, harvest errors);
-- a streaming run log, history drawer, JSON report export.
+- a streaming run log, history drawer, JSON report export;
+- a theme pack, a **border style** option (solid, dashed, dotted) and dark mode
+  in the header.
+
+The Meta fallback catalog always includes `muse-spark-1.3` and
+`muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.
 
 Runs stream over SSE; reloading the page re-subscribes and replays every event.
 A completed report is saved to IndexedDB automatically.
@@ -270,7 +281,7 @@ A completed report is saved to IndexedDB automatically.
 | Route | Purpose |
 | --- | --- |
 | `GET /health` | liveness |
-| `GET /providers` | configured providers, models and the env default evaluator/verifier pool (never a key) |
+| `GET /providers` | configured providers, models, the env default evaluator/verifier pool and the agent personas (never a key) |
 | `POST /parse/manifest` | parse and validate a manifest |
 | `POST /parse/rubric` | parse a rubric |
 | `POST /runs/preview` | dry parse for the upload preview |

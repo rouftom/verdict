@@ -30,8 +30,10 @@ import {
   cn,
 } from '@verdict/ui'
 import { useTheme } from '@/components/theme-provider'
+import { BORDER_STYLES, type BorderStyle } from '@verdict/theme'
 import {
   reasoningEffortsFor,
+  type AgentPool,
   type ModelRef,
   type ProjectConsensus,
   type ProjectEvaluation,
@@ -135,6 +137,7 @@ export function VerdictWorkspace() {
     evaluators: [],
     verifiers: [],
   })
+  const [agents, setAgents] = React.useState<AgentPool>()
   const [providersError, setProvidersError] = React.useState<string | null>(null)
 
   const [manifestText, setManifestText] = React.useState('')
@@ -179,6 +182,7 @@ export function VerdictWorkspace() {
         if (cancelled) return
         setProviders(result.providers)
         setDefaults(result.defaults)
+        setAgents(result.agents)
         setProvidersError(null)
       })
       .catch((error) => {
@@ -461,14 +465,14 @@ export function VerdictWorkspace() {
 
   const configuredCount = providers.filter((provider) => provider.configured).length
   const projects = preview?.projects ?? []
-  const criteria = preview?.rubric.criteria ?? []
+  const criteria = preview?.rubric.criteria ?? live.report?.criteria ?? []
   const toggleAnchor = (id: string) => {
     setAnchors((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : current.length >= 3 ? current : [...current, id]))
   }
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-background">
-      <header className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+    <div className="flex min-h-dvh flex-col bg-background">
+      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-primary text-[13px] font-black text-primary-foreground">
             V
@@ -495,20 +499,37 @@ export function VerdictWorkspace() {
             className="w-[120px]"
             triggerClassName="text-[11px]"
           />
+          <Select
+            value={theme.borderStyle}
+            onValueChange={(value) => theme.setBorderStyle(value as BorderStyle)}
+            options={BORDER_STYLES.map((style) => ({
+              value: style,
+              label: `${style[0]!.toUpperCase()}${style.slice(1)} border`,
+            }))}
+            ariaLabel="Border style"
+            className="w-[118px]"
+            triggerClassName="text-[11px]"
+          />
           <Button type="button" variant="ghost" size="icon-sm" aria-label="Toggle dark mode" onClick={theme.toggleMode}>
             {theme.mode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="custom-scrollbar flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
-          <Card>
-            <CardHeader>
-              <Layers className="h-3.5 w-3.5 text-brand-primary" />
-              <CardTitle>Inputs</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 pt-0">
+      <main className="mx-auto flex w-full max-w-[1800px] flex-col gap-2 p-2">
+        <Card>
+          <CardHeader>
+            <Layers className="h-3.5 w-3.5 text-brand-primary" />
+            <CardTitle>Inputs</CardTitle>
+            <span className="ml-auto flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+              <span>
+                {projects.length} project{projects.length === 1 ? '' : 's'}
+              </span>
+              {preview ? <span>{preview.rulesChars.toLocaleString()} rule chars</span> : null}
+            </span>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 pt-0">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <UploadCard
                 id="manifest"
                 label="Project manifest"
@@ -518,8 +539,7 @@ export function VerdictWorkspace() {
                 text={manifestText}
                 placeholder={'[\n  { "name": "Project", "track": "startup", "github": "https://github.com/owner/repo", "youtube": "https://youtu.be/…" }\n]'}
                 required
-                rows={5}
-                presets={[{ label: 'winners.json', url: '/samples/winners.json' }]}
+                rows={7}
                 onText={(text) => {
                   setManifestText(text)
                   setManifestName(undefined)
@@ -532,7 +552,6 @@ export function VerdictWorkspace() {
                   setManifestText('')
                   setManifestName(undefined)
                 }}
-                onPreset={(preset) => void loadPreset(preset.label, preset.url, 'manifest')}
               />
 
               <UploadCard
@@ -543,7 +562,7 @@ export function VerdictWorkspace() {
                 filename={rulesName}
                 text={rulesText}
                 placeholder="Optional. Eligibility rules, problem statements, disqualifiers…"
-                rows={3}
+                rows={7}
                 presets={[{ label: 'Hackathon rules', url: '/rules/meta-ai-developer-hackathon.md' }]}
                 onText={(text) => {
                   setRulesText(text)
@@ -560,9 +579,11 @@ export function VerdictWorkspace() {
                 onPreset={(preset) => void loadPreset(preset.label, preset.url, 'rules')}
               />
 
-              <div className="flex flex-col gap-1.5">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs font-semibold">Rubric</Label>
+                  <Label htmlFor="rubric" className="text-xs font-semibold">
+                    Rubric
+                  </Label>
                   <Badge tone={rubricMode === 'builtin' ? 'brand' : 'neutral'}>
                     {rubricMode === 'builtin' ? 'built-in neutral' : 'custom'}
                   </Badge>
@@ -581,7 +602,13 @@ export function VerdictWorkspace() {
                   >
                     Built-in
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-6 rounded-full px-2 text-[11px]" onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-6 rounded-full px-2 text-[11px]"
+                    onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}
+                  >
                     Generic YAML
                   </Button>
                 </div>
@@ -593,7 +620,7 @@ export function VerdictWorkspace() {
                   filename={rubricName}
                   text={rubricText}
                   placeholder="Paste a rubric, or choose a preset above."
-                  rows={3}
+                  rows={5}
                   onText={(text) => {
                     setRubricText(text)
                     setRubricName(undefined)
@@ -611,35 +638,24 @@ export function VerdictWorkspace() {
                   }}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CheckCircle2 className={cn('h-3.5 w-3.5', preview ? 'text-emerald-500' : 'text-muted-foreground')} />
-              <CardTitle>Preview</CardTitle>
-              <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
-                {projects.length} project{projects.length === 1 ? '' : 's'}
-              </span>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
               {previewError ? (
-                <p className="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[11px] text-destructive">
+                <p className="flex items-start gap-1.5 text-[11px] text-destructive">
                   <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {previewError}
                 </p>
               ) : null}
               {preview ? (
                 <>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone="success">Rubric · {preview.rubric.name}</Badge>
                     {criteria.map((criterion) => (
                       <Badge key={criterion.id} tone="neutral">
                         {criterion.label} · {Math.round(criterion.weight * 100)}%
                       </Badge>
                     ))}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Rubric: <span className="text-foreground">{preview.rubric.name}</span> · {preview.rulesChars.toLocaleString()} rule chars
-                  </p>
                   {preview.warnings.length > 0 ? (
                     <ul className="list-inside list-disc text-[10px] text-amber-600">
                       {preview.warnings.slice(0, 6).map((warning) => (
@@ -648,58 +664,64 @@ export function VerdictWorkspace() {
                     </ul>
                   ) : null}
                   {projects.length > 0 ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                         Calibration anchors (max 3)
                       </Label>
-                      <div className="flex flex-wrap gap-1">
-                        {projects.map((project) => (
-                          <button
-                            key={project.id}
-                            type="button"
-                            onClick={() => toggleAnchor(project.id)}
-                            className={cn(
-                              'rounded-full border px-2 py-0.5 text-[10px]',
-                              anchors.includes(project.id)
-                                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                                : 'border-border text-muted-foreground hover:bg-muted',
-                            )}
-                          >
-                            {project.name}
-                          </button>
-                        ))}
-                      </div>
+                      {projects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => toggleAnchor(project.id)}
+                          className={cn(
+                            'rounded-full border px-2 py-0.5 text-[10px]',
+                            anchors.includes(project.id)
+                              ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                              : 'border-border text-muted-foreground hover:bg-muted',
+                          )}
+                        >
+                          {project.name}
+                        </button>
+                      ))}
                     </div>
                   ) : null}
                 </>
               ) : !previewError ? (
                 <p className="text-[11px] text-muted-foreground">Upload or paste a manifest to validate it.</p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
+          <Card className="xl:col-span-3">
             <CardHeader>
               <Settings2 className="h-3.5 w-3.5 text-brand-primary" />
               <CardTitle>Models</CardTitle>
+              <span className="ml-auto text-[10px] text-muted-foreground">per-agent model and reasoning effort</span>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
-              <div className="flex items-center justify-between">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">6 evaluators</Label>
-                <span className="text-[10px] text-muted-foreground">each scores all 4 criteria</span>
+            <CardContent className="grid grid-cols-1 gap-3 pt-0 md:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">6 evaluators</Label>
+                  <span className="text-[10px] text-muted-foreground">all 4 criteria</span>
+                </div>
+                <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
               </div>
-              <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
-              <Separator className="my-0.5" />
-              <div className="flex items-center justify-between">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">2 verifiers</Label>
-                <span className="text-[10px] text-muted-foreground">audit + final ranking</span>
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">2 verifiers</Label>
+                  <span className="text-[10px] text-muted-foreground">audit + final ranking</span>
+                </div>
+                <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
               </div>
-              <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
-              {providersError ? <p className="text-[10px] text-destructive">Could not reach the API: {providersError}</p> : null}
+              {providersError ? (
+                <p className="text-[10px] text-destructive md:col-span-2">Could not reach the API: {providersError}</p>
+              ) : null}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="xl:col-span-2">
             <CardHeader>
               <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
               <CardTitle>Options</CardTitle>
@@ -750,50 +772,31 @@ export function VerdictWorkspace() {
               </p>
             </CardContent>
           </Card>
+        </div>
 
-          <div className="sticky bottom-0 flex flex-col gap-1.5 bg-background/95 pb-1 pt-1 backdrop-blur">
-            <div className="flex gap-2">
-              {running ? (
-                <Button type="button" variant="destructive" className="flex-1" onClick={() => void stopRun()}>
-                  <Square className="h-4 w-4" /> Cancel run
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="flex-1"
-                  disabled={!manifestText.trim() || evaluatorModels.length === 0 || verifierModels.length === 0 || starting}
-                  onClick={() => void startRun()}
-                >
-                  <Play className="h-4 w-4" /> {starting ? 'Starting…' : 'Evaluate projects'}
-                </Button>
-              )}
-              <Button type="button" variant="outline" size="icon" aria-label="Refresh run" disabled={!runId} onClick={() => runId && void refreshRun(runId)}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" size="icon" aria-label="Export report" disabled={!live.report} onClick={exportReport}>
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusPill status={status} />
-              {runError ? <span className="min-w-0 truncate text-[10px] text-destructive">{runError}</span> : null}
-              {!runError && live.report ? (
-                <span className="text-[10px] text-muted-foreground">report ready · {formatDate(live.report.createdAt)}</span>
-              ) : null}
-            </div>
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-1 px-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pipeline</span>
+            <span className="text-[10px] text-muted-foreground">click an evaluator or verifier node for its live synthesis</span>
           </div>
-        </aside>
-
-        <section className="flex min-h-0 flex-col gap-2">
           <PipelineGraph
             status={status}
-            evaluations={live.evaluations.length}
-            revisions={live.revisions.length}
-            verifications={live.verifications.length}
+            evaluations={live.evaluations}
+            revisions={live.revisions}
+            verifications={live.verifications}
+            agents={agents}
+            evaluatorModels={evaluatorModels}
+            verifierModels={verifierModels}
+            criteria={criteria}
+            projects={projects}
+            selectedProjectId={selectedId}
             hasReport={Boolean(live.report)}
             failed={status === 'failed'}
           />
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="h-[min(72vh,780px)] min-h-[540px]">
             <ResultsPanel
               report={live.report}
               rubric={preview?.rubric}
@@ -804,9 +807,40 @@ export function VerdictWorkspace() {
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
+          </div>
+          <div className="h-[min(72vh,780px)] min-h-[540px]">
             <EventLog events={events} />
           </div>
-        </section>
+        </div>
+
+        <div className="sticky bottom-0 z-20 -mx-2 mt-1 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
+          {running ? (
+            <Button type="button" variant="destructive" onClick={() => void stopRun()}>
+              <Square className="h-4 w-4" /> Cancel run
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={!manifestText.trim() || evaluatorModels.length === 0 || verifierModels.length === 0 || starting}
+              onClick={() => void startRun()}
+            >
+              <Play className="h-4 w-4" /> {starting ? 'Starting…' : 'Evaluate projects'}
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="icon" aria-label="Refresh run" disabled={!runId} onClick={() => runId && void refreshRun(runId)}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="outline" size="icon" aria-label="Export report" disabled={!live.report} onClick={exportReport}>
+            <Download className="h-4 w-4" />
+          </Button>
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
+            <StatusPill status={status} />
+            {runError ? <span className="min-w-0 truncate text-[10px] text-destructive">{runError}</span> : null}
+            {!runError && live.report ? (
+              <span className="text-[10px] text-muted-foreground">report ready · {formatDate(live.report.createdAt)}</span>
+            ) : null}
+          </div>
+        </div>
       </main>
 
       {historyOpen ? (
