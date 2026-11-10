@@ -29,6 +29,8 @@
     "genericYaml": "通用 YAML",
     "rubricBadge": "评分标准 · {{name}}",
     "anchors": "校准锚点（最多 3 个）",
+    "anchorFilter": "筛选锚点",
+    "anchorNoMatch": "没有匹配的项目。",
     "chooseManifest": "选择清单文件以进行校验。",
     "presetError": "预设 {{label}} 返回了 {{status}}。"
   },
@@ -150,6 +152,8 @@
   },
   "results": {
     "ranking": "排名",
+    "track": "赛道",
+    "allTracks": "全部赛道",
     "final": "最终",
     "provisional": "暂定",
     "uploadManifest": "上传清单以在此查看项目。",

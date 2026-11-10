@@ -30,6 +30,8 @@
     "genericYaml": "Generic YAML",
     "rubricBadge": "Rubric · {{name}}",
     "anchors": "Calibration anchors (max 3)",
+    "anchorFilter": "Filter anchors",
+    "anchorNoMatch": "No matching project.",
     "chooseManifest": "Choose a manifest file to validate it.",
     "presetError": "Preset {{label}} returned {{status}}."
   },
@@ -157,6 +159,8 @@
   },
   "results": {
     "ranking": "Ranking",
+    "track": "Track",
+    "allTracks": "All tracks",
     "final": "final",
     "provisional": "provisional",
     "uploadManifest": "Upload a manifest to see projects here.",

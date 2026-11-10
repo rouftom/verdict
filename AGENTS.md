@@ -151,6 +151,13 @@ rewrites its generated file, leave it alone.
   pipeline view and the results view, so only one is on screen at a time.
 - Large lists stay virtualised: `react-virtuoso` for the run log and ranking,
   `onlyRenderVisibleElements` for React Flow.
+- Calibration anchors cap at three and show the `n/3` count. Long names are
+  truncated in the chip, the chip list scrolls instead of pushing the section
+  taller, and above three projects a small case-insensitive field filters the
+  chips by name.
+- Results carry a track selector when a ranking spans several tracks. It is
+  view state only: never re-rank or call the API, and when the current project
+  is outside the chosen track fall back to that track's first entry.
 - All six evaluators score all four criteria. The model pool is cycled across
   the fixed roles.
 

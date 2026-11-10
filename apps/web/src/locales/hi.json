@@ -30,6 +30,8 @@
     "genericYaml": "सामान्य YAML",
     "rubricBadge": "रूब्रिक · {{name}}",
     "anchors": "कैलिब्रेशन एंकर (अधिकतम 3)",
+    "anchorFilter": "एंकर फ़िल्टर करें",
+    "anchorNoMatch": "कोई मिलान करने वाली परियोजना नहीं.",
     "chooseManifest": "मान्य करने के लिए मैनिफ़ेस्ट फ़ाइल चुनें।",
     "presetError": "प्रीसेट {{label}} ने {{status}} लौटाया।"
   },
@@ -157,6 +159,8 @@
   },
   "results": {
     "ranking": "रैंकिंग",
+    "track": "ट्रैक",
+    "allTracks": "सभी ट्रैक",
     "final": "अंतिम",
     "provisional": "अनंतिम",
     "uploadManifest": "यहाँ परियोजनाएँ देखने के लिए मैनिफ़ेस्ट अपलोड करें।",
