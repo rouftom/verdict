@@ -37,18 +37,16 @@ and no transcription.
 ### Installing yt-dlp
 
 The Python zipapp (the file named `yt-dlp` in the release assets) imports
-`zlib` through Python's `zipimport`. Minimal Python installs — including some
-container images — ship without it, and then `yt-dlp --version` fails with
-`ModuleNotFoundError: No module named 'zlib'`.
-
-Either install zlib for the Python runtime:
+`zlib` through Python's `zipimport`. Check the interpreter that `PATH` resolves:
 
 ```bash
-# Debian / Ubuntu
-sudo apt-get install -y zlib1g zlib1g-dev
+python3 -c "import zlib; print(zlib.ZLIB_VERSION)"
 ```
 
-or use the self-contained Linux build, which embeds its own runtime:
+If that fails while the system interpreter has it — for example `python3` is a
+`/usr/local/bin/python3` built without zlib, but `/usr/bin/python3` works — run
+the zipapp with the working interpreter, install zlib for the former, or use the
+self-contained Linux build, which embeds its own runtime:
 
 ```bash
 mkdir -p ~/.local/bin
@@ -57,6 +55,13 @@ curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linu
 chmod +x ~/.local/bin/yt-dlp
 export PATH="$HOME/.local/bin:$PATH"   # or set YTDLP_PATH
 yt-dlp --version
+```
+
+On a Debian/Ubuntu host the zlib runtime is `zlib1g` (and `zlib1g-dev` only if
+you build Python yourself):
+
+```bash
+sudo apt-get install -y zlib1g zlib1g-dev
 ```
 
 `YTDLP_IMPERSONATE` only accepts a target listed by
@@ -134,7 +139,7 @@ OPENAI_MODELS=
 ANTHROPIC_MODELS=
 GOOGLE_MODELS=
 XAI_MODELS=
-RUNWARE_MODELS=
+RUNWARE_MODELS=           # AIR ids, e.g. google:gemini@4-argon,deepseek:v4.1@flash-1017
 GROQ_MODELS=
 DEEPSEEK_MODELS=
 NEBIUS_MODELS=
@@ -144,6 +149,15 @@ OLLAMA_MODELS=
 # agent defaults (comma list of provider:model); empty = cycle every configured model
 EVAL_MODELS=
 VERIFIER_MODELS=
+
+# reasoning effort per provider (none|minimal|low|medium|high|xhigh|max, or a token budget)
+REASONING_EFFORT=
+REASONING_EFFORT_ANTHROPIC=   # maps to Anthropic `effort` or a thinking budget
+REASONING_EFFORT_GOOGLE=      # maps to `thinkingLevel` or `thinkingBudget`
+REASONING_EFFORT_OPENAI=      # maps to `reasoningEffort`
+REASONING_EFFORT_GROQ=
+REASONING_EFFORT_NVIDIA=
+REASONING_EFFORT_RUNWARE=
 
 # transcription: any OpenAI-compatible /audio/transcriptions endpoint
 TRANSCRIPTION_BASE_URL=
@@ -167,6 +181,22 @@ A provider appears in the model pickers only when its key is configured. The
 UI always offers six evaluator slots and two verifier slots; the same model can
 fill several slots (useful for a single-provider demo), but diversity is
 recommended.
+
+### Reasoning effort
+
+`REASONING_EFFORT_<PROVIDER>` (or the global `REASONING_EFFORT`) is translated
+to each provider's own knob:
+
+| Provider | Mapping |
+| --- | --- |
+| Anthropic | `low…max` → `effort`; `none`/`minimal` → thinking disabled; a number → `thinking.budgetTokens` |
+| Google | `minimal…high` → `thinkingLevel`; `none` → budget 0; `xhigh`/`max` → `high`; a number → `thinkingBudget` |
+| OpenAI | `reasoningEffort` |
+| xAI | `reasoningEffort` (`minimal`→`low`, `max`→`xhigh`) |
+| OpenAI-compatible: Meta, Groq, DeepSeek, Nebius, NVIDIA, Runware, Ollama | `reasoning_effort` |
+
+Leave it empty to send nothing. An unrecognised value is ignored, never
+forwarded to an API that would reject it.
 
 ## Inputs
 

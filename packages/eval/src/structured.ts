@@ -1,5 +1,6 @@
 import { generateObject, generateText, type LanguageModel, type ModelMessage } from 'ai'
 import type { z } from 'zod'
+import { reasoningProviderOptions, supportsTemperature } from '@verdict/providers'
 import type { ModelRef } from '@verdict/shared'
 
 export interface UsageTotals {
@@ -20,7 +21,8 @@ export interface StructuredOptions<T> {
   schema: z.ZodType<T>
   system: string
   prompt: string
-  temperature: number
+  /** Omit to use the provider default (some Claude 5.5 models reject it). */
+  temperature?: number
   maxOutputTokens?: number
   /** Public video URL, passed natively only to providers that accept it. */
   videoUrl?: string
@@ -47,8 +49,10 @@ function extractJson(text: string): string {
  * do not implement tool/JSON mode; the fallback keeps the pipeline usable.
  */
 export async function generateStructured<T>(options: StructuredOptions<T>): Promise<StructuredResult<T>> {
-  const { model, schema, system, prompt, temperature, maxOutputTokens = 4096, videoUrl } = options
+  const { model, schema, system, prompt, maxOutputTokens = 4096, videoUrl } = options
   const nativeVideo = Boolean(videoUrl) && options.modelRef.provider === 'google'
+  const providerOptions = reasoningProviderOptions(options.modelRef.provider)
+  const temperature = supportsTemperature(options.modelRef) ? options.temperature : undefined
 
   const messages: ModelMessage[] | undefined = nativeVideo
     ? [
@@ -68,7 +72,8 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
       schema,
       system,
       ...(messages ? { messages } : { prompt }),
-      temperature,
+      ...(temperature !== undefined ? { temperature } : {}),
+      ...(providerOptions ? { providerOptions } : {}),
       maxOutputTokens,
       maxRetries: 1,
     })
@@ -78,7 +83,8 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
       model,
       system: `${system}\n\nReturn only one JSON object that matches this contract. No markdown, no prose:\n${options.jsonContract ?? JSON.stringify(schemaShape(schema))}`,
       ...(messages ? { messages } : { prompt }),
-      temperature,
+      ...(temperature !== undefined ? { temperature } : {}),
+      ...(providerOptions ? { providerOptions } : {}),
       maxOutputTokens,
       maxRetries: 1,
     })

@@ -140,13 +140,17 @@ export function listProviders(): ProviderInfo[] {
       id: 'anthropic',
       label: DESCRIPTIONS.anthropic,
       configured: Boolean(anthropicKey),
-      models: parseModels(env('ANTHROPIC_MODELS'), 'anthropic', ['claude-sonnet-4-5', 'claude-opus-4-1']),
+      models: parseModels(env('ANTHROPIC_MODELS'), 'anthropic', ['claude-sonnet-5-5', 'claude-opus-5-5']),
     },
     {
       id: 'google',
       label: DESCRIPTIONS.google,
       configured: Boolean(googleKey),
-      models: parseModels(env('GOOGLE_MODELS'), 'google', ['gemini-3.1-pro-preview', 'gemini-2.5-flash']),
+      models: parseModels(env('GOOGLE_MODELS'), 'google', [
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-3.1-pro-preview',
+      ]),
     },
     {
       id: 'xai',
@@ -160,7 +164,14 @@ export function listProviders(): ProviderInfo[] {
       label: DESCRIPTIONS.runware,
       configured: Boolean(runwareKey),
       baseURL: withV1(env('RUNWARE_BASE_URL') || 'https://api.runware.ai/v1'),
-      models: parseModels(env('RUNWARE_MODELS'), 'runware', []),
+      models: parseModels(env('RUNWARE_MODELS'), 'runware', [
+        'google:gemini@4-argon',
+        'deepseek:v4.1@flash-1017',
+        'xai:grok@4.7',
+        'moonshotai:kimi@k3.1-pro',
+        'zai:glm@5.3',
+        'minimax:m3.1@flash',
+      ]),
     },
     {
       id: 'groq',
