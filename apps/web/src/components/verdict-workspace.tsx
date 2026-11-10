@@ -30,17 +30,18 @@ import {
   cn,
 } from '@verdict/ui'
 import { useTheme } from '@/components/theme-provider'
-import type {
-  ModelRef,
-  ProjectConsensus,
-  ProjectEvaluation,
-  ProjectRevision,
-  ProjectVerification,
-  ProviderInfo,
-  Report,
-  RunEvent,
-  RunSnapshot,
-  RunStatus,
+import {
+  reasoningEffortsFor,
+  type ModelRef,
+  type ProjectConsensus,
+  type ProjectEvaluation,
+  type ProjectRevision,
+  type ProjectVerification,
+  type ProviderInfo,
+  type Report,
+  type RunEvent,
+  type RunSnapshot,
+  type RunStatus,
 } from '@verdict/shared'
 import {
   createRun,
@@ -88,7 +89,31 @@ function flatModels(providers: ProviderInfo[]): ModelRef[] {
 
 function fillModels(pool: ModelRef[], size: number): ModelRef[] {
   if (pool.length === 0) return []
-  return Array.from({ length: size }, (_, index) => pool[index % pool.length]!)
+  return Array.from({ length: size }, (_, index) => ({ ...pool[index % pool.length]! }))
+}
+
+/** Keep saved refs that still exist in the configured catalog; drop the rest. */
+function sanitizeModels(models: ModelRef[], providers: ProviderInfo[]): ModelRef[] {
+  const catalog = new Map(
+    providers
+      .filter((provider) => provider.configured)
+      .map((provider) => [provider.id, new Set(provider.models.map((model) => model.id))] as const),
+  )
+  return models
+    .filter((ref) => catalog.get(ref.provider)?.has(ref.model) ?? false)
+    .map((ref) => {
+      if (ref.reasoningEffort && !reasoningEffortsFor(ref.provider, ref.model).includes(ref.reasoningEffort)) {
+        return { provider: ref.provider, model: ref.model }
+      }
+      return { ...ref }
+    })
+}
+
+/** Drop pool entries whose provider has no key, so a stale env never seeds a dead slot. */
+function usablePool(pool: ModelRef[], providers: ProviderInfo[]): ModelRef[] {
+  const configured = new Set(providers.filter((provider) => provider.configured).map((provider) => provider.id))
+  const filtered = pool.filter((ref) => configured.has(ref.provider))
+  return filtered.length > 0 ? filtered : flatModels(providers)
 }
 
 function upsert<T>(items: T[], next: T, key: (entry: T) => string): T[] {
@@ -106,6 +131,10 @@ function messageOf(error: unknown): string {
 export function VerdictWorkspace() {
   const theme = useTheme()
   const [providers, setProviders] = React.useState<ProviderInfo[]>([])
+  const [defaults, setDefaults] = React.useState<{ evaluators: ModelRef[]; verifiers: ModelRef[] }>({
+    evaluators: [],
+    verifiers: [],
+  })
   const [providersError, setProvidersError] = React.useState<string | null>(null)
 
   const [manifestText, setManifestText] = React.useState('')
@@ -149,6 +178,7 @@ export function VerdictWorkspace() {
       .then((result) => {
         if (cancelled) return
         setProviders(result.providers)
+        setDefaults(result.defaults)
         setProvidersError(null)
       })
       .catch((error) => {
@@ -166,16 +196,19 @@ export function VerdictWorkspace() {
     void (async () => {
       const saved = await loadSettings<WorkspaceSettings>()
       if (cancelled) return
-      const pool = flatModels(providers)
+      const evalPool = usablePool(defaults.evaluators, providers)
+      const verifierPool = usablePool(defaults.verifiers, providers)
       if (saved) {
-        setEvaluatorModels(saved.evaluatorModels.length > 0 ? saved.evaluatorModels : fillModels(pool, 6))
-        setVerifierModels(saved.verifierModels.length > 0 ? saved.verifierModels : fillModels(pool, 2))
+        const savedEvaluators = sanitizeModels(saved.evaluatorModels, providers)
+        const savedVerifiers = sanitizeModels(saved.verifierModels, providers)
+        setEvaluatorModels(savedEvaluators.length > 0 ? savedEvaluators : fillModels(evalPool, 6))
+        setVerifierModels(savedVerifiers.length > 0 ? savedVerifiers : fillModels(verifierPool, 2))
         setShowRanks(saved.showRanks)
         setMaxVideoMinutes(saved.maxVideoMinutes)
         setTemperature(saved.temperature)
       } else {
-        setEvaluatorModels(fillModels(pool, 6))
-        setVerifierModels(fillModels(pool, 2))
+        setEvaluatorModels(fillModels(evalPool, 6))
+        setVerifierModels(fillModels(verifierPool, 2))
       }
       setRestored(true)
       setHistory(await listRuns())
@@ -183,7 +216,7 @@ export function VerdictWorkspace() {
     return () => {
       cancelled = true
     }
-  }, [providers, restored])
+  }, [providers, defaults, restored])
 
   // Persist configuration (best effort, localStorage-free).
   React.useEffect(() => {

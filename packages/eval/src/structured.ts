@@ -51,7 +51,11 @@ function extractJson(text: string): string {
 export async function generateStructured<T>(options: StructuredOptions<T>): Promise<StructuredResult<T>> {
   const { model, schema, system, prompt, maxOutputTokens = 4096, videoUrl } = options
   const nativeVideo = Boolean(videoUrl) && options.modelRef.provider === 'google'
-  const providerOptions = reasoningProviderOptions(options.modelRef.provider)
+  const providerOptions = reasoningProviderOptions(
+    options.modelRef.provider,
+    options.modelRef.reasoningEffort,
+    options.modelRef.model,
+  )
   const temperature = supportsTemperature(options.modelRef) ? options.temperature : undefined
 
   const messages: ModelMessage[] | undefined = nativeVideo

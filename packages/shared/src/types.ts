@@ -36,9 +36,21 @@ export interface ProviderInfo {
   models: ModelOption[]
 }
 
+/**
+ * Provider-neutral reasoning effort. Each provider maps it to its own knob:
+ * Anthropic `effort`/thinking budget, Google `thinkingLevel`/`thinkingBudget`,
+ * OpenAI, xAI and OpenAI-compatible gateways `reasoning_effort`.
+ */
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
 export interface ModelRef {
   provider: ProviderId
   model: string
+  /**
+   * Per-agent override. Left unset, the provider falls back to
+   * `REASONING_EFFORT_<PROVIDER>` then `REASONING_EFFORT`.
+   */
+  reasoningEffort?: ReasoningEffort
 }
 
 /** A project as read from the uploaded manifest. */

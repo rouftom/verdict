@@ -1,21 +1,13 @@
-import type { ProviderId } from '@verdict/shared'
+import {
+  REASONING_EFFORTS,
+  REASONING_EFFORT_LABELS,
+  clampReasoningEffort,
+  type ProviderId,
+  type ReasoningEffort,
+} from '@verdict/shared'
 
-/**
- * Provider-neutral reasoning effort. Each provider maps it to its own knob:
- * Anthropic `effort` (or a thinking budget), Google `thinkingLevel`, OpenAI and
- * OpenAI-compatible gateways `reasoning_effort`.
- */
-export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
-
-export const REASONING_EFFORTS: ReasoningEffort[] = [
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-]
+export type { ReasoningEffort }
+export { REASONING_EFFORTS, REASONING_EFFORT_LABELS }
 
 /** Shape accepted by the AI SDK `providerOptions` field. */
 type ReasoningValue = string | number | boolean | ReasoningValue[] | { [key: string]: ReasoningValue }
@@ -39,8 +31,9 @@ function env(name: string): string {
   return (process.env[name] ?? '').trim()
 }
 
-/** `REASONING_EFFORT_<PROVIDER>` wins; `REASONING_EFFORT` is the fallback. */
-export function reasoningEffortFor(provider: ProviderId): string {
+/** A per-agent override wins; then `REASONING_EFFORT_<PROVIDER>`; then the global fallback. */
+export function reasoningEffortFor(provider: ProviderId, override?: ReasoningEffort): string {
+  if (override) return override
   return env(`REASONING_EFFORT_${PROVIDER_NAMES[provider]}`) || env('REASONING_EFFORT')
 }
 
@@ -55,11 +48,16 @@ function asBudget(value: string): number | undefined {
 }
 
 /**
- * Translate the configured effort into the provider's own options. Unknown
- * values are ignored rather than sent to an API that would reject them.
+ * Translate a configured effort into the provider's own options. Values the
+ * provider does not accept are clamped to the nearest supported level instead
+ * of being forwarded and rejected.
  */
-export function reasoningProviderOptions(provider: ProviderId): ReasoningProviderOptions | undefined {
-  const raw = reasoningEffortFor(provider)
+export function reasoningProviderOptions(
+  provider: ProviderId,
+  override?: ReasoningEffort,
+  model?: string,
+): ReasoningProviderOptions | undefined {
+  const raw = reasoningEffortFor(provider, override)
   if (!raw) return undefined
   const value = raw.toLowerCase()
 
@@ -68,36 +66,30 @@ export function reasoningProviderOptions(provider: ProviderId): ReasoningProvide
     if (budget) return { anthropic: { thinking: { type: 'enabled', budgetTokens: budget } } }
     if (value === 'none' || value === 'minimal') return { anthropic: { thinking: { type: 'disabled' } } }
     const effort = asEffort(value)
-    if (!effort) return undefined
-    return { anthropic: { effort } }
+    const clamped = effort ? clampReasoningEffort(provider, effort, model) : undefined
+    return clamped ? { anthropic: { effort: clamped } } : undefined
   }
 
   if (provider === 'google') {
     const budget = asBudget(value)
     if (budget) return { google: { thinkingConfig: { thinkingBudget: budget } } }
     if (value === 'none') return { google: { thinkingConfig: { thinkingBudget: 0 } } }
-    if (value === 'xhigh' || value === 'max') return { google: { thinkingConfig: { thinkingLevel: 'high' } } }
     const effort = asEffort(value)
-    if (!effort || effort === 'xhigh' || effort === 'max') return undefined
-    return { google: { thinkingConfig: { thinkingLevel: effort } } }
+    const clamped = effort ? clampReasoningEffort(provider, effort, model) : undefined
+    return clamped ? { google: { thinkingConfig: { thinkingLevel: clamped } } } : undefined
   }
 
-  if (provider === 'xai') {
-    const effort = asEffort(value)
-    if (!effort) return undefined
-    const mapped = effort === 'minimal' ? 'low' : effort === 'max' ? 'xhigh' : effort
-    return { xai: { reasoningEffort: mapped } }
-  }
+  const effort = asEffort(value)
+  if (!effort) return undefined
+  const clamped = clampReasoningEffort(provider, effort, model)
+  if (!clamped) return undefined
 
-  if (provider === 'openai') {
-    const effort = asEffort(value)
-    return effort ? { openai: { reasoningEffort: effort } } : undefined
-  }
+  if (provider === 'xai') return { xai: { reasoningEffort: clamped } }
+  if (provider === 'openai') return { openai: { reasoningEffort: clamped } }
 
   // OpenAI-compatible gateways (Meta, Groq, DeepSeek, Nebius, NVIDIA, Runware,
   // Ollama) all forward `reasoning_effort` under their provider name.
-  const effort = asEffort(value)
-  return effort ? { [provider]: { reasoningEffort: effort } } : undefined
+  return { [provider]: { reasoningEffort: clamped } }
 }
 
 /**

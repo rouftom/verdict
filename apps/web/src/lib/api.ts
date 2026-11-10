@@ -58,7 +58,15 @@ export interface RunSummary {
   error?: string
 }
 
-export function fetchProviders(): Promise<{ providers: ProviderInfo[] }> {
+export interface ProviderResponse {
+  providers: ProviderInfo[]
+  defaults: {
+    evaluators: ModelRef[]
+    verifiers: ModelRef[]
+  }
+}
+
+export function fetchProviders(): Promise<ProviderResponse> {
   return request('/providers')
 }
 

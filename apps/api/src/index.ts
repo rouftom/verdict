@@ -1,7 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { z } from 'zod'
-import { listProviders } from '@verdict/providers'
+import { listProviders, modelPool } from '@verdict/providers'
 import {
   parseManifestText,
   parseRubricText,
@@ -28,7 +28,14 @@ app.get('/health', async () => ({
   runs: listRuns().length,
 }))
 
-app.get('/providers', async () => ({ providers: listProviders() }))
+app.get('/providers', async () => ({
+  providers: listProviders(),
+  /** The env-configured starting pool; the UI uses it for a fresh workspace. */
+  defaults: {
+    evaluators: modelPool('EVAL_MODELS', 6),
+    verifiers: modelPool('VERIFIER_MODELS', 2),
+  },
+}))
 
 app.post('/parse/manifest', async (request, reply) => {
   const schema = z.object({ text: z.string().min(1) })
