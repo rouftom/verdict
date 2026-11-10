@@ -131,12 +131,15 @@
     "done": "terminé",
     "failed": "échec",
     "cancelled": "annulé",
+    "paused": "en pause",
     "escalated": "escaladé"
   },
   "run": {
     "evaluate": "Évaluer",
     "starting": "Démarrage…",
     "cancel": "Annuler l'exécution",
+    "pause": "Mettre en pause",
+    "resume": "Reprendre l'exécution",
     "refresh": "Rafraîchir l'exécution",
     "export": "Exporter le rapport",
     "log": "Journal d'exécution",
@@ -197,6 +200,7 @@
     "close": "Fermer le journal",
     "reduce": "Réduire le journal",
     "expand": "Développer le journal",
+    "jump": "Aller au dernier événement",
     "dockBottom": "Ancrer le journal en bas",
     "dockTop": "Ancrer le journal en haut",
     "dockLeft": "Ancrer le journal à gauche",

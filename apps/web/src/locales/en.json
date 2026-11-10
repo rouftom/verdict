@@ -131,12 +131,15 @@
     "done": "done",
     "failed": "failed",
     "cancelled": "cancelled",
+    "paused": "paused",
     "escalated": "escalated"
   },
   "run": {
     "evaluate": "Evaluate",
     "starting": "Starting…",
     "cancel": "Cancel run",
+    "pause": "Pause run",
+    "resume": "Resume run",
     "refresh": "Refresh run",
     "export": "Export report",
     "log": "Run log",
@@ -197,6 +200,7 @@
     "close": "Close run log",
     "reduce": "Reduce run log",
     "expand": "Expand run log",
+    "jump": "Jump to the latest event",
     "dockBottom": "Dock run log at the bottom",
     "dockTop": "Dock run log at the top",
     "dockLeft": "Dock run log on the left",

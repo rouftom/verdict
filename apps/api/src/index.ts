@@ -10,7 +10,7 @@ import {
   type RunEvent,
 } from '@verdict/shared'
 import { config } from './config'
-import { cancelRun, createRun, getRun, listRuns, parseInputs, subscribe } from './state'
+import { cancelRun, createRun, getRun, listRuns, parseInputs, pauseRun, resumeRun, subscribe } from './state'
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -222,6 +222,22 @@ app.post<{ Params: { id: string } }>('/runs/:id/cancel', async (request, reply) 
   if (!run) return reply.code(404).send({ error: 'Run not found.' })
   const cancelled = cancelRun(run.id)
   return { cancelled, status: run.status }
+})
+
+app.post<{ Params: { id: string } }>('/runs/:id/pause', async (request, reply) => {
+  const run = getRun(request.params.id)
+  if (!run) return reply.code(404).send({ error: 'Run not found.' })
+  const result = pauseRun(run.id)
+  if (!result) return reply.code(409).send({ error: 'Run is not active.' })
+  return { paused: result.paused, status: run.status }
+})
+
+app.post<{ Params: { id: string } }>('/runs/:id/resume', async (request, reply) => {
+  const run = getRun(request.params.id)
+  if (!run) return reply.code(404).send({ error: 'Run not found.' })
+  const result = resumeRun(run.id)
+  if (!result) return reply.code(409).send({ error: 'Run is not active.' })
+  return { paused: result.paused, status: run.status }
 })
 
 app.setErrorHandler((error, _request, reply) => {

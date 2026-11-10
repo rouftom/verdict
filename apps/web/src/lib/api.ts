@@ -101,6 +101,14 @@ export function cancelRun(id: string): Promise<{ cancelled: boolean; status: str
   return request(`/runs/${id}/cancel`, { method: 'POST', body: '{}' })
 }
 
+export function pauseRun(id: string): Promise<{ paused: boolean; status: string }> {
+  return request(`/runs/${id}/pause`, { method: 'POST', body: '{}' })
+}
+
+export function resumeRun(id: string): Promise<{ paused: boolean; status: string }> {
+  return request(`/runs/${id}/resume`, { method: 'POST', body: '{}' })
+}
+
 /** Subscribe to a run's SSE stream. Returns a disposer. */
 export function subscribeRun(id: string, onEvent: (event: RunEvent) => void, onError?: () => void): () => void {
   if (typeof window === 'undefined') return () => {}

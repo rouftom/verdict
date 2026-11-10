@@ -126,12 +126,15 @@
     "done": "已完成",
     "failed": "失败",
     "cancelled": "已取消",
+    "paused": "已暂停",
     "escalated": "已升级"
   },
   "run": {
     "evaluate": "评估",
     "starting": "正在启动…",
     "cancel": "取消运行",
+    "pause": "暂停运行",
+    "resume": "继续运行",
     "refresh": "刷新运行",
     "export": "导出报告",
     "log": "运行日志",
@@ -187,6 +190,7 @@
     "close": "关闭运行日志",
     "reduce": "缩小运行日志",
     "expand": "展开运行日志",
+    "jump": "跳到最新事件",
     "dockBottom": "将运行日志停靠到底部",
     "dockTop": "将运行日志停靠到顶部",
     "dockLeft": "将运行日志停靠到左侧",

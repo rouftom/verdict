@@ -19,6 +19,7 @@ import {
   Circle,
   Flag,
   Loader2,
+  Pause,
   ShieldCheck,
   UserRound,
   XCircle,
@@ -649,20 +650,24 @@ export function PipelineGraph({
   )
 }
 
-export function StatusPill({ status, error }: { status?: RunStatus; error?: string }) {
+export function StatusPill({ status, error, paused }: { status?: RunStatus; error?: string; paused?: boolean }) {
   const { t } = useTranslation()
   const tone =
-    status === 'done'
-      ? 'success'
-      : status === 'failed' || status === 'cancelled'
-        ? 'danger'
-        : status
-          ? 'brand'
-          : 'neutral'
-  const key = error ? 'failed' : (status ?? 'idle')
+    paused
+      ? 'neutral'
+      : status === 'done'
+        ? 'success'
+        : status === 'failed' || status === 'cancelled'
+          ? 'danger'
+          : status
+            ? 'brand'
+            : 'neutral'
+  const key = error ? 'failed' : paused ? 'paused' : (status ?? 'idle')
   return (
     <Badge tone={tone as 'success' | 'danger' | 'brand' | 'neutral'} className="capitalize">
-      {status && !['done', 'failed', 'cancelled', 'queued'].includes(status) ? (
+      {paused ? (
+        <Pause className="h-3 w-3" />
+      ) : status && !['done', 'failed', 'cancelled', 'queued'].includes(status) ? (
         <Loader2 className="h-3 w-3 animate-spin" />
       ) : null}
       {t(`status.${key}`, { defaultValue: key })}

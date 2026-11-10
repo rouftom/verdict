@@ -39,6 +39,47 @@ const runs = new Map<string, RunSnapshot>()
 const subscribers = new Map<string, Set<(event: RunEvent) => void>>()
 const controllers = new Map<string, AbortController>()
 
+/**
+ * A pause gate sits between two pipeline steps. Pausing lets the calls already
+ * in flight finish, then holds every worker on `wait()` until the user resumes
+ * or cancels (cancelling releases the waiters through the abort signal).
+ */
+interface RunGate {
+  paused: boolean
+  wait: (signal?: AbortSignal) => Promise<void>
+  pause: () => void
+  resume: () => void
+}
+
+const gates = new Map<string, RunGate>()
+
+function createGate(): RunGate {
+  const waiters = new Set<() => void>()
+  const gate: RunGate = {
+    paused: false,
+    wait(signal) {
+      if (!gate.paused || signal?.aborted) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        const release = () => {
+          signal?.removeEventListener('abort', release)
+          waiters.delete(release)
+          resolve()
+        }
+        waiters.add(release)
+        signal?.addEventListener('abort', release, { once: true })
+      })
+    },
+    pause() {
+      gate.paused = true
+    },
+    resume() {
+      gate.paused = false
+      for (const release of [...waiters]) release()
+    },
+  }
+  return gate
+}
+
 export function parseInputs(input: CreateRunInput): ParsedInputs {
   const manifest = parseManifestText(input.manifestText)
   const rubric = parseRubricText(input.rubricText ?? '', input.rubricFilename)
@@ -122,6 +163,8 @@ function upsert<T extends { projectId: string }>(items: T[], next: T): void {
 async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verifierModels: ModelRef[]): Promise<void> {
   const controller = new AbortController()
   controllers.set(snapshot.id, controller)
+  const gate = createGate()
+  gates.set(snapshot.id, gate)
   snapshot.status = 'harvesting'
   try {
     const result = await runEvaluation({
@@ -134,6 +177,7 @@ async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verif
       verifierModels,
       signal: controller.signal,
       warnings: snapshot.warnings,
+      waitForResume: (signal) => gate.wait(signal),
       onEvent: (event) => {
         // Once the run is aborted, late events from an in-flight model call must
         // not flip the status back to an active stage.
@@ -178,6 +222,7 @@ async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verif
     pushEvent(snapshot, { type: 'error', runId: snapshot.id, at: snapshot.updatedAt, message })
   } finally {
     controllers.delete(snapshot.id)
+    gates.delete(snapshot.id)
     subscribers.delete(snapshot.id)
   }
 }
@@ -196,10 +241,40 @@ export function cancelRun(id: string): boolean {
   const snapshot = runs.get(id)
   if (snapshot) {
     snapshot.status = 'cancelled'
+    snapshot.paused = false
     snapshot.updatedAt = new Date().toISOString()
   }
+  gates.get(id)?.resume()
   controller.abort()
   return true
+}
+
+/** Hold the run at its next step boundary. In-flight calls are not killed. */
+export function pauseRun(id: string): { paused: boolean } | undefined {
+  const gate = gates.get(id)
+  const snapshot = runs.get(id)
+  if (!gate || !snapshot) return undefined
+  if (gate.paused) return { paused: true }
+  gate.pause()
+  snapshot.paused = true
+  const at = new Date().toISOString()
+  snapshot.updatedAt = at
+  pushEvent(snapshot, { type: 'log', runId: id, at, message: 'Run paused. Calls in flight will finish, then the pipeline holds.' })
+  return { paused: true }
+}
+
+/** Release a paused run. */
+export function resumeRun(id: string): { paused: boolean } | undefined {
+  const gate = gates.get(id)
+  const snapshot = runs.get(id)
+  if (!gate || !snapshot) return undefined
+  if (!gate.paused) return { paused: false }
+  gate.resume()
+  snapshot.paused = false
+  const at = new Date().toISOString()
+  snapshot.updatedAt = at
+  pushEvent(snapshot, { type: 'log', runId: id, at, message: 'Run resumed.' })
+  return { paused: false }
 }
 
 export function subscribe(id: string, listener: (event: RunEvent) => void): () => void {
