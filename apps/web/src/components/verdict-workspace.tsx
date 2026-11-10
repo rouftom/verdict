@@ -11,6 +11,7 @@ import {
   Network,
   Play,
   RefreshCw,
+  Search,
   Settings2,
   Square,
   Terminal,
@@ -152,6 +153,7 @@ export function VerdictWorkspace() {
   const [verifierModels, setVerifierModels] = React.useState<ModelRef[]>([])
   const [showRanks, setShowRanks] = React.useState(false)
   const [anchors, setAnchors] = React.useState<string[]>([])
+  const [anchorQuery, setAnchorQuery] = React.useState('')
   const [maxVideoMinutes, setMaxVideoMinutes] = React.useState(20)
   const [temperature, setTemperature] = React.useState(0.2)
 
@@ -468,6 +470,10 @@ export function VerdictWorkspace() {
   }
 
   const projects = preview?.projects ?? []
+  const anchorNeedle = anchorQuery.trim().toLowerCase()
+  const anchorMatches = anchorNeedle
+    ? projects.filter((project) => project.name.toLowerCase().includes(anchorNeedle))
+    : projects
   const criteria = preview?.rubric.criteria ?? live.report?.criteria ?? []
   const hasResults =
     Boolean(live.report) || live.consensus.length > 0 || live.evaluations.length > 0 || live.verifications.length > 0
@@ -615,25 +621,49 @@ export function VerdictWorkspace() {
                     </ul>
                   ) : null}
                   {projects.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {t('inputs.anchors')}
-                      </Label>
-                      {projects.map((project) => (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() => toggleAnchor(project.id)}
-                          className={cn(
-                            'rounded-full border px-2 py-0.5 text-[10px]',
-                            anchors.includes(project.id)
-                              ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                              : 'border-border text-muted-foreground hover:bg-muted',
-                          )}
-                        >
-                          {project.name}
-                        </button>
-                      ))}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {t('inputs.anchors')}
+                        </Label>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{anchors.length}/3</span>
+                        {projects.length > 3 ? (
+                          <div className="relative ml-auto min-w-[8rem] flex-1 sm:max-w-[13rem]">
+                            <Search
+                              className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            <input
+                              value={anchorQuery}
+                              onChange={(event) => setAnchorQuery(event.target.value)}
+                              placeholder={t('inputs.anchorFilter')}
+                              aria-label={t('inputs.anchorFilter')}
+                              className="h-6 w-full rounded-full border border-border bg-transparent pl-6 pr-2 text-[10px] text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25"
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="custom-scrollbar flex max-h-20 flex-wrap content-start gap-1.5 overflow-y-auto">
+                        {anchorMatches.map((project) => (
+                          <button
+                            key={project.id}
+                            type="button"
+                            onClick={() => toggleAnchor(project.id)}
+                            title={project.name}
+                            className={cn(
+                              'inline-flex max-w-[12rem] items-center rounded-full border px-2 py-0.5 text-[10px]',
+                              anchors.includes(project.id)
+                                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                                : 'border-border text-muted-foreground hover:bg-muted',
+                            )}
+                          >
+                            <span className="truncate">{project.name}</span>
+                          </button>
+                        ))}
+                        {anchorMatches.length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground">{t('inputs.anchorNoMatch')}</span>
+                        ) : null}
+                      </div>
                     </div>
                   ) : null}
                 </>

@@ -30,6 +30,8 @@
     "genericYaml": "YAML générique",
     "rubricBadge": "Rubrique · {{name}}",
     "anchors": "Ancrages de calibration (max 3)",
+    "anchorFilter": "Filtrer les ancrages",
+    "anchorNoMatch": "Aucun projet correspondant.",
     "chooseManifest": "Choisissez un fichier de manifeste pour le valider.",
     "presetError": "Le préréglage {{label}} a renvoyé {{status}}."
   },
@@ -157,6 +159,8 @@
   },
   "results": {
     "ranking": "Classement",
+    "track": "Piste",
+    "allTracks": "Toutes les pistes",
     "final": "final",
     "provisional": "provisoire",
     "uploadManifest": "Importez un manifeste pour voir les projets ici.",

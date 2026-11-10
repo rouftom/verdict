@@ -293,7 +293,9 @@ The workspace has:
   and rubric), each a file picker, with a live validation strip underneath
   (project count, criteria and weights, warnings, anchors). The rubric row also
   carries the **Built-in** and **Generic YAML** shortcuts, aligned to the end
-  of the picker row;
+  of the picker row. **Calibration anchors (max 3)** shows the selected count,
+  truncates long project names and, once a manifest has more than three
+  projects, adds a small filter field above a scrollable chip list;
 - one **Models** block in two columns: **six evaluators** on the left, the
   **two verifiers** and the run **options** on the right, each agent slot
   carrying its own model and reasoning select;
@@ -309,6 +311,10 @@ The workspace has:
 - a per-track ranking and a project detail table, shown as soon as results
   start arriving (consensus, spread, final
   scores, evaluator matrix, verifier adjustments, harvest errors);
+- a **track selector** above the ranking when a run spans several tracks:
+  show one track at a time or keep them all in one scroll. The project detail
+  follows the selection, and a selection made outside the chosen track falls
+  back to that track's first project;
 - one bottom-bar toggle that switches between the pipeline view and the results
   view, so only one of them is on screen at a time;
 - a streaming run log in a floating panel opened from the bottom bar, a

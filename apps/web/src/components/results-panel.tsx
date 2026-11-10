@@ -13,7 +13,7 @@ import {
   Minus,
   Trophy,
 } from 'lucide-react'
-import { Badge, Card, CardContent, CardHeader, CardTitle, cn } from '@verdict/ui'
+import { Badge, Card, CardContent, CardHeader, CardTitle, Select, cn } from '@verdict/ui'
 import {
   primaryTrack,
   projectTracks,
@@ -205,6 +205,7 @@ export function ResultsPanel({
   onSelect,
 }: ResultsPanelProps) {
   const { t } = useTranslation()
+  const [trackFilter, setTrackFilter] = React.useState('all')
   const hasResults =
     Boolean(report) || consensus.length > 0 || evaluations.length > 0 || verifications.length > 0
   if (!hasResults) return null
@@ -212,7 +213,16 @@ export function ResultsPanel({
   const criteria: CriterionMeta[] = report?.criteria ?? rubric?.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.weight })) ?? []
   const rankings = report?.rankings ?? provisionalRankings(manifest, consensus, rubric)
   const reportsById = new Map((report?.projects ?? []).map((project) => [project.projectId, project]))
-  const selected = selectedId ?? rankings[0]?.entries[0]?.projectId
+  // Multi-track runs rank every project in each of its tracks. The filter keeps
+  // one track on screen at a time; a stale value falls back to every track.
+  const trackNames = rankings.map((ranking) => ranking.track)
+  const activeTrack = trackFilter !== 'all' && trackNames.includes(trackFilter) ? trackFilter : 'all'
+  const visibleRankings = activeTrack === 'all' ? rankings : rankings.filter((ranking) => ranking.track === activeTrack)
+  const fallbackId = rankings[0]?.entries[0]?.projectId
+  const requested = selectedId ?? fallbackId
+  const selected = visibleRankings.some((ranking) => ranking.entries.some((entry) => entry.projectId === requested))
+    ? requested
+    : visibleRankings[0]?.entries[0]?.projectId
   const selectedReport = selected ? reportsById.get(selected) : undefined
   const selectedConsensus = selectedReport?.consensus ?? consensus.find((entry) => entry.projectId === selected)
   const selectedEvaluations = evaluations.filter((evaluation) => evaluation.projectId === selected)
@@ -232,11 +242,27 @@ export function ResultsPanel({
             {t(`results.${sourceOfRanks}`)}
           </Badge>
         </CardHeader>
+        {trackNames.length > 1 ? (
+          <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
+            <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.track')}</span>
+            <Select
+              value={activeTrack}
+              onValueChange={setTrackFilter}
+              ariaLabel={t('results.track')}
+              options={[
+                { value: 'all', label: t('results.allTracks') },
+                ...trackNames.map((name) => ({ value: name, label: name })),
+              ]}
+              className="min-w-0 flex-1"
+              triggerClassName="h-6 text-[10px]"
+            />
+          </div>
+        ) : null}
         <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
           {manifest.length === 0 ? (
             <p className="p-4 text-xs text-muted-foreground">{t('results.uploadManifest')}</p>
           ) : (
-            <RankingList rankings={rankings} selected={selected} onSelect={onSelect} />
+            <RankingList rankings={visibleRankings} selected={selected} onSelect={onSelect} />
           )}
         </CardContent>
       </Card>
