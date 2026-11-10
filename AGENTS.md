@@ -188,7 +188,8 @@ rewrites its generated file, leave it alone.
   in sync. Do not read `localStorage` during render, it would reintroduce a
   hydration mismatch.
 - The header globe selector writes the `verdict-language` cookie plus the same
-  `localStorage` key. Add a language by adding its JSON file, its entry in
+  `localStorage` key. It sits after the History button and stays compact (short
+  codes only). Add a language by adding its JSON file, its entry in
   `src/lib/i18n.ts`, and its section in the parity test.
 - Agent names and lenses are translated by id under `agents.*`; server-provided
   summaries, rationales, project names and other evidence stay data, not UI

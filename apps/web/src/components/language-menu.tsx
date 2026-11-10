@@ -23,7 +23,7 @@ export function LanguageMenu() {
         onValueChange={changeLanguage}
         options={LANGUAGES.map((language) => ({ value: language.value, label: language.short }))}
         ariaLabel={t('app.language')}
-        className="w-[92px]"
+        className="w-[68px]"
         triggerClassName="h-7 rounded-full"
       />
     </div>
