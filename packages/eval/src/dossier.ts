@@ -71,7 +71,7 @@ export function buildDossier(project: ProjectInput, evidence: ProjectEvidence): 
     for (const file of repo.keyFiles) {
       if (used > 13_000) break
       const content = clip(file.content, 3_000)
-      keyFiles.push(`--- ${file.path} ---\n${content}`)
+      keyFiles.push(`### ${file.path}\n${content}`)
       used += content.length
     }
     sections.push(['KEY FILES', keyFiles.join('\n\n') || '(none selected)'].join('\n'))

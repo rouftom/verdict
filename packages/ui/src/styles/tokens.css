@@ -1,8 +1,6 @@
-/* ─────────────────────────────────────────────────────────────────────────
-   SPS design tokens. The base values are the default pack (`meta`, default blue)
+/* SPS design tokens. The base values are the default pack (`meta`, default blue)
    so nothing flashes before the runtime pack CSS applies. Pack-specific values
-   live in @sps/theme (packs/*.json) and always win over these defaults.
-   ───────────────────────────────────────────────────────────────────────── */
+   live in @verdict/theme (packs/*.json) and always win over these defaults. */
 
 :root {
   --charte-primary: #0866ff;

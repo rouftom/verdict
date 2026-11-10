@@ -119,7 +119,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   const evaluators = EVALUATORS.slice(0, Math.max(1, rubric.consensus.evaluators))
   const verifiers = VERIFIERS.slice(0, Math.max(1, rubric.consensus.verifiers))
 
-  // 1. Harvest ---------------------------------------------------------------
+  // 1. Harvest
   throwIfAborted(signal)
   emit('stage', { message: 'harvesting' })
   const evidenceList = await mapLimit(manifest, options.concurrency, async (project) => {
@@ -146,7 +146,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
   const evidenceMap = new Map(evidenceList.map((evidence) => [evidence.projectId, evidence]))
 
-  // 2. Independent evaluation -------------------------------------------------
+  // 2. Independent evaluation
   throwIfAborted(signal)
   emit('stage', { message: 'evaluating' })
   const evaluations: ProjectEvaluation[] = []
@@ -185,7 +185,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     evaluations.push(...projectEvaluations)
   })
 
-  // 3. Cross-review -----------------------------------------------------------
+  // 3. Cross-review
   throwIfAborted(signal)
   emit('stage', { message: 'reviewing' })
   const revisions: ProjectRevision[] = []
@@ -229,7 +229,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     revisions.push(...projectRevisions)
   })
 
-  // 4. Consensus --------------------------------------------------------------
+  // 4. Consensus
   throwIfAborted(signal)
   emit('stage', { message: 'consensus' })
   const consensus = manifest.map((project) => {
@@ -240,7 +240,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     return result
   })
 
-  // 5. Comparative ranking pass ----------------------------------------------
+  // 5. Comparative ranking pass
   throwIfAborted(signal)
   const tracks = groupByTrack(manifest)
   const comparativeOrders = new Map<string, string[]>()
@@ -268,7 +268,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     comparativeOrders.set(track, result.order)
   }
 
-  // 6. Verification -----------------------------------------------------------
+  // 6. Verification
   throwIfAborted(signal)
   emit('stage', { message: 'verifying' })
   const verifications: ProjectVerification[] = []
@@ -321,7 +321,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     verifications.push(...projectVerifications)
   })
 
-  // 7. Final ranking and report ----------------------------------------------
+  // 7. Final ranking and report
   const finalByTrack = new Map<string, RankedProject[]>()
   for (const [track, projects] of tracks) {
     const projectVerifications = verifications.filter((verification) => projects.some((project) => project.id === verification.projectId))
