@@ -2,8 +2,6 @@
 
 import * as React from 'react'
 import {
-  BORDER_STORAGE_KEY,
-  DEFAULT_BORDER_STYLE,
   DEFAULT_CORNER_STYLE,
   DEFAULT_THEME_PACK_ID,
   MODE_STORAGE_KEY,
@@ -11,11 +9,9 @@ import {
   THEME_PACKS,
   THEME_PACK_STORAGE_KEY,
   getThemePack,
-  resolveBorderStyle,
   resolveCornerStyle,
   resolveMode,
   surfaceFor,
-  type BorderStyle,
   type CornerStyle,
   type ThemeMode,
   type ThemePack,
@@ -25,12 +21,10 @@ interface ThemeContextValue {
   packId: string
   mode: ThemeMode
   radius: CornerStyle
-  borderStyle: BorderStyle
   packs: ThemePack[]
   setPack: (id: string) => void
   setMode: (mode: ThemeMode) => void
   setRadius: (radius: CornerStyle) => void
-  setBorderStyle: (style: BorderStyle) => void
   toggleMode: () => void
 }
 
@@ -51,7 +45,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [packId, setPackId] = React.useState(DEFAULT_THEME_PACK_ID)
   const [mode, setModeState] = React.useState<ThemeMode>('light')
   const [radius, setRadiusState] = React.useState<CornerStyle>(DEFAULT_CORNER_STYLE)
-  const [borderStyle, setBorderStyleState] = React.useState<BorderStyle>(DEFAULT_BORDER_STYLE)
   const packRef = React.useRef(packId)
   const modeRef = React.useRef<ThemeMode>(mode)
 
@@ -60,17 +53,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const storedMode = resolveMode(localStorage.getItem(MODE_STORAGE_KEY))
     const storedPack = getThemePack(localStorage.getItem(THEME_PACK_STORAGE_KEY) ?? DEFAULT_THEME_PACK_ID)
     const storedRadius = resolveCornerStyle(localStorage.getItem(RADIUS_STORAGE_KEY))
-    const storedBorder = resolveBorderStyle(localStorage.getItem(BORDER_STORAGE_KEY))
     packRef.current = storedPack.id
     modeRef.current = storedMode
     setPackId(storedPack.id)
     setModeState(storedMode)
     setRadiusState(storedRadius)
-    setBorderStyleState(storedBorder)
     document.documentElement.setAttribute('data-theme-pack', storedPack.id)
     document.documentElement.classList.toggle('dark', storedMode === 'dark')
     document.documentElement.dataset.radius = storedRadius
-    document.documentElement.dataset.borderStyle = storedBorder
     applyChrome(storedPack, storedMode)
   }, [])
 
@@ -92,17 +82,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setRadius = React.useCallback((next: CornerStyle) => {
-    const value: CornerStyle = next === 'rounded' ? 'rounded' : DEFAULT_CORNER_STYLE
+    const value = resolveCornerStyle(next)
     setRadiusState(value)
     localStorage.setItem(RADIUS_STORAGE_KEY, value)
     document.documentElement.dataset.radius = value
-  }, [])
-
-  const setBorderStyle = React.useCallback((next: BorderStyle) => {
-    const value = resolveBorderStyle(next)
-    setBorderStyleState(value)
-    localStorage.setItem(BORDER_STORAGE_KEY, value)
-    document.documentElement.dataset.borderStyle = value
   }, [])
 
   const value = React.useMemo<ThemeContextValue>(
@@ -110,15 +93,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       packId,
       mode,
       radius,
-      borderStyle,
       packs: THEME_PACKS,
       setPack,
       setMode,
       setRadius,
-      setBorderStyle,
       toggleMode: () => setMode(mode === 'dark' ? 'light' : 'dark'),
     }),
-    [packId, mode, radius, borderStyle, setPack, setMode, setRadius, setBorderStyle],
+    [packId, mode, radius, setPack, setMode, setRadius],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

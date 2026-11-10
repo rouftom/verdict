@@ -5,16 +5,16 @@ Evidence-grounded, multi-agent evaluation of hackathon-style projects.
 Upload a manifest of projects, the rules, and a rubric. `verdict` harvests each
 project's GitHub repository and demo video, then runs:
 
-1. **6 evaluator agents** — each scores the *same* weighted criteria
+1. **6 evaluator agents**: each scores the *same* weighted criteria
    independently.
-2. **1 cross-review round** — every agent sees the other five, anonymised, and
+2. **1 cross-review round**: every agent sees the other five, anonymised, and
    may revise with a written justification.
-3. **Consensus** — trimmed mean per criterion, spread, and MAD dispersion.
-4. **Comparative ranking** — one ordinal pass per track, aggregated by Borda
+3. **Consensus**: trimmed mean per criterion, spread, and MAD dispersion.
+4. **Comparative ranking**: one ordinal pass per track, aggregated by Borda
    count. Ranking is always produced, even with a single project.
-5. **2 verifier agents** — audit the six evaluations, then reconcile final
+5. **2 verifier agents**: audit the six evaluations, then reconcile final
    criterion scores and the per-track ranking.
-6. **Report** — final scores, ranking, supplied-rank delta, evidence errors,
+6. **Report**: final scores, ranking, supplied-rank delta, evidence errors,
    token usage.
 
 No authentication, no database. Run snapshots and the last workspace
@@ -43,8 +43,8 @@ The Python zipapp (the file named `yt-dlp` in the release assets) imports
 python3 -c "import zlib; print(zlib.ZLIB_VERSION)"
 ```
 
-If that fails while the system interpreter has it — for example `python3` is a
-`/usr/local/bin/python3` built without zlib, but `/usr/bin/python3` works — run
+If that fails while the system interpreter has it (for example `python3` is a
+`/usr/local/bin/python3` built without zlib, but `/usr/bin/python3` works), run
 the zipapp with the working interpreter, install zlib for the former, or use the
 self-contained Linux build, which embeds its own runtime:
 
@@ -120,7 +120,7 @@ LOG_LEVEL=info
 MAX_RUNS_IN_MEMORY=20
 MAX_EVENTS_PER_RUN=2000
 
-# providers — set the key(s) you have
+# providers: set the key(s) you have
 MODEL_API_KEY=            # Meta Model API (OpenAI-compatible), META_BASE_URL
 OPENAI_API_KEY=           # OPENAI_BASE_URL
 ANTHROPIC_API_KEY=        # ANTHROPIC_BASE_URL
@@ -182,7 +182,7 @@ UI always offers six evaluator slots and two verifier slots; the same model can
 fill several slots (useful for a single-provider demo), but diversity is
 recommended.
 
-Each slot has a searchable model select — models are grouped by provider — and
+Each slot has a searchable model select (models are grouped by provider) and
 its own reasoning selector (`Auto`, `None`, `Minimal`, `Low`, `Medium`, `High`,
 `Extra high`, `Max`). `Auto` keeps the environment default; any other value is
 stored on that agent's `ModelRef` and overrides the env for that call only. The
@@ -220,14 +220,13 @@ forwarded to an API that would reject it.
 | Evaluation rules | Markdown, TXT | Passed verbatim to every agent as untrusted context. Optional. |
 | Rubric | YAML, JSON, Markdown table | Optional; the built-in neutral rubric is used when empty. |
 
-Example inputs ship inside the repository, so the preset buttons work out of
-the box:
+Example inputs ship inside the repository:
 
-- `apps/web/public/rules/judging-rubric.generic.yaml` / `.md` — neutral rubric,
+- `apps/web/public/rules/judging-rubric.generic.yaml` / `.md`: neutral rubric,
   same weights as the organiser rubric (Impact 30%, Use of AI Tooling 25%,
   Technical Depth & Execution 20%, Demo 25%).
-- `apps/web/public/rules/meta-ai-developer-hackathon.md` — example rules
-  upload.
+- `apps/web/public/rules/hackathon-rules.example.md`: generic example rules
+  upload, with no organiser or provider branding.
 
 The example manifest (`winners.json`) is deliberately kept **outside** this
 repository, next to the organiser rubric, so frequent edits to it never cause a
@@ -254,21 +253,23 @@ original text.
 
 The workspace has:
 
-- inputs in **three responsive columns** — project manifest, evaluation rules,
-  rubric — with a live validation strip underneath (project count, criteria and
+- inputs in **three responsive columns** (project manifest, evaluation rules
+  and rubric), with a live validation strip underneath (project count, criteria and
   weights, warnings, anchors);
 - **models (3/5) and options (2/5)** side by side on wide screens, stacked on
   narrow ones; each agent slot carries its own model and reasoning select;
-- a React Flow pipeline where harvest fans out to **one node per evaluator**
+- a React Flow pipeline, shown once a run starts, where harvest fans out to **one node per evaluator**
   (six in parallel), converges on cross-review, consensus and ranking, then fans
   out to **one node per verifier** before the report. Click any agent node for a
   live synthesis popover: model, effort, project, per-criterion scores,
   confidence, summary, red flags, revisions and verifier adjustments;
-- a per-track ranking with a project detail table (consensus, spread, final
+- a per-track ranking and a project detail table, shown as soon as results
+  start arriving (consensus, spread, final
   scores, evaluator matrix, verifier adjustments, harvest errors);
-- a streaming run log, history drawer, JSON report export;
-- a theme pack, a **border style** option (solid, dashed, dotted) and dark mode
-  in the header.
+- a streaming run log in a floating panel opened from the bottom bar, a
+  history drawer and a JSON report export;
+- a single appearance menu in the header: theme pack, light or dark mode and
+  **rounded or square corners** applied to the whole interface.
 
 The Meta fallback catalog always includes `muse-spark-1.3` and
 `muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.

@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   SPS design tokens. The base values are the default pack (`meta`, Meta blue)
+   SPS design tokens. The base values are the default pack (`meta`, default blue)
    so nothing flashes before the runtime pack CSS applies. Pack-specific values
    live in @sps/theme (packs/*.json) and always win over these defaults.
    ───────────────────────────────────────────────────────────────────────── */

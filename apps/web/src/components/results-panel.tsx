@@ -90,7 +90,7 @@ function averageVerifierScores(verifications: ProjectVerification[], criteria: C
 }
 
 function DeltaPill({ delta }: { delta?: number }) {
-  if (delta === undefined) return <span className="text-[10px] text-muted-foreground">—</span>
+  if (delta === undefined) return <span className="text-[10px] text-muted-foreground">-</span>
   if (delta === 0)
     return (
       <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
@@ -120,6 +120,10 @@ export function ResultsPanel({
   selectedId,
   onSelect,
 }: ResultsPanelProps) {
+  const hasResults =
+    Boolean(report) || consensus.length > 0 || evaluations.length > 0 || verifications.length > 0
+  if (!hasResults) return null
+
   const criteria: CriterionMeta[] = report?.criteria ?? rubric?.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.weight })) ?? []
   const rankings = report?.rankings ?? provisionalRankings(manifest, consensus, rubric)
   const reportsById = new Map((report?.projects ?? []).map((project) => [project.projectId, project]))
@@ -255,9 +259,9 @@ export function ResultsPanel({
                         <tr key={criterion.id} className="border-t border-border">
                           <td className="px-2 py-1 font-medium">{criterion.label}</td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{pct(criterion.weight)}</td>
-                          <td className="px-2 py-1 text-right tabular-nums">{consensusEntry?.score.toFixed(1) ?? '—'}</td>
-                          <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{consensusEntry?.spread.toFixed(1) ?? '—'}</td>
-                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{final !== undefined ? final.toFixed(1) : '—'}</td>
+                          <td className="px-2 py-1 text-right tabular-nums">{consensusEntry?.score.toFixed(1) ?? '-'}</td>
+                          <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{consensusEntry?.spread.toFixed(1) ?? '-'}</td>
+                          <td className="px-2 py-1 text-right font-semibold tabular-nums">{final !== undefined ? final.toFixed(1) : '-'}</td>
                         </tr>
                       )
                     })}
@@ -292,7 +296,7 @@ export function ResultsPanel({
                                 className={cn('px-1.5 py-1 text-right tabular-nums', score && score.confidence < 0.4 && 'text-muted-foreground')}
                                 title={score?.rationale}
                               >
-                                {score?.score.toFixed(0) ?? '—'}
+                                {score?.score.toFixed(0) ?? '-'}
                               </td>
                             )
                           })}
@@ -317,7 +321,7 @@ export function ResultsPanel({
                         <ul className="mt-1 list-inside list-disc text-[10px] text-muted-foreground">
                           {verification.adjustments.map((adjustment) => (
                             <li key={adjustment.criterionId}>
-                              {adjustment.criterionId}: {adjustment.from} → {adjustment.to} — {adjustment.reason}
+                              {adjustment.criterionId}: {adjustment.from} → {adjustment.to}: {adjustment.reason}
                             </li>
                           ))}
                         </ul>

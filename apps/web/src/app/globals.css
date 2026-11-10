@@ -115,20 +115,6 @@
   }
 }
 
-/* Border-style option: unlayered so it wins over Tailwind preflight's
-   `border-style: solid` and the base input rule. */
-html[data-border-style='dashed'] *,
-html[data-border-style='dashed'] *::before,
-html[data-border-style='dashed'] *::after {
-  border-style: dashed;
-}
-
-html[data-border-style='dotted'] *,
-html[data-border-style='dotted'] *::before,
-html[data-border-style='dotted'] *::after {
-  border-style: dotted;
-}
-
 @layer utilities {
   .custom-scrollbar {
     scrollbar-width: thin;
@@ -181,7 +167,8 @@ html[data-border-style='dotted'] *::after {
   }
   /*
    * The pack tokens mix the primary at 30% "transparent". That reads as a pale
-   * grey with a near-black pack, but as a saturated blue with Meta blue, and the
+   * grey with a near-black pack, but as a saturated blue with the default
+   * blue pack, and the
    * secondary text stops being legible. Mixing against the page background at a
    * lower ratio keeps the same tinted-panel idea in every pack.
    */

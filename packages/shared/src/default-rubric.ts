@@ -7,7 +7,7 @@ import type { Rubric } from './types'
  */
 export const DEFAULT_RUBRIC: Rubric = {
   version: 1,
-  name: 'Project evaluation — generic rubric',
+  name: 'Project evaluation (generic rubric)',
   description:
     'Four weighted criteria: impact, use of AI tooling, technical depth and demo. Upload another rubric to replace it.',
   scale: {

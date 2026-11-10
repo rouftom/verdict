@@ -3,16 +3,14 @@
 import * as React from 'react'
 import {
   AlertTriangle,
-  CheckCircle2,
   Download,
   History,
   Layers,
-  Moon,
   Play,
   RefreshCw,
   Settings2,
   Square,
-  Sun,
+  Terminal,
   Trash2,
   X,
 } from 'lucide-react'
@@ -25,12 +23,8 @@ import {
   CardTitle,
   Checkbox,
   Label,
-  Select,
-  Separator,
   cn,
 } from '@verdict/ui'
-import { useTheme } from '@/components/theme-provider'
-import { BORDER_STYLES, type BorderStyle } from '@verdict/theme'
 import {
   reasoningEffortsFor,
   type AgentPool,
@@ -62,6 +56,7 @@ import { ModelSlots } from './model-slots'
 import { PipelineGraph, StatusPill } from './pipeline-graph'
 import { ResultsPanel } from './results-panel'
 import { EventLog } from './event-log'
+import { AppearanceMenu } from './appearance-menu'
 
 const RUNNING: RunStatus[] = ['queued', 'parsing', 'harvesting', 'evaluating', 'reviewing', 'consensus', 'verifying']
 
@@ -131,7 +126,6 @@ function messageOf(error: unknown): string {
 }
 
 export function VerdictWorkspace() {
-  const theme = useTheme()
   const [providers, setProviders] = React.useState<ProviderInfo[]>([])
   const [defaults, setDefaults] = React.useState<{ evaluators: ModelRef[]; verifiers: ModelRef[] }>({
     evaluators: [],
@@ -168,6 +162,7 @@ export function VerdictWorkspace() {
 
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [logOpen, setLogOpen] = React.useState(false)
   const [restored, setRestored] = React.useState(false)
 
   const unsubscribe = React.useRef<(() => void) | null>(null)
@@ -463,9 +458,10 @@ export function VerdictWorkspace() {
     setHistory(await listRuns())
   }
 
-  const configuredCount = providers.filter((provider) => provider.configured).length
   const projects = preview?.projects ?? []
   const criteria = preview?.rubric.criteria ?? live.report?.criteria ?? []
+  const hasResults =
+    Boolean(live.report) || live.consensus.length > 0 || live.evaluations.length > 0 || live.verifications.length > 0
   const toggleAnchor = (id: string) => {
     setAnchors((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : current.length >= 3 ? current : [...current, id]))
   }
@@ -484,35 +480,11 @@ export function VerdictWorkspace() {
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Badge tone={configuredCount > 0 ? 'success' : 'danger'}>
-            {configuredCount} provider{configuredCount === 1 ? '' : 's'}
-          </Badge>
           <Button type="button" variant="outline" size="sm" onClick={() => setHistoryOpen((value) => !value)}>
             <History className="h-3.5 w-3.5" /> History
             {history.length > 0 ? <span className="tabular-nums text-muted-foreground">({history.length})</span> : null}
           </Button>
-          <Select
-            value={theme.packId}
-            onValueChange={theme.setPack}
-            options={theme.packs.map((pack) => ({ value: pack.id, label: pack.name.en }))}
-            ariaLabel="Theme pack"
-            className="w-[120px]"
-            triggerClassName="text-[11px]"
-          />
-          <Select
-            value={theme.borderStyle}
-            onValueChange={(value) => theme.setBorderStyle(value as BorderStyle)}
-            options={BORDER_STYLES.map((style) => ({
-              value: style,
-              label: `${style[0]!.toUpperCase()}${style.slice(1)} border`,
-            }))}
-            ariaLabel="Border style"
-            className="w-[118px]"
-            triggerClassName="text-[11px]"
-          />
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Toggle dark mode" onClick={theme.toggleMode}>
-            {theme.mode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <AppearanceMenu />
         </div>
       </header>
 
@@ -563,7 +535,6 @@ export function VerdictWorkspace() {
                 text={rulesText}
                 placeholder="Optional. Eligibility rules, problem statements, disqualifiers…"
                 rows={7}
-                presets={[{ label: 'Hackathon rules', url: '/rules/meta-ai-developer-hackathon.md' }]}
                 onText={(text) => {
                   setRulesText(text)
                   setRulesName(undefined)
@@ -576,7 +547,6 @@ export function VerdictWorkspace() {
                   setRulesText('')
                   setRulesName(undefined)
                 }}
-                onPreset={(preset) => void loadPreset(preset.label, preset.url, 'rules')}
               />
 
               <div className="flex min-w-0 flex-col gap-1.5">
@@ -768,34 +738,36 @@ export function VerdictWorkspace() {
                 </div>
               </div>
               <p className="text-[10px] leading-tight text-muted-foreground">
-                Runs stream over SSE. Snapshots are kept in this browser's IndexedDB — no account, no server database.
+                Runs stream over SSE. Snapshots are kept in this browser's IndexedDB, no account and no server database.
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center justify-between gap-1 px-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pipeline</span>
-            <span className="text-[10px] text-muted-foreground">click an evaluator or verifier node for its live synthesis</span>
+        {runId ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center justify-between gap-1 px-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pipeline</span>
+              <span className="text-[10px] text-muted-foreground">click an evaluator or verifier node for its live synthesis</span>
+            </div>
+            <PipelineGraph
+              status={status}
+              evaluations={live.evaluations}
+              revisions={live.revisions}
+              verifications={live.verifications}
+              agents={agents}
+              evaluatorModels={evaluatorModels}
+              verifierModels={verifierModels}
+              criteria={criteria}
+              projects={projects}
+              selectedProjectId={selectedId}
+              hasReport={Boolean(live.report)}
+              failed={status === 'failed'}
+            />
           </div>
-          <PipelineGraph
-            status={status}
-            evaluations={live.evaluations}
-            revisions={live.revisions}
-            verifications={live.verifications}
-            agents={agents}
-            evaluatorModels={evaluatorModels}
-            verifierModels={verifierModels}
-            criteria={criteria}
-            projects={projects}
-            selectedProjectId={selectedId}
-            hasReport={Boolean(live.report)}
-            failed={status === 'failed'}
-          />
-        </div>
+        ) : null}
 
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
+        {hasResults ? (
           <div className="h-[min(72vh,780px)] min-h-[540px]">
             <ResultsPanel
               report={live.report}
@@ -808,10 +780,7 @@ export function VerdictWorkspace() {
               onSelect={setSelectedId}
             />
           </div>
-          <div className="h-[min(72vh,780px)] min-h-[540px]">
-            <EventLog events={events} />
-          </div>
-        </div>
+        ) : null}
 
         <div className="sticky bottom-0 z-20 -mx-2 mt-1 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
           {running ? (
@@ -833,6 +802,16 @@ export function VerdictWorkspace() {
           <Button type="button" variant="outline" size="icon" aria-label="Export report" disabled={!live.report} onClick={exportReport}>
             <Download className="h-4 w-4" />
           </Button>
+          <Button
+            type="button"
+            variant={logOpen ? 'secondary' : 'outline'}
+            size="icon"
+            aria-label="Run log"
+            aria-pressed={logOpen}
+            onClick={() => setLogOpen((value) => !value)}
+          >
+            <Terminal className="h-4 w-4" />
+          </Button>
           <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
             <StatusPill status={status} />
             {runError ? <span className="min-w-0 truncate text-[10px] text-destructive">{runError}</span> : null}
@@ -842,6 +821,12 @@ export function VerdictWorkspace() {
           </div>
         </div>
       </main>
+
+      {logOpen ? (
+        <div className="fixed bottom-16 right-3 z-40 h-[min(45vh,420px)] w-[min(92vw,440px)] shadow-2xl">
+          <EventLog events={events} onClose={() => setLogOpen(false)} />
+        </div>
+      ) : null}
 
       {historyOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setHistoryOpen(false)}>

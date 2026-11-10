@@ -1,8 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, cn } from '@verdict/ui'
-import { Terminal } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
+import { Terminal, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
 
 function toneOf(event: RunEvent): string {
@@ -13,7 +13,7 @@ function toneOf(event: RunEvent): string {
   return 'text-foreground'
 }
 
-export function EventLog({ events }: { events: RunEvent[] }) {
+export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: () => void }) {
   const end = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' })
@@ -25,6 +25,11 @@ export function EventLog({ events }: { events: RunEvent[] }) {
         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
         <CardTitle>Run log</CardTitle>
         <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{events.length} events</span>
+        {onClose ? (
+          <Button type="button" variant="ghost" size="icon-sm" aria-label="Close run log" onClick={onClose}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-auto p-2">
         {events.length === 0 ? (

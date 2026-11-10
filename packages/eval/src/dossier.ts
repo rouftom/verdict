@@ -140,7 +140,7 @@ export function anonymisedEvaluations(evaluations: ProjectEvaluation[], excludeA
       [
         `EVALUATOR ${String.fromCharCode(65 + index)} (identity withheld)`,
         `overall: ${evaluation.overall}`,
-        ...evaluation.scores.map((score) => `- ${score.criterionId}: ${score.score} (confidence ${score.confidence}) — ${score.rationale} | evidence: ${score.evidence.join('; ') || 'none'}`),
+        ...evaluation.scores.map((score) => `- ${score.criterionId}: ${score.score} (confidence ${score.confidence}): ${score.rationale} | evidence: ${score.evidence.join('; ') || 'none'}`),
         `summary: ${evaluation.summary}`,
       ].join('\n'),
     )

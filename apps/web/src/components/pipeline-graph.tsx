@@ -13,12 +13,12 @@ import {
 } from '@xyflow/react'
 import { Badge, Popover, PopoverContent, PopoverTrigger, cn } from '@verdict/ui'
 import {
+  Activity,
   CheckCircle2,
   Circle,
   Flag,
   Loader2,
   ShieldCheck,
-  Sparkles,
   UserRound,
   XCircle,
 } from 'lucide-react'
@@ -188,7 +188,7 @@ function AgentCard({ data }: { data: AgentData }) {
                 <div key={criterion.id} className="flex items-center gap-2 text-[10px]">
                   <span className="min-w-0 flex-1 truncate">{criterion.label}</span>
                   <span className={cn('w-8 text-right font-semibold tabular-nums', entry ? scoreClass(entry.score) : 'text-muted-foreground')}>
-                    {entry ? entry.score.toFixed(0) : '—'}
+                    {entry ? entry.score.toFixed(0) : '-'}
                   </span>
                 </div>
               )
@@ -235,7 +235,7 @@ function AgentCard({ data }: { data: AgentData }) {
       )}
 
       <p className="flex items-center gap-1 text-[9px] text-muted-foreground">
-        <Sparkles className="h-2.5 w-2.5" />
+        <Activity className="h-2.5 w-2.5" />
         {data.count} result{data.count === 1 ? '' : 's'} across project{data.count === 1 ? '' : 's'} · live
       </p>
     </div>

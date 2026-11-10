@@ -63,9 +63,6 @@ export interface ChromeBootstrapOptions {
   /** Applying `<html data-radius>` before first paint avoids a corner flash. */
   radiusStorageKey?: string
   defaultRadius?: string
-  /** Applying `<html data-border-style>` before first paint avoids a hairline flash. */
-  borderStorageKey?: string
-  defaultBorder?: string
 }
 
 /** Inline pre-paint script embedded in the root layout (no flash on first paint). */
@@ -77,8 +74,6 @@ export function buildChromeBootstrapScript(options: ChromeBootstrapOptions): str
     themes,
     radiusStorageKey,
     defaultRadius,
-    borderStorageKey,
-    defaultBorder,
   } = options
   const surfaceLight: Record<string, string> = Object.fromEntries(
     themes.map((t) => [t.id, t.tokens.light['--background'] ?? t.preview.surface]),
@@ -97,12 +92,7 @@ var root=document.documentElement;root.setAttribute('data-theme-pack',id);
 if(dark)root.classList.add('dark');else root.classList.remove('dark');
 ${
     radiusStorageKey
-      ? `var radius=localStorage.getItem(${JSON.stringify(radiusStorageKey)})||${JSON.stringify(defaultRadius ?? 'square')};root.setAttribute('data-radius',radius==='rounded'?'rounded':'square');`
-      : ''
-  }
-${
-    borderStorageKey
-      ? `var border=localStorage.getItem(${JSON.stringify(borderStorageKey)})||${JSON.stringify(defaultBorder ?? 'solid')};root.setAttribute('data-border-style',border==='dashed'||border==='dotted'?border:'solid');`
+      ? `var radius=localStorage.getItem(${JSON.stringify(radiusStorageKey)})||${JSON.stringify(defaultRadius ?? 'rounded')};root.setAttribute('data-radius',radius==='square'?'square':'rounded');`
       : ''
   }
 var color=(dark?sd:sl)[id]||(dark?sd:sl)[${JSON.stringify(defaultThemeId)}];

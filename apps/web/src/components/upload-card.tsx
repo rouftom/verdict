@@ -1,13 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { FileText, Upload, X, Sparkles } from 'lucide-react'
+import { FileText, Upload, X } from 'lucide-react'
 import { Badge, Button, Label, Textarea, cn } from '@verdict/ui'
-
-export interface UploadPreset {
-  label: string
-  url: string
-}
 
 export interface UploadCardProps {
   id: string
@@ -19,11 +14,9 @@ export interface UploadCardProps {
   placeholder: string
   required?: boolean
   rows?: number
-  presets?: UploadPreset[]
   onText: (text: string) => void
   onFile: (filename: string, text: string) => void
   onClear: () => void
-  onPreset?: (preset: UploadPreset) => void
 }
 
 export function UploadCard({
@@ -36,11 +29,9 @@ export function UploadCard({
   placeholder,
   required = false,
   rows = 5,
-  presets = [],
   onText,
   onFile,
   onClear,
-  onPreset,
 }: UploadCardProps) {
   const input = React.useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = React.useState(false)
@@ -128,23 +119,6 @@ export function UploadCard({
           ) : null}
         </div>
         <p className="mt-1 text-[11px] leading-tight text-muted-foreground">{hint}</p>
-
-        {presets.length > 0 && onPreset ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {presets.map((preset) => (
-              <Button
-                key={preset.url}
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 rounded-full border border-border px-2 text-[11px]"
-                onClick={() => onPreset(preset)}
-              >
-                <Sparkles className="h-3 w-3" /> {preset.label}
-              </Button>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
@@ -155,7 +129,7 @@ export function UploadCard({
         placeholder={placeholder}
         rows={rows}
         spellCheck={false}
-        className="min-h-0 resize-y font-mono text-[11px] leading-relaxed"
+        className="min-h-0 resize-y font-mono text-[10px] leading-relaxed"
       />
     </div>
   )

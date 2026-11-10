@@ -5,7 +5,7 @@ dist/
 coverage/
 *.tsbuildinfo
 
-# Secrets — never committed
+# Secrets: never committed
 .env
 .env.*
 !.env.example
