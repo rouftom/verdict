@@ -146,6 +146,7 @@
     "showPipeline": "Show pipeline",
     "showResults": "Show results",
     "reportReady": "report ready · {{date}}",
+    "lost": "This run is no longer available. The API probably restarted, so start a new run.",
     "failed": "Run failed."
   },
   "history": {
@@ -196,7 +197,11 @@
     "events_one": "{{count}} event",
     "events_other": "{{count}} events",
     "empty": "Nothing yet. Start a run to stream stages and model verdicts.",
-    "close": "Close run log"
+    "close": "Close run log",
+    "dockBottom": "Dock run log at the bottom",
+    "dockTop": "Dock run log at the top",
+    "dockLeft": "Dock run log on the left",
+    "dockRight": "Dock run log on the right"
   },
   "sw": {
     "ready": "A new version is ready.",

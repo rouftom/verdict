@@ -4,8 +4,19 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
-import { Terminal, X } from 'lucide-react'
+import { PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
+
+export type LogDock = 'bottom' | 'top' | 'left' | 'right'
+
+const DOCK_ICONS = {
+  bottom: PanelBottom,
+  top: PanelTop,
+  left: PanelLeft,
+  right: PanelRight,
+} as const
+
+const DOCKS: LogDock[] = ['bottom', 'top', 'left', 'right']
 
 function toneOf(event: RunEvent): string {
   if (event.type === 'error') return 'text-destructive'
@@ -15,7 +26,17 @@ function toneOf(event: RunEvent): string {
   return 'text-foreground'
 }
 
-export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: () => void }) {
+export function EventLog({
+  events,
+  onClose,
+  dock = 'bottom',
+  onDockChange,
+}: {
+  events: RunEvent[]
+  onClose?: () => void
+  dock?: LogDock
+  onDockChange?: (dock: LogDock) => void
+}) {
   const { t } = useTranslation()
   return (
     <Card className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -23,6 +44,28 @@ export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: ()
         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
         <CardTitle>{t('log.title')}</CardTitle>
         <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{t('log.events', { count: events.length })}</span>
+        {onDockChange ? (
+          <div className="flex items-center gap-0.5">
+            {DOCKS.map((position) => {
+              const Icon = DOCK_ICONS[position]
+              return (
+                <Button
+                  key={position}
+                  type="button"
+                  variant={dock === position ? 'secondary' : 'ghost'}
+                  size="icon-sm"
+                  className="h-6 w-6"
+                  aria-label={t(`log.dock${position[0]!.toUpperCase()}${position.slice(1)}`)}
+                  title={t(`log.dock${position[0]!.toUpperCase()}${position.slice(1)}`)}
+                  aria-pressed={dock === position}
+                  onClick={() => onDockChange(position)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </Button>
+              )
+            })}
+          </div>
+        ) : null}
         {onClose ? (
           <Button type="button" variant="ghost" size="icon-sm" aria-label={t('log.close')} onClick={onClose}>
             <X className="h-3.5 w-3.5" />

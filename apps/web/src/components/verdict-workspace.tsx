@@ -8,6 +8,7 @@ import {
   Download,
   History,
   Layers,
+  Loader2,
   Network,
   Play,
   RefreshCw,
@@ -56,7 +57,7 @@ import { UploadCard } from './upload-card'
 import { ModelSlots } from './model-slots'
 import { PipelineGraph, StatusPill } from './pipeline-graph'
 import { ResultsPanel } from './results-panel'
-import { EventLog } from './event-log'
+import { EventLog, type LogDock } from './event-log'
 import { AppearanceMenu } from './appearance-menu'
 import { LanguageMenu } from './language-menu'
 import { SectionCard } from './section-card'
@@ -80,6 +81,13 @@ interface LiveState {
 }
 
 const EMPTY_LIVE: LiveState = { evaluations: [], revisions: [], consensus: [], verifications: [] }
+
+const LOG_DOCK_CLASS: Record<LogDock, string> = {
+  bottom: 'fixed bottom-16 left-1/2 z-40 h-[min(38vh,360px)] w-[min(96vw,760px)] -translate-x-1/2',
+  top: 'fixed top-16 left-1/2 z-40 h-[min(38vh,360px)] w-[min(96vw,760px)] -translate-x-1/2',
+  left: 'fixed bottom-16 left-3 top-16 z-40 w-[min(92vw,440px)]',
+  right: 'fixed bottom-16 right-3 top-16 z-40 w-[min(92vw,440px)]',
+}
 
 function flatModels(providers: ProviderInfo[]): ModelRef[] {
   return providers
@@ -163,11 +171,14 @@ export function VerdictWorkspace() {
   const [live, setLive] = React.useState<LiveState>(EMPTY_LIVE)
   const [runError, setRunError] = React.useState<string | null>(null)
   const [starting, setStarting] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
   const [selectedId, setSelectedId] = React.useState<string | undefined>()
 
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [logDock, setLogDock] = React.useState<LogDock>('bottom')
   const [view, setView] = React.useState<'pipeline' | 'results'>('pipeline')
   const [restored, setRestored] = React.useState(false)
 
@@ -319,6 +330,10 @@ export function VerdictWorkspace() {
         break
       }
       case 'error':
+        if (event.message === 'Run cancelled.') {
+          setStatus('cancelled')
+          break
+        }
         setRunError(event.message ?? t('run.failed'))
         setStatus('failed')
         break
@@ -327,43 +342,77 @@ export function VerdictWorkspace() {
     }
   }
 
-  const refreshRun = async (id: string) => {
-    try {
-      const snapshot: RunSnapshot = await fetchRun(id)
-      setStatus(snapshot.status)
-      setEvents(snapshot.events)
-      setLive({
-        evaluations: snapshot.evaluations,
-        revisions: snapshot.revisions,
-        consensus: snapshot.consensus,
-        verifications: snapshot.verifications,
-        ...(snapshot.report ? { report: snapshot.report } : {}),
-      })
-      setSelectedId((current) => current ?? snapshot.report?.rankings[0]?.entries[0]?.projectId ?? snapshot.manifest[0]?.id)
-      if (snapshot.error) setRunError(snapshot.error)
-      if (snapshot.report) {
-        await saveRun({
-          id: snapshot.id,
-          createdAt: snapshot.createdAt,
-          status: snapshot.status,
-          savedAt: new Date().toISOString(),
-          summary: {
-            projects: snapshot.manifest.length,
-            rubric: snapshot.rubric.name,
-            tracks: snapshot.report.rankings.length,
-          },
-          snapshot,
+  const refreshRun = React.useCallback(
+    async (id: string, manual = false) => {
+      if (manual) setRefreshing(true)
+      try {
+        const snapshot: RunSnapshot = await fetchRun(id)
+        setStatus(snapshot.status)
+        setEvents(snapshot.events)
+        setLive({
+          evaluations: snapshot.evaluations,
+          revisions: snapshot.revisions,
+          consensus: snapshot.consensus,
+          verifications: snapshot.verifications,
+          ...(snapshot.report ? { report: snapshot.report } : {}),
         })
-        setHistory(await listRuns())
+        setSelectedId((current) => current ?? snapshot.report?.rankings[0]?.entries[0]?.projectId ?? snapshot.manifest[0]?.id)
+        // A cancelled run reports "Run cancelled." as its error; that is a user
+        // action, not a failure, so it must not raise the red banner.
+        if (snapshot.status === 'cancelled') setRunError(null)
+        else if (snapshot.error) setRunError(snapshot.error)
+        else if (snapshot.status !== 'failed') setRunError(null)
+        if (['done', 'failed', 'cancelled'].includes(snapshot.status)) {
+          unsubscribe.current?.()
+          unsubscribe.current = null
+        }
+        if (snapshot.report) {
+          await saveRun({
+            id: snapshot.id,
+            createdAt: snapshot.createdAt,
+            status: snapshot.status,
+            savedAt: new Date().toISOString(),
+            summary: {
+              projects: snapshot.manifest.length,
+              rubric: snapshot.rubric.name,
+              tracks: snapshot.report.rankings.length,
+            },
+            snapshot,
+          })
+          setHistory(await listRuns())
+        }
+      } catch (error) {
+        const message = messageOf(error)
+        if (/not found|404/i.test(message)) {
+          unsubscribe.current?.()
+          unsubscribe.current = null
+          setRunError(t('run.lost'))
+          setStatus('failed')
+        } else if (manual) {
+          setRunError(message)
+        }
+        // A transient failure is harmless while the SSE stream or the poll is
+        // still running; the next tick retries.
+      } finally {
+        if (manual) setRefreshing(false)
       }
-    } catch {
-      /* a transient fetch failure is harmless; the SSE stream keeps updating */
-    }
-  }
+    },
+    [t],
+  )
+
+  // If the SSE stream drops (a restart, a proxy, a laptop waking up), the run
+  // keeps going server-side. Poll the snapshot until it reaches a terminal
+  // status so the pipeline never freezes on a stale stage.
+  React.useEffect(() => {
+    if (!runId || !running) return
+    const timer = setInterval(() => void refreshRun(runId), 4000)
+    return () => clearInterval(timer)
+  }, [refreshRun, runId, running])
 
   const startRun = async () => {
     if (starting || running) return
     setStarting(true)
+    setCancelling(false)
     setRunError(null)
     setEvents([])
     setLive(EMPTY_LIVE)
@@ -415,12 +464,22 @@ export function VerdictWorkspace() {
   }
 
   const stopRun = async () => {
-    if (!runId) return
+    if (!runId || cancelling) return
+    setCancelling(true)
     try {
-      await cancelRun(runId)
-      setStatus('cancelled')
+      const result = await cancelRun(runId)
+      unsubscribe.current?.()
+      unsubscribe.current = null
+      if (result.cancelled) {
+        setStatus('cancelled')
+        setRunError(null)
+      } else {
+        await refreshRun(runId, true)
+      }
     } catch (error) {
       setRunError(messageOf(error))
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -790,8 +849,8 @@ export function VerdictWorkspace() {
 
         <div className="sticky bottom-0 z-20 -mx-2 mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
           {running ? (
-            <Button type="button" variant="destructive" onClick={() => void stopRun()}>
-              <Square className="h-4 w-4" /> {t('run.cancel')}
+            <Button type="button" variant="destructive" disabled={cancelling} onClick={() => void stopRun()}>
+              {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />} {t('run.cancel')}
             </Button>
           ) : (
             <Button
@@ -799,11 +858,18 @@ export function VerdictWorkspace() {
               disabled={!manifestText.trim() || evaluatorModels.length === 0 || verifierModels.length === 0 || starting}
               onClick={() => void startRun()}
             >
-              <Play className="h-4 w-4" /> {starting ? t('run.starting') : t('run.evaluate')}
+              {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} {starting ? t('run.starting') : t('run.evaluate')}
             </Button>
           )}
-          <Button type="button" variant="outline" size="icon" aria-label={t('run.refresh')} disabled={!runId} onClick={() => runId && void refreshRun(runId)}>
-            <RefreshCw className="h-4 w-4" />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={t('run.refresh')}
+            disabled={!runId || refreshing}
+            onClick={() => runId && void refreshRun(runId, true)}
+          >
+            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
           <Button type="button" variant="outline" size="icon" aria-label={t('run.export')} disabled={!live.report} onClick={exportReport}>
             <Download className="h-4 w-4" />
@@ -840,8 +906,8 @@ export function VerdictWorkspace() {
       </main>
 
       {logOpen ? (
-        <div className="fixed bottom-16 right-3 z-40 h-[min(45vh,420px)] w-[min(92vw,440px)] shadow-2xl">
-          <EventLog events={events} onClose={() => setLogOpen(false)} />
+        <div className={cn('shadow-2xl', LOG_DOCK_CLASS[logDock])}>
+          <EventLog events={events} onClose={() => setLogOpen(false)} dock={logDock} onDockChange={setLogDock} />
         </div>
       ) : null}
 

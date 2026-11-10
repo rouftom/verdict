@@ -27,6 +27,7 @@ export interface RankTrackArgs {
   /** When true, supplied ranks are shown to the ranking pass as context only. */
   showProvidedRanks?: boolean
   onLog?: (message: string) => void
+  signal?: AbortSignal
 }
 
 export interface RankTrackResult {
@@ -57,7 +58,7 @@ function normaliseOrder(order: string[], allowed: Set<string>, fallback: string[
 
 /** Comparative pass: every evaluator model orders the track; Borda aggregates them. */
 export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
-  const { track, projects, consensus, evidence, anchors, rubric, modelRefs, temperature, showProvidedRanks, onLog } = args
+  const { track, projects, consensus, evidence, anchors, rubric, modelRefs, temperature, showProvidedRanks, onLog, signal } = args
   const allProjects = args.allProjects ?? projects
   const allConsensus = args.allConsensus ?? consensus
   const usage: UsageTotals = { inputTokens: 0, outputTokens: 0, calls: 0 }
@@ -99,6 +100,7 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
         prompt: rankingPrompt(track, packets, trackAnchors, suppliedRanks, calibrationPackets),
         temperature,
         jsonContract: `{ "order": ["project-id", "..."], "rationale": "one sentence" }`,
+        ...(signal ? { signal } : {}),
       })
       usage.inputTokens += result.usage.inputTokens
       usage.outputTokens += result.usage.outputTokens

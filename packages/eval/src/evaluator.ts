@@ -30,10 +30,11 @@ export interface EvaluateArgs {
   agent: AgentDefinition
   modelRef: ModelRef
   temperature: number
+  signal?: AbortSignal
 }
 
 export async function evaluateProject(args: EvaluateArgs): Promise<{ evaluation: ProjectEvaluation; usage: UsageTotals }> {
-  const { project, evidence, rubric, rulesText, agent, modelRef, temperature } = args
+  const { project, evidence, rubric, rulesText, agent, modelRef, temperature, signal } = args
   const dossier = buildDossier(project, evidence)
   const result = await generateStructured({
     model: createLanguageModel(modelRef),
@@ -43,6 +44,7 @@ export async function evaluateProject(args: EvaluateArgs): Promise<{ evaluation:
     prompt: evaluatorPrompt(project, dossier),
     temperature,
     jsonContract: JSON_CONTRACT,
+    ...(signal ? { signal } : {}),
     ...(project.youtube ? { videoUrl: project.youtube } : {}),
   })
 

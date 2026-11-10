@@ -146,6 +146,7 @@
     "showPipeline": "Afficher le pipeline",
     "showResults": "Afficher les résultats",
     "reportReady": "rapport prêt · {{date}}",
+    "lost": "Cette exécution n'est plus disponible. L'API a probablement redémarré, relancez une exécution.",
     "failed": "L'exécution a échoué."
   },
   "history": {
@@ -196,7 +197,11 @@
     "events_one": "{{count}} événement",
     "events_other": "{{count}} événements",
     "empty": "Rien pour l'instant. Lancez une exécution pour voir les étapes et les verdicts des modèles.",
-    "close": "Fermer le journal"
+    "close": "Fermer le journal",
+    "dockBottom": "Ancrer le journal en bas",
+    "dockTop": "Ancrer le journal en haut",
+    "dockLeft": "Ancrer le journal à gauche",
+    "dockRight": "Ancrer le journal à droite"
   },
   "sw": {
     "ready": "Une nouvelle version est prête.",

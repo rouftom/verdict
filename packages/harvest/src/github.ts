@@ -35,9 +35,12 @@ function headers(): Record<string, string> {
   }
 }
 
-async function githubJson<T>(url: string): Promise<T | null> {
+async function githubJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   try {
-    const response = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(20_000) })
+    const response = await fetch(url, {
+      headers: headers(),
+      signal: signal ?? AbortSignal.timeout(20_000),
+    })
     if (!response.ok) return null
     return (await response.json()) as T
   } catch {
@@ -171,7 +174,7 @@ export async function harvestRepo(value: string, options: HarvestRepoOptions = {
   if (!ref) throw new Error(`Unsupported repository URL: ${value}`)
 
   const maxBytes = options.maxBytes ?? Number(env('MAX_REPO_BYTES') || 60 * 1024 * 1024)
-  const meta = await githubJson<RepoMeta>(`https://api.github.com/repos/${ref.owner}/${ref.repo}`)
+  const meta = await githubJson<RepoMeta>(`https://api.github.com/repos/${ref.owner}/${ref.repo}`, options.signal)
   if (!meta && !env('GITHUB_TOKEN')) {
     // The API can be rate-limited without a token; the tarball may still work.
   }
@@ -209,8 +212,8 @@ export async function harvestRepo(value: string, options: HarvestRepoOptions = {
     })
 
     const walked = await walkRepository(root)
-    const languages = (await githubJson<LanguageMap>(`https://api.github.com/repos/${ref.owner}/${ref.repo}/languages`)) ?? {}
-    const commitsRaw = (await githubJson<CommitApi[]>(`https://api.github.com/repos/${ref.owner}/${ref.repo}/commits?per_page=20`)) ?? []
+    const languages = (await githubJson<LanguageMap>(`https://api.github.com/repos/${ref.owner}/${ref.repo}/languages`, options.signal)) ?? {}
+    const commitsRaw = (await githubJson<CommitApi[]>(`https://api.github.com/repos/${ref.owner}/${ref.repo}/commits?per_page=20`, options.signal)) ?? []
     const commits: CommitInfo[] = commitsRaw.map((entry) => ({
       ...(entry.sha ? { sha: entry.sha.slice(0, 12) } : {}),
       message: (entry.commit?.message ?? '').split('\n')[0] ?? '',

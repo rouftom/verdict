@@ -250,18 +250,34 @@ function AgentCard({ data }: { data: AgentData }) {
   )
 }
 
+/** Only one agent card may stay open at a time, so a second click swaps it. */
+const AgentPopoverContext = React.createContext<{
+  openId: string | null
+  setOpenId: (id: string | null) => void
+}>({ openId: null, setOpenId: () => {} })
+
 function AgentNode({ data }: NodeProps) {
   const { t } = useTranslation()
   const agent = data as AgentData
   const latest = agent.revision ?? agent.evaluation
   const overall = agent.verification?.finalOverall ?? latest?.overall
+  const popover = React.useContext(AgentPopoverContext)
+  const open = popover.openId === agent.agent.id
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(next) => popover.setOpenId(next ? agent.agent.id : null)}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
+          title={t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
+          // React Flow captures pointer events on the pane. Stop them on the
+          // trigger or the popover opens and closes in the same gesture.
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
           className={cn(
-            'nodrag nopan w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
+            'nodrag nopan cursor-pointer w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
             'hover:border-brand-primary/60 hover:bg-brand-primary/5',
             agent.status === 'active' && 'border-brand-primary ring-2 ring-brand-primary/20',
             agent.status === 'done' && 'border-emerald-500/40',
@@ -288,7 +304,14 @@ function AgentNode({ data }: NodeProps) {
           <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
         </button>
       </PopoverTrigger>
-      <PopoverContent side="right" align="start" sideOffset={8} className="z-[1000] w-[320px] p-2.5">
+      <PopoverContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        collisionPadding={12}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        className="z-[1000] w-[320px] p-2.5"
+      >
         <AgentCard data={agent} />
       </PopoverContent>
     </Popover>
@@ -421,6 +444,8 @@ export function PipelineGraph({
   const activeIndex = statusIndex(status)
   const evaluatorPool = agents?.evaluators ?? []
   const verifierPool = agents?.verifiers ?? []
+  const [openAgentId, setOpenAgentId] = React.useState<string | null>(null)
+  const popoverState = React.useMemo(() => ({ openId: openAgentId, setOpenId: setOpenAgentId }), [openAgentId])
   const projectNames = React.useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects])
 
   const evaluatorSummaries = React.useMemo(
@@ -598,26 +623,28 @@ export function PipelineGraph({
 
   return (
     <div className="h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.16 }}
-        minZoom={0.35}
-        onlyRenderVisibleElements
-        panOnDrag
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        zoomOnDoubleClick={false}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={18} size={1} />
-        <Controls showInteractive={false} className="!bottom-1.5 !left-1.5" />
-      </ReactFlow>
+      <AgentPopoverContext.Provider value={popoverState}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.16 }}
+          minZoom={0.35}
+          onlyRenderVisibleElements
+          panOnDrag
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          zoomOnDoubleClick={false}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={18} size={1} />
+          <Controls showInteractive={false} className="!bottom-1.5 !left-1.5" />
+        </ReactFlow>
+      </AgentPopoverContext.Provider>
     </div>
   )
 }

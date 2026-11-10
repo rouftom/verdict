@@ -154,11 +154,25 @@ app.get<{ Params: { id: string } }>('/runs/:id/events', (request, reply) => {
     return
   }
 
+  // `reply.raw.writeHead` bypasses the Fastify CORS hook, and EventSource is a
+  // cross-origin request in development. Echo the allowed origin here or the
+  // browser blocks the stream as soon as it opens.
+  const allowedOrigins = config.webOrigin
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+  const requestOrigin = request.headers.origin
+  const allowOrigin =
+    requestOrigin && (allowedOrigins.includes('*') || allowedOrigins.includes(requestOrigin))
+      ? requestOrigin
+      : allowedOrigins[0]
+
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
+    ...(allowOrigin ? { 'Access-Control-Allow-Origin': allowOrigin, Vary: 'Origin' } : {}),
   })
 
   const terminal = ['done', 'failed', 'cancelled'].includes(run.status)

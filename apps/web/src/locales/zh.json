@@ -140,6 +140,7 @@
     "showPipeline": "显示流水线",
     "showResults": "显示结果",
     "reportReady": "报告已就绪 · {{date}}",
+    "lost": "该运行已不可用。API 可能已重启，请重新启动一次运行。",
     "failed": "运行失败。"
   },
   "history": {
@@ -185,7 +186,11 @@
     "title": "运行日志",
     "events_other": "{{count}} 个事件",
     "empty": "暂无内容。启动运行以流式查看阶段和模型判定。",
-    "close": "关闭运行日志"
+    "close": "关闭运行日志",
+    "dockBottom": "将运行日志停靠到底部",
+    "dockTop": "将运行日志停靠到顶部",
+    "dockLeft": "将运行日志停靠到左侧",
+    "dockRight": "将运行日志停靠到右侧"
   },
   "sw": {
     "ready": "新版本已就绪。",

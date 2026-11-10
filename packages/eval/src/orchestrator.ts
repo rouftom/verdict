@@ -167,6 +167,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             agent,
             modelRef,
             temperature: options.temperature,
+            signal,
           })
           addUsage(usage, result.usage)
           emit('evaluation', {
@@ -214,6 +215,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             own,
             all: ownEvaluations,
             round: 2,
+            signal,
           })
           addUsage(usage, result.usage)
           emit('revision', {
@@ -265,6 +267,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       allConsensus: consensus,
       showProvidedRanks: options.showRanksToAgents,
       onLog: log,
+      signal,
     })
     addUsage(usage, result.usage)
     comparativeOrders.set(track, result.order)
@@ -294,6 +297,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             agent,
             modelRef,
             temperature: options.temperature,
+            signal,
           })
           addUsage(usage, result.usage)
           emit('verification', {
@@ -337,6 +341,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       modelRefs: verifierModels,
       temperature: options.temperature,
       onLog: log,
+      signal,
     })
     addUsage(usage, rankingResult.usage)
     const comparative = comparativeOrders.get(track) ?? []

@@ -135,6 +135,9 @@ async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verif
       signal: controller.signal,
       warnings: snapshot.warnings,
       onEvent: (event) => {
+        // Once the run is aborted, late events from an in-flight model call must
+        // not flip the status back to an active stage.
+        if (controller.signal.aborted) return
         pushEvent(snapshot, event)
         switch (event.type) {
           case 'stage':
@@ -163,6 +166,7 @@ async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verif
     snapshot.evidence = result.evidence
     snapshot.report = result.report
     snapshot.warnings = result.warnings
+    if (controller.signal.aborted) throw new Error('Run cancelled.')
     snapshot.status = 'done'
     snapshot.updatedAt = new Date().toISOString()
     pushEvent(snapshot, { type: 'log', runId: snapshot.id, at: snapshot.updatedAt, message: `done in ${result.usage.calls} model call(s)` })
@@ -189,6 +193,11 @@ export function listRuns(): RunSnapshot[] {
 export function cancelRun(id: string): boolean {
   const controller = controllers.get(id)
   if (!controller) return false
+  const snapshot = runs.get(id)
+  if (snapshot) {
+    snapshot.status = 'cancelled'
+    snapshot.updatedAt = new Date().toISOString()
+  }
   controller.abort()
   return true
 }
