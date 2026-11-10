@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { z } from 'zod'
+import { EVALUATORS, VERIFIERS } from '@verdict/eval'
 import { listProviders, modelPool } from '@verdict/providers'
 import {
   parseManifestText,
@@ -34,6 +35,11 @@ app.get('/providers', async () => ({
   defaults: {
     evaluators: modelPool('EVAL_MODELS', 6),
     verifiers: modelPool('VERIFIER_MODELS', 2),
+  },
+  /** Personas only: the pipeline graph labels one node per agent. */
+  agents: {
+    evaluators: EVALUATORS.map((agent) => ({ ...agent })),
+    verifiers: VERIFIERS.map((agent) => ({ ...agent })),
   },
 }))
 

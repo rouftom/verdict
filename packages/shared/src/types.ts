@@ -43,6 +43,20 @@ export interface ProviderInfo {
  */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
+/** Public (non-secret) description of an evaluator or verifier persona. */
+export interface AgentInfo {
+  id: string
+  name: string
+  lens: string
+  focus: string
+  evidenceHint: string
+}
+
+export interface AgentPool {
+  evaluators: AgentInfo[]
+  verifiers: AgentInfo[]
+}
+
 export interface ModelRef {
   provider: ProviderId
   model: string
