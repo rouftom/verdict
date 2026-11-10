@@ -1,0 +1,401 @@
+@import '@xyflow/react/dist/style.css';
+@import 'tailwindcss';
+@import '../../../../packages/ui/src/styles/tokens.css';
+
+@source '../../../../packages/ui/src/**/*.{ts,tsx}';
+@source '../../../../packages/theme/src/**/*.{ts,tsx}';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive, #ef4444);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand charte slots (driven by the active pack) */
+  --color-brand-primary: var(--charte-primary);
+  --color-brand-accent: var(--charte-accent);
+  --color-brand-primary-light: var(--charte-primary-light);
+  --color-brand-primary-dark: var(--charte-primary-dark);
+  --color-brand-accent-light: var(--charte-accent-light);
+  --color-brand-ink: var(--charte-ink);
+  --color-brand-surface: var(--charte-surface);
+  --color-brand-danger: var(--charte-danger);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font-montserrat), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  html {
+    @apply font-sans;
+  }
+  .container {
+    width: 100%;
+    max-width: 1280px;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  /* Admin micro-interactions */
+  a,
+  button,
+  [role='button'],
+  [role='tab'],
+  input,
+  textarea,
+  select {
+    transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    button:active:not(:disabled),
+    [role='button']:active,
+    a:active {
+      transform: scale(0.98);
+    }
+  }
+  input:not(.border-0):not(.border-none),
+  textarea:not(.border-0):not(.border-none),
+  select:not(.border-0):not(.border-none) {
+    background-color: transparent;
+    color: var(--foreground);
+    border-width: 1px;
+    border-style: solid;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 0.7;
+  }
+}
+
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  /* Scrolls without reserving a gutter, so edge-to-edge content (grids, heroes)
+     reaches the rounded corner instead of leaving an empty strip on the right. */
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .dark .custom-scrollbar {
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: oklch(0.556 0 0 / 40%);
+    border-radius: 20px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 0.2s;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--primary);
+  }
+    .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  /*
+   * The pack tokens mix the primary at 30% "transparent". That reads as a pale
+   * grey with a near-black pack, but as a saturated blue with Meta blue, and the
+   * secondary text stops being legible. Mixing against the page background at a
+   * lower ratio keeps the same tinted-panel idea in every pack.
+   */
+  .assistant-panel {
+    background: var(--assistant-panel-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #f0d98a 0%, var(--charte-accent) 55%, #a8821f 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  /* Soft brand halo behind the sign-in panel. */
+  .brand-glow {
+    background:
+      radial-gradient(60% 60% at 20% 10%, color-mix(in oklab, var(--charte-primary) 28%, transparent), transparent 70%),
+      radial-gradient(50% 50% at 85% 90%, color-mix(in oklab, var(--charte-accent) 18%, transparent), transparent 70%);
+  }
+  .text-gradient-brand {
+    background: linear-gradient(
+      135deg,
+      var(--charte-primary) 0%,
+      var(--charte-primary-light) 50%,
+      var(--charte-primary-dark) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* Indeterminate processing bar (@verdict/ui IndeterminateBar). */
+@keyframes verdict-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+/* Dense admin table/UI density */
+html[data-density='dense'] {
+  font-size: 0.9375rem;
+}
+
+/*
+ * Corner treatment: square is the console default, and the appearance menu
+ * writes `data-radius` on <html>. Tailwind emits the radius utilities as
+ * `calc(var(--radius) + Npx)`, so zeroing `--radius` alone would still leave
+ * 4–12px corners: the utilities have to be flattened explicitly.
+ * `rounded-full` deliberately stays round (avatars, pills, spinners).
+ */
+html[data-radius='square'] {
+  --radius: 0px;
+}
+
+html[data-radius='square']
+  :where(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-radius: 0;
+}
+
+/* Moving light on the StarBorder edges (@verdict/ui StarBorder, console tab strip). */
+@keyframes star-movement-bottom {
+  0% {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-100%, 0%);
+    opacity: 0;
+  }
+}
+
+@keyframes star-movement-top {
+  0% {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(100%, 0%);
+    opacity: 0;
+  }
+}
+
+.animate-star-movement-bottom {
+  animation: star-movement-bottom var(--star-border-speed, 6s) linear infinite alternate;
+}
+
+.animate-star-movement-top {
+  animation: star-movement-top var(--star-border-speed, 6s) linear infinite alternate;
+}
+
+/* Row action menus (floating table actions), ported from organization. */
+
+@layer utilities {
+  /* Sticky actions column: pin the LAST column of every admin table to the
+     right edge while the rest scrolls horizontally.
+     - Header cell stays transparent.
+     - Body cell is invisible at rest and, on row hover, takes the row's own
+       hover background + a backdrop blur so it blends with the row while
+       masking the columns scrolling underneath.
+     Opt in with `.table-actions`; use the zero-width overlay variant with
+     `.table-actions-overlay`. Tables without an actions column must not reserve
+     that pinned width. */
+  [data-slot="table-container"] {
+    container-type: inline-size;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
+    overscroll-behavior-x: contain;
+  }
+  [data-slot="table-container"]::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  [data-slot="table-container"]::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  [data-slot="table-container"]::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+  }
+  [data-slot="table-container"]::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+  }
+  [data-slot="table"].table-actions > thead > tr > th:last-child,
+  [data-slot="table"].table-actions-overlay > thead > tr > th:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    background-color: transparent;
+    min-width: 11rem;
+    padding-inline: 1.5rem;
+    white-space: nowrap;
+  }
+  [data-slot="table"].table-actions > tbody > tr > td:last-child:not([colspan]),
+  [data-slot="table"].table-actions-overlay > tbody > tr > td:last-child:not([colspan]) {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    /* Invisible at rest, no visible background. */
+    background-color: transparent;
+    width: 40cqw;
+    min-width: 11rem;
+    padding-inline: 1.5rem;
+    white-space: nowrap;
+    text-align: center;
+  }
+  /* On row hover only, the pinned cell takes the row's OWN hover background
+     (inherited) + a backdrop blur, so it blends perfectly with the rest of the
+     row while blurring the content scrolling underneath. */
+  [data-slot="table"].table-actions > tbody > tr:hover > td:last-child:not([colspan]),
+  [data-slot="table"].table-actions-overlay > tbody > tr:hover > td:last-child:not([colspan]) {
+    background-color: inherit !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* While a row's action menu is open (long-press on touch), keep the row
+     highlighted with the same background as its hover state until it closes. */
+  [data-slot="table"].table-actions > tbody > tr[data-row-menu-open="true"],
+  [data-slot="table"].table-actions-overlay > tbody > tr[data-row-menu-open="true"] {
+    background-color: color-mix(in oklab, #f8fafc 50%, transparent);
+  }
+  .dark [data-slot="table"].table-actions > tbody > tr[data-row-menu-open="true"],
+  .dark [data-slot="table"].table-actions-overlay > tbody > tr[data-row-menu-open="true"] {
+    background-color: color-mix(in oklab, var(--charte-primary-dark) 30%, transparent);
+  }
+  [data-slot="table"].table-actions > tbody > tr[data-row-menu-open="true"] > td:last-child:not([colspan]),
+  [data-slot="table"].table-actions-overlay > tbody > tr[data-row-menu-open="true"] > td:last-child:not([colspan]) {
+    background-color: inherit !important;
+  }
+
+  /* Overlay variant (opt-in via `.table-actions-overlay`): the pinned actions
+     column reserves NO space at rest (zero width) and the actions reveal as a
+     frosted overlay pinned to the right edge when the row is hovered. */
+  [data-slot="table"].table-actions-overlay > thead > tr > th:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    width: 0;
+    min-width: 0;
+    max-width: 0;
+    padding: 0;
+    background-color: transparent;
+    /* The label stays in the accessibility tree but its glyphs must not widen
+       the zero-width cell: their overflow would give the table a phantom
+       horizontal scrollbar. */
+    font-size: 0;
+  }
+  [data-slot="table"].table-actions-overlay > tbody > tr > td:last-child:not([colspan]) {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    width: 0;
+    min-width: 0;
+    max-width: 0;
+    padding: 0;
+    background-color: transparent;
+    overflow: visible;
+    text-align: right;
+  }
+
+}
+
+/* Workflow graph controls follow the theme (light and dark). */
+.verdict-flow .react-flow__controls {
+  --xy-controls-button-background-color-default: var(--card);
+  --xy-controls-button-background-color-hover-default: var(--secondary);
+  --xy-controls-button-color-default: var(--foreground);
+  --xy-controls-button-color-hover-default: var(--foreground);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-controls-box-shadow-default: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+/* Loading shimmer: a soft highlight sweeping across placeholders. */
+@keyframes verdict-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--foreground) 8%, transparent) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: verdict-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Active edges of the process graph: a moving dash while the step runs. */
+@keyframes dash {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -20; }
+}

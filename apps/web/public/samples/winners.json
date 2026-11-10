@@ -1,0 +1,72 @@
+[
+    {
+      "name": "Consai",
+      "rank": 1,
+      "github": "https://github.com/lucianobogo/punchwalk",
+      "youtube": "https://youtu.be/NBY_h07xsII",
+      "track": "startup"
+    },
+    {
+      "name": "Formwright",
+      "rank": 2,
+      "github": "https://github.com/Romanok2805/formwright",
+      "youtube": "https://www.youtube.com/watch?v=yIW7dZEq8gQ",
+      "track": "startup"
+    },
+    {
+      "name": "ORCA by IssueLab",
+      "rank": 3,
+      "github": "https://github.com/IssueLab-Inc/ORCA",
+      "youtube": "https://youtu.be/hoYnbPvhq0M",
+      "track": "startup"
+    },
+    {
+      "name": "Voluma Bio",
+      "rank": 4,
+      "github": "https://github.com/voluma-bio/voluma",
+      "youtube": "https://youtu.be/qKdEp_oNrdA",
+      "track": "startup"
+    },
+    {
+      "name": "Kroonen AI",
+      "rank": 1,
+      "github": "https://github.com/kroonen-ai/glimmer-scope",
+      "youtube": "https://www.youtube.com/watch?v=6krusrrYQls",
+      "track": "startup"
+    },
+    {
+      "name": "ControlAnything",
+      "rank": 1,
+      "github": "https://github.com/Apolotary/controlanything",
+      "youtube": "https://www.youtube.com/watch?v=hIwSHZT-eoQ",
+      "track": "indie"
+    },
+    {
+      "name": "Gatekeeper",
+      "rank": 2,
+      "github": "https://github.com/lb2002/gatekeeper",
+      "youtube": "https://youtu.be/gM_wsjJBctM",
+      "track": "indie"
+    },
+    {
+      "name": "David Barry (Basement Ready)",
+      "rank": 3,
+      "github": "https://github.com/Dbar2/basement-ready",
+      "youtube": "https://www.youtube.com/watch?v=mFCAcvSXj48",
+      "track": "indie"
+    },
+    {
+      "name": "Aurora",
+      "rank": 4,
+      "github": "https://github.com/divagr18/nemesis",
+      "youtube": "https://www.youtube.com/watch?v=JirwnL-4Ed8",
+      "track": "indie"
+    },
+     {
+      "name": "Video2URDF",
+      "rank": 5,
+      "github": "https://github.com/SungHyunC/video2urdf",
+      "youtube": "https://youtu.be/aK_csSIU24c",
+      "track": "indie"
+    }
+]

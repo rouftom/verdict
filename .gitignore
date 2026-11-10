@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Secrets — never committed
+.env
+.env.*
+!.env.example
+
+# Harvested artefacts
+tmp/
+.verdict/
+*.log

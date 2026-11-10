@@ -1,0 +1,93 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   SPS design tokens. The base values are the default pack (`meta`, Meta blue)
+   so nothing flashes before the runtime pack CSS applies. Pack-specific values
+   live in @sps/theme (packs/*.json) and always win over these defaults.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --charte-primary: #0866ff;
+  --charte-primary-light: #4e93ff;
+  --charte-primary-dark: #0043b8;
+  --charte-accent: #00a3ff;
+  --charte-accent-light: #63c8ff;
+  --charte-ink: #06122b;
+  --charte-surface: #f2f6ff;
+  --charte-danger: #ef4444;
+  --brand-dark: #06122b;
+  --brand-accent: #0866ff;
+  --brand-highlight: #00c2ff;
+
+  --background: #f7f9fe;
+  --foreground: #0b1526;
+  --card: #ffffff;
+  --card-foreground: #0b1526;
+  --popover: #ffffff;
+  --popover-foreground: #0b1526;
+  --primary: #0866ff;
+  --primary-foreground: #ffffff;
+  --secondary: #eff4ff;
+  --secondary-foreground: #0b1526;
+  --muted: #eff3fb;
+  --muted-foreground: #5b6b85;
+  --accent: #0064e0;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #dfe7f5;
+  --input: #d7e1f2;
+  --ring: #0866ff;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0b1526;
+  --sidebar-primary: #0866ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eff4ff;
+  --sidebar-accent-foreground: #0b1526;
+  --sidebar-border: #e4eaf6;
+  --sidebar-ring: #0866ff;
+  --chart-1: #0866ff;
+  --chart-2: #00a3ff;
+  --chart-3: #00c2ff;
+  --chart-4: #0043b8;
+  --chart-5: #5b6b85;
+
+  --radius: 0.625rem;
+  --assistant-panel-bg: color-mix(in oklab, var(--charte-primary) 8%, var(--background));
+  --app-panel-bg: var(--charte-surface);
+}
+
+.dark {
+  --background: #050b18;
+  --foreground: #f2f6fc;
+  --card: #0a1426;
+  --card-foreground: #f2f6fc;
+  --popover: #0a1426;
+  --popover-foreground: #f2f6fc;
+  --primary: #4e93ff;
+  --primary-foreground: #04101f;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #f2f6fc;
+  --muted: rgba(255, 255, 255, 0.05);
+  --muted-foreground: rgba(226, 236, 250, 0.62);
+  --accent: #63c8ff;
+  --accent-foreground: #04101f;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: #4e93ff;
+  --sidebar: #040b16;
+  --sidebar-foreground: #dce7f7;
+  --sidebar-primary: #4e93ff;
+  --sidebar-primary-foreground: #04101f;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #f2f6fc;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #4e93ff;
+  --chart-1: #4e93ff;
+  --chart-2: #63c8ff;
+  --chart-3: #00a3ff;
+  --chart-4: #93b7e8;
+  --chart-5: #b8cce8;
+  --assistant-panel-bg: color-mix(in oklab, var(--charte-primary-dark) 14%, var(--background));
+  --app-panel-bg: color-mix(in oklab, var(--charte-ink) 88%, #000);
+}

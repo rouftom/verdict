@@ -1,0 +1,174 @@
+# Generic judging rubric (neutral example input)
+#
+# Same four weighted criteria and the same 0–100 scale as the organiser rubric,
+# with no organiser or vendor name. This is the default example: it can be
+# uploaded as-is, and it can stand in for any similar projects competition.
+#
+# Weights: Impact 30%, Use of AI Tooling 25%, Technical Depth & Execution 20%,
+# Demo 25%.
+
+version: 1
+name: Project evaluation — generic rubric
+updated: 2026-11-10
+
+description: >
+  Four weighted criteria scored independently by six evaluator agents, then
+  audited by two verifier agents. Every score must cite evidence from the
+  repository or the demo video.
+
+scale:
+  min: 0
+  max: 100
+  step: 1
+  anchors:
+    - range: [0, 19]
+      label: Absent
+      hint: No credible evidence, or the criterion is contradicted by the artefacts.
+    - range: [20, 39]
+      label: Weak
+      hint: Mentioned but shallow, generic, or only partly working.
+    - range: [40, 59]
+      label: Adequate
+      hint: Present and functional, but conventional.
+    - range: [60, 79]
+      label: Strong
+      hint: Thoughtful, well executed, clearly evidenced.
+    - range: [80, 100]
+      label: Exceptional
+      hint: Distinctive, surprising, production-grade or genuinely novel.
+
+criteria:
+  - id: impact
+    label: Impact (30%)
+    weight: 0.30
+    description: "What's the real-world potential here? Who benefits, and how much does it matter? Could this actually become something people use? Does it fit into one of the problem statements listed above?"
+    questions:
+      - Who is the user, and what concrete problem is solved for them?
+      - Is the benefit measurable, or only asserted?
+      - Is the scope credible for the time available?
+      - Does the project fit one of the published problem statements?
+    evidence:
+      - repository
+      - demo_video
+      - transcript
+    signals:
+      - Clear target user and a concrete pain point
+      - Demonstrated workflow rather than a slideware claim
+      - Credible path to real usage
+    red_flags:
+      - Generic idea with no specific beneficiary
+      - Impact claimed only in the README, never shown in the demo
+
+  - id: ai_tooling
+    label: Use of AI Tooling (25%)
+    weight: 0.25
+    description: "How creatively did this team use AI tooling? Did they go beyond a basic integration? Did they surface capabilities that were unexpected or genuinely inventive?"
+    questions:
+      - Which models or AI capabilities are actually used at runtime?
+      - Is the integration meaningful, or a thin wrapper around a chat call?
+      - Are model-specific strengths (vision, reasoning, tools, open weights) used deliberately?
+      - Is there evidence of iteration or inventive use?
+    evidence:
+      - repository
+      - demo_video
+      - transcript
+    signals:
+      - Model choice justified by the task
+      - Multiple capabilities combined coherently
+      - Non-obvious or inventive use
+    red_flags:
+      - AI mentioned in the pitch but absent from the code
+      - Single generic prompt with no product around it
+
+  - id: technical_depth
+    label: Technical Depth & Execution (20%)
+    weight: 0.20
+    description: "Is the engineering sound and thoughtfully refined? Does this feel like something that was thought through with real craft."
+    questions:
+      - Is the architecture coherent and the code readable?
+      - Are failure modes, limits and edge cases handled?
+      - Is there evidence of testing, typing, observability or operational care?
+      - Is the work original and built during the event?
+    evidence:
+      - repository
+      - commit_history
+      - demo_video
+    signals:
+      - Clear separation of concerns
+      - Tests, validation, error handling
+      - Dependencies and configuration managed deliberately
+    red_flags:
+      - Generated or copied code presented as new work
+      - No error handling, no tests, hard-coded secrets
+      - Repository does not build or does not match the demo
+
+  - id: demo
+    label: Demo (25%)
+    weight: 0.25
+    description: "Is this a working, impressive demo? Does the product hold up live? Is the demo video genuinely cool to watch?"
+    questions:
+      - Does the demo show the product actually working end to end?
+      - Is the video clear, credible and well paced?
+      - Does the shown behaviour match the repository?
+      - Would the product hold up under live questions?
+    evidence:
+      - demo_video
+      - transcript
+      - keyframes
+      - repository
+    signals:
+      - Real interaction, not only slides
+      - Clear narrative and visible output
+      - Claims consistent with the code
+    red_flags:
+      - Mocked or pre-recorded results presented as live
+      - Missing key functionality
+      - Demo behaviour impossible to reproduce from the repository
+
+ranking:
+  scope: track
+  primary: weighted_score
+  comparative_pass: true
+  tie_breakers:
+    - impact
+    - demo
+    - technical_depth
+  provided_ranks:
+    use_in_scores: false
+    compare_after: true
+  anchors:
+    source: user_selection
+    max: 3
+
+consensus:
+  evaluators: 6
+  verifiers: 2
+  max_rounds: 2
+  tolerance_points: 8
+  aggregation: trimmed_mean
+  require_evidence: true
+  min_evidence_per_criterion: 1
+  verifier_adjustment_limit: 10
+  on_unresolved: escalate
+
+rules:
+  - id: new_work
+    label: Built during the event
+    severity: disqualify
+    check: Commit history and demo must show work produced during the event window.
+  - id: public_repo
+    label: Public repository
+    severity: disqualify
+    check: The repository must be publicly accessible.
+  - id: demo_video
+    label: Required demo video
+    severity: disqualify
+    check: A demo video of the required length must be present.
+  - id: one_track
+    label: Single track
+    severity: disqualify
+    check: The project must be entered in exactly one track.
+  - id: rights
+    label: Rights to code, data and assets
+    severity: disqualify
+    check: No unlicensed code, data or assets.
