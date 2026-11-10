@@ -142,6 +142,10 @@ rewrites its generated file, leave it alone.
   end of the picker row.
 - Models is one block in two columns: six evaluators on the left, two verifiers
   and the run options on the right.
+- `SearchSelect` is the grouped combobox behind the model, reasoning and
+  language pickers. Its search field carries `border-0` on purpose: the global
+  input rule adds a 1 px border, and this field must blend into the search row
+  next to the icon.
 - The pipeline appears only after a run starts. Ranking and project detail
   appear as soon as results arrive. One bottom-bar toggle switches between the
   pipeline view and the results view, so only one is on screen at a time.
@@ -187,6 +191,16 @@ rewrites its generated file, leave it alone.
   keep the offline fallback page working.
 - Development must not leave a worker behind: `src/lib/sw-registration.ts`
   unregisters workers and clears caches outside production.
+
+### Tab favicon
+
+- `apps/web/src/hooks/use-processing-favicon.ts` paints a pulsing dot on every
+  declared `rel="icon"` link while a run is active, then restores the original
+  `href`, `type` and `sizes` when it settles. Same pattern as the organization
+  console.
+- Call it once from the workspace with the `running` flag. Never tie it to a
+  finished run, and never swap a single hardcoded icon: Next.js declares
+  several icon links and the browser keeps the untouched one.
 
 ### Brand assets
 
