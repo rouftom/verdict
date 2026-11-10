@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { FileText, Upload, X } from 'lucide-react'
-import { Badge, Button, Label, Textarea, cn } from '@verdict/ui'
+import { Badge, Button, Label, cn } from '@verdict/ui'
 
 export interface UploadCardProps {
   id: string
@@ -11,10 +11,9 @@ export interface UploadCardProps {
   accept: string
   filename?: string
   text: string
-  placeholder: string
   required?: boolean
-  rows?: number
-  onText: (text: string) => void
+  /** Extra controls aligned to the end of the picker row (rubric mode, presets). */
+  actions?: React.ReactNode
   onFile: (filename: string, text: string) => void
   onClear: () => void
 }
@@ -26,10 +25,8 @@ export function UploadCard({
   accept,
   filename,
   text,
-  placeholder,
   required = false,
-  rows = 5,
-  onText,
+  actions,
   onFile,
   onClear,
 }: UploadCardProps) {
@@ -113,24 +110,16 @@ export function UploadCard({
             <span className="text-[11px] text-muted-foreground">drop or choose a file</span>
           )}
           {chars > 0 ? (
-            <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
+            <span className="text-[11px] tabular-nums text-muted-foreground">
               {lines} lines · {chars.toLocaleString()} chars
             </span>
           ) : null}
+          {actions ? <div className="ml-auto flex flex-wrap items-center gap-1.5">{actions}</div> : null}
         </div>
         <p className="mt-1 text-[11px] leading-tight text-muted-foreground">{hint}</p>
       </div>
 
       {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
-
-      <Textarea
-        value={text}
-        onChange={(event) => onText(event.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        spellCheck={false}
-        className="min-h-0 resize-y font-mono text-[10px] leading-relaxed"
-      />
     </div>
   )
 }

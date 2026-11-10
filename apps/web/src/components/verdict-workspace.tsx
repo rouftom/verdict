@@ -485,7 +485,7 @@ export function VerdictWorkspace() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1800px] flex-col gap-2 p-2">
+      <main className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-2 px-2 pt-2">
         <SectionCard
           title="Inputs"
           icon={<Layers className="h-3.5 w-3.5 text-brand-primary" />}
@@ -507,13 +507,7 @@ export function VerdictWorkspace() {
                 accept=".json,.yaml,.yml,application/json,text/yaml"
                 filename={manifestName}
                 text={manifestText}
-                placeholder={'[\n  { "name": "Project", "track": "startup", "github": "https://github.com/owner/repo", "youtube": "https://youtu.be/…" }\n]'}
                 required
-                rows={7}
-                onText={(text) => {
-                  setManifestText(text)
-                  setManifestName(undefined)
-                }}
                 onFile={(filename, text) => {
                   setManifestText(text)
                   setManifestName(filename)
@@ -531,12 +525,6 @@ export function VerdictWorkspace() {
                 accept=".md,.markdown,.txt,.yaml,.yml"
                 filename={rulesName}
                 text={rulesText}
-                placeholder="Optional. Eligibility rules, problem statements, disqualifiers…"
-                rows={7}
-                onText={(text) => {
-                  setRulesText(text)
-                  setRulesName(undefined)
-                }}
                 onFile={(filename, text) => {
                   setRulesText(text)
                   setRulesName(filename)
@@ -547,65 +535,50 @@ export function VerdictWorkspace() {
                 }}
               />
 
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="rubric" className="text-xs font-semibold">
-                    Rubric
-                  </Label>
-                  <Badge tone={rubricMode === 'builtin' ? 'brand' : 'neutral'}>
-                    {rubricMode === 'builtin' ? 'built-in neutral' : 'custom'}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <Button
-                    type="button"
-                    variant={rubricMode === 'builtin' ? 'primary' : 'outline'}
-                    size="sm"
-                    className="h-6 rounded-full px-2 text-[11px]"
-                    onClick={() => {
-                      setRubricText('')
-                      setRubricName(undefined)
-                      setRubricMode('builtin')
-                    }}
-                  >
-                    Built-in
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-6 rounded-full px-2 text-[11px]"
-                    onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}
-                  >
-                    Generic YAML
-                  </Button>
-                </div>
-                <UploadCard
-                  id="rubric"
-                  label="Custom rubric"
-                  hint="YAML/JSON, or the markdown criteria table. Empty = the built-in neutral rubric."
-                  accept=".yaml,.yml,.json,.md,.markdown"
-                  filename={rubricName}
-                  text={rubricText}
-                  placeholder="Paste a rubric, or choose a preset above."
-                  rows={5}
-                  onText={(text) => {
-                    setRubricText(text)
-                    setRubricName(undefined)
-                    setRubricMode(text.trim() ? 'custom' : 'builtin')
-                  }}
-                  onFile={(filename, text) => {
-                    setRubricText(text)
-                    setRubricName(filename)
-                    setRubricMode('custom')
-                  }}
-                  onClear={() => {
-                    setRubricText('')
-                    setRubricName(undefined)
-                    setRubricMode('builtin')
-                  }}
-                />
-              </div>
+              <UploadCard
+                id="rubric"
+                label="Rubric"
+                hint="YAML, JSON or the markdown criteria table. No file means the built-in neutral rubric."
+                accept=".yaml,.yml,.json,.md,.markdown"
+                filename={rubricName}
+                text={rubricText}
+                actions={
+                  <>
+                    <Button
+                      type="button"
+                      variant={rubricMode === 'builtin' ? 'primary' : 'outline'}
+                      size="sm"
+                      className="h-6 px-2 text-[11px]"
+                      onClick={() => {
+                        setRubricText('')
+                        setRubricName(undefined)
+                        setRubricMode('builtin')
+                      }}
+                    >
+                      Built-in
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[11px]"
+                      onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}
+                    >
+                      Generic YAML
+                    </Button>
+                  </>
+                }
+                onFile={(filename, text) => {
+                  setRubricText(text)
+                  setRubricName(filename)
+                  setRubricMode('custom')
+                }}
+                onClear={() => {
+                  setRubricText('')
+                  setRubricName(undefined)
+                  setRubricMode('builtin')
+                }}
+              />
             </div>
 
             <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
@@ -655,89 +628,87 @@ export function VerdictWorkspace() {
                   ) : null}
                 </>
               ) : !previewError ? (
-                <p className="text-[11px] text-muted-foreground">Upload or paste a manifest to validate it.</p>
+                <p className="text-[11px] text-muted-foreground">Choose a manifest file to validate it.</p>
               ) : null}
             </div>
         </SectionCard>
 
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-5">
-          <SectionCard
-            title="Models"
-            icon={<Settings2 className="h-3.5 w-3.5 text-brand-primary" />}
-            aside={<span className="ml-auto text-[10px] text-muted-foreground">per-agent model and reasoning effort</span>}
-            className="lg:col-span-3"
-            contentClassName="grid grid-cols-1 gap-3 pt-0 md:grid-cols-2"
-          >
-              <div className="flex min-w-0 flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">6 evaluators</Label>
-                  <span className="text-[10px] text-muted-foreground">all 4 criteria</span>
-                </div>
-                <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
-              </div>
-              <div className="flex min-w-0 flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">2 verifiers</Label>
-                  <span className="text-[10px] text-muted-foreground">audit + final ranking</span>
-                </div>
-                <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
-              </div>
-              {providersError ? (
-                <p className="text-[10px] text-destructive md:col-span-2">Could not reach the API: {providersError}</p>
-              ) : null}
-          </SectionCard>
+        <SectionCard
+          title="Models"
+          icon={<Settings2 className="h-3.5 w-3.5 text-brand-primary" />}
+          aside={<span className="ml-auto text-[10px] text-muted-foreground">per-agent model and reasoning effort, then run options</span>}
+          contentClassName="grid grid-cols-1 gap-4 pt-0 md:grid-cols-2"
+        >
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">6 evaluators</Label>
+              <span className="text-[10px] text-muted-foreground">all 4 criteria</span>
+            </div>
+            <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
+          </div>
 
-          <SectionCard
-            title="Options"
-            icon={<Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}
-            className="lg:col-span-2"
-            contentClassName="flex flex-col gap-2 pt-0"
-          >
-              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
-                <Checkbox checked={showRanks} onCheckedChange={(value) => setShowRanks(value === true)} className="mt-0.5" />
-                <span>
-                  <span className="block text-[11px] font-medium">Show supplied ranks to the ranking pass</span>
-                  <span className="block text-[10px] leading-tight text-muted-foreground">
-                    Audit only. Criterion scores are fixed before ranking and are never changed by a supplied rank.
-                  </span>
+          <div className="flex min-w-0 flex-col gap-2 md:border-l md:border-border md:pl-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">2 verifiers</Label>
+              <span className="text-[10px] text-muted-foreground">audit + final ranking</span>
+            </div>
+            <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
+
+            <div className="mt-1 h-px bg-border" />
+
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Options</Label>
+              <span className="text-[10px] text-muted-foreground">ranking and harvest</span>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
+              <Checkbox checked={showRanks} onCheckedChange={(value) => setShowRanks(value === true)} className="mt-0.5" />
+              <span>
+                <span className="block text-[11px] font-medium">Show supplied ranks to the ranking pass</span>
+                <span className="block text-[10px] leading-tight text-muted-foreground">
+                  Audit only. Criterion scores are fixed before ranking and are never changed by a supplied rank.
                 </span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="video-cap" className="text-[10px] text-muted-foreground">
-                    Max video (min)
-                  </Label>
-                  <input
-                    id="video-cap"
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={maxVideoMinutes}
-                    onChange={(event) => setMaxVideoMinutes(Math.max(1, Math.min(120, Number(event.target.value) || 20)))}
-                    className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="temperature" className="text-[10px] text-muted-foreground">
-                    Temperature
-                  </Label>
-                  <input
-                    id="temperature"
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={temperature}
-                    onChange={(event) => setTemperature(Math.max(0, Math.min(1, Number(event.target.value) || 0)))}
-                    className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
-                  />
-                </div>
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="video-cap" className="text-[10px] text-muted-foreground">
+                  Max video (min)
+                </Label>
+                <input
+                  id="video-cap"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={maxVideoMinutes}
+                  onChange={(event) => setMaxVideoMinutes(Math.max(1, Math.min(120, Number(event.target.value) || 20)))}
+                  className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
+                />
               </div>
-              <p className="text-[10px] leading-tight text-muted-foreground">
-                Runs stream over SSE. Snapshots are kept in this browser's IndexedDB, no account and no server database.
-              </p>
-          </SectionCard>
-        </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="temperature" className="text-[10px] text-muted-foreground">
+                  Temperature
+                </Label>
+                <input
+                  id="temperature"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={temperature}
+                  onChange={(event) => setTemperature(Math.max(0, Math.min(1, Number(event.target.value) || 0)))}
+                  className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] leading-tight text-muted-foreground">
+              Runs stream over SSE. Snapshots are kept in this browser's IndexedDB, no account and no server database.
+            </p>
+          </div>
+
+          {providersError ? (
+            <p className="text-[10px] text-destructive md:col-span-2">Could not reach the API: {providersError}</p>
+          ) : null}
+        </SectionCard>
 
         {runId ? (
           <div className="flex flex-col gap-1">
@@ -777,7 +748,7 @@ export function VerdictWorkspace() {
           </div>
         ) : null}
 
-        <div className="sticky bottom-0 z-20 -mx-2 mt-1 flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
+        <div className="sticky bottom-0 z-20 -mx-2 mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
           {running ? (
             <Button type="button" variant="destructive" onClick={() => void stopRun()}>
               <Square className="h-4 w-4" /> Cancel run

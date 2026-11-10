@@ -254,10 +254,15 @@ original text.
 The workspace has:
 
 - inputs in **three responsive columns** (project manifest, evaluation rules
-  and rubric), with a live validation strip underneath (project count, criteria and
-  weights, warnings, anchors);
-- **models (3/5) and options (2/5)** side by side on wide screens, stacked on
-  narrow ones; each agent slot carries its own model and reasoning select;
+  and rubric), each a file picker, with a live validation strip underneath
+  (project count, criteria and weights, warnings, anchors). The rubric row also
+  carries the **Built-in** and **Generic YAML** shortcuts, aligned to the end
+  of the picker row;
+- one **Models** block in two columns: **six evaluators** on the left, the
+  **two verifiers** and the run **options** on the right, each agent slot
+  carrying its own model and reasoning select;
+- collapsible **Inputs** and **Models** sections, so a long run does not push
+  the controls around;
 - a React Flow pipeline, shown once a run starts, where harvest fans out to **one node per evaluator**
   (six in parallel), converges on cross-review, consensus and ranking, then fans
   out to **one node per verifier** before the report. Click any agent node for a
@@ -268,8 +273,11 @@ The workspace has:
   scores, evaluator matrix, verifier adjustments, harvest errors);
 - a streaming run log in a floating panel opened from the bottom bar, a
   history drawer and a JSON report export;
-- a single appearance menu in the header: theme pack, light or dark mode and
-  **rounded or square corners** applied to the whole interface.
+- a single appearance menu in the header: theme pack, light, dark or **system**
+  mode (automatic, follows the OS) and **rounded or square corners** applied to
+  the whole interface, pills included;
+- a run bar pinned to the bottom of the viewport, which stays there even when
+  every section is collapsed.
 
 The Meta fallback catalog always includes `muse-spark-1.3` and
 `muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.
