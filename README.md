@@ -1,6 +1,21 @@
-# verdict
+<p align="center">
+  <img src="./apps/web/public/logo.svg" width="88" height="88" alt="verdict logo" />
+</p>
 
-Evidence-grounded, multi-agent evaluation of hackathon-style projects.
+<h1 align="center">verdict</h1>
+
+<p align="center">
+  Evidence-grounded, multi-agent evaluation of hackathon-style projects.
+</p>
+
+<p align="center">
+  <a href="https://bun.sh"><img alt="Bun 1.4.2" src="https://img.shields.io/badge/Bun-1.4.2-000000?logo=bun&logoColor=white" /></a>
+  <a href="https://nextjs.org"><img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" /></a>
+  <a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React-19-087EA4?logo=react&logoColor=white" /></a>
+  <a href="https://www.typescriptlang.org"><img alt="TypeScript 5.6" src="https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white" /></a>
+  <a href="https://turbo.build"><img alt="Turbo 2.3" src="https://img.shields.io/badge/Turbo-2.3-EF4444?logo=turborepo&logoColor=white" /></a>
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-3DA639" />
+</p>
 
 Upload a manifest of projects, the rules, and a rubric. `verdict` harvests each
 project's GitHub repository and demo video, then runs:
@@ -103,6 +118,18 @@ Production build:
 bun run build
 cd apps/web && bun run start
 ```
+
+### PWA and offline
+
+`bun run build` runs `apps/web/scripts/build-sw.ts` first. It copies
+`apps/web/sw/sw.template.js` to the gitignored `apps/web/public/sw.js` and stamps
+it with the commit id, so every deploy registers a new worker. Navigations are
+network-first, images and fonts cache-first, styles and scripts
+stale-while-revalidate, and API or SSE requests are network-only. `next dev`
+unregisters any worker and clears its caches, so HMR never serves a stale bundle.
+
+The web app manifest is `apps/web/src/app/manifest.ts`. The logo, icons and the
+offline page live under `apps/web/public/`.
 
 ## Environment
 
@@ -277,7 +304,9 @@ The workspace has:
   mode (automatic, follows the OS) and **rounded or square corners** applied to
   the whole interface, pills included;
 - a run bar pinned to the bottom of the viewport, which stays there even when
-  every section is collapsed.
+  every section is collapsed;
+- an installable PWA: a Workbox service worker caches the shell and an offline
+  fallback page, and never caches API or SSE traffic.
 
 The Meta fallback catalog always includes `muse-spark-1.3` and
 `muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.
@@ -306,17 +335,25 @@ reports it has seen.
 
 ## Repository layout
 
-```
-verdict
-├── apps/api        Fastify + SSE, in-memory run store
-├── apps/web        Next.js 16 single-screen workspace
-├── packages/shared types, zod schemas, manifest + rubric parsers, consensus
-├── packages/providers provider registry + AI SDK model factory
-├── packages/harvest   GitHub tarball/indexing, yt-dlp, frames, transcription
-├── packages/eval      agents, dossiers, prompts, consensus, ranking, verifiers
-├── packages/ui        shared UI kit
-└── packages/theme     theme packs and chrome
-```
+| Path | Role |
+| --- | --- |
+| `apps/api` | Fastify + SSE, in-memory run store |
+| `apps/web` | Next.js 16 single-screen workspace, PWA shell |
+| `apps/web/sw` | Workbox template stamped into `public/sw.js` at build time |
+| `apps/web/scripts/build-sw.ts` | Stamps the worker with the commit id |
+| `packages/shared` | types, zod schemas, manifest and rubric parsers, consensus |
+| `packages/providers` | provider registry and AI SDK model factory |
+| `packages/harvest` | GitHub tarball and indexing, yt-dlp, frames, transcription |
+| `packages/eval` | agents, dossiers, prompts, consensus, ranking, verifiers |
+| `packages/ui` | shared UI kit |
+| `packages/theme` | theme packs and chrome |
+
+Every app and package is a Bun workspace driven by Turbo. Root commands fan out
+through `turbo run`; run a single workspace from its directory with
+`cd apps/web && bun run build`.
+
+`AGENTS.md` at the repository root explains the architecture, the conventions
+and the verification checklist for anyone, human or agent, taking over the code.
 
 ## Guarantees and limits
 
