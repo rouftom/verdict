@@ -72,9 +72,6 @@
     "searchModel": "मॉडल खोजें",
     "noMatch": "कोई कॉन्फ़िगर किया गया मॉडल मेल नहीं खाता।",
     "noProvider": "कोई प्रदाता कॉन्फ़िगर नहीं है. .env में कुंजी जोड़ें (उदाहरण MODEL_API_KEY या OPENAI_API_KEY), फिर पुनः लोड करें।",
-    "hidden_one": "बिना कुंजी वाला {{count}} प्रदाता छिपा है।",
-    "hidden_other": "बिना कुंजी वाले {{count}} प्रदाता छिपे हैं।",
-    "catalogError": "{{providers}}: मॉडल एंडपॉइंट विफल रहा, सूची खाली है या env fallback से आई है।",
     "modelAria": "{{slot}} मॉडल {{index}}",
     "reasoningAria": "{{slot}} तर्क प्रयास {{index}}"
   },
