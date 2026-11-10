@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Check, Moon, Palette, Sun } from 'lucide-react'
+import { Check, Monitor, Moon, Palette, Sun } from 'lucide-react'
 import {
   Button,
   DropdownMenu,
@@ -14,14 +14,22 @@ import {
 } from '@verdict/ui'
 import { useTheme } from '@/components/theme-provider'
 
-const CORNERS = [
-  { value: 'rounded', label: 'Rounded' },
-  { value: 'square', label: 'Square' },
+const MODES = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'system', label: 'System', icon: Monitor },
 ] as const
 
+const CORNERS = [
+  { value: 'square', label: 'Square' },
+  { value: 'rounded', label: 'Rounded' },
+] as const
+
+const groupTitle = 'text-[10px] font-semibold text-muted-foreground'
+
 /**
- * One appearance control: colour pack, light or dark mode and the corner
- * treatment of the whole console, following the FSM header menu.
+ * One appearance control: colour pack, light, dark or system mode and the
+ * corner treatment of the whole console, following the FSM header menu.
  */
 export function AppearanceMenu() {
   const theme = useTheme()
@@ -34,9 +42,7 @@ export function AppearanceMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          Theme
-        </DropdownMenuLabel>
+        <DropdownMenuLabel className={groupTitle}>Theme</DropdownMenuLabel>
         {theme.packs.map((pack) => (
           <DropdownMenuItem
             key={pack.id}
@@ -54,16 +60,11 @@ export function AppearanceMenu() {
         ))}
 
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          Mode
-        </DropdownMenuLabel>
-        {[
-          { value: 'light', label: 'Light', icon: Sun },
-          { value: 'dark', label: 'Dark', icon: Moon },
-        ].map(({ value, label, icon: Icon }) => (
+        <DropdownMenuLabel className={groupTitle}>Mode</DropdownMenuLabel>
+        {MODES.map(({ value, label, icon: Icon }) => (
           <DropdownMenuItem
             key={value}
-            onSelect={() => theme.setMode(value as 'light' | 'dark')}
+            onSelect={() => theme.setMode(value)}
             className="cursor-pointer gap-2"
           >
             <Icon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -73,9 +74,7 @@ export function AppearanceMenu() {
         ))}
 
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          Corners
-        </DropdownMenuLabel>
+        <DropdownMenuLabel className={groupTitle}>Corners</DropdownMenuLabel>
         {CORNERS.map(({ value, label }) => (
           <DropdownMenuItem
             key={value}

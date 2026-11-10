@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { Virtuoso } from 'react-virtuoso'
 import {
   ArrowDown,
   ArrowUp,
@@ -39,6 +40,18 @@ interface CriterionMeta {
   id: string
   label: string
   weight: number
+}
+
+/** One flat row per track header and per ranked project, so a huge manifest virtualises. */
+type RankingRow =
+  | { kind: 'track'; track: string; count: number }
+  | { kind: 'entry'; entry: TrackRanking['entries'][number] }
+
+function flattenRankings(rankings: TrackRanking[]): RankingRow[] {
+  return rankings.flatMap((track) => [
+    { kind: 'track' as const, track: track.track, count: track.entries.length },
+    ...track.entries.map((entry) => ({ kind: 'entry' as const, entry })),
+  ])
 }
 
 function provisionalRankings(manifest: ProjectInput[], consensus: ProjectConsensus[], rubric?: Rubric): TrackRanking[] {
@@ -110,6 +123,70 @@ function evaluatorScore(evaluation: ProjectEvaluation, criterionId: string): Cri
   return evaluation.scores.find((score) => score.criterionId === criterionId)
 }
 
+/**
+ * Virtualised per-track ranking. Only the visible rows are mounted, so a
+ * manifest with thousands of projects scrolls without slowing the page down.
+ */
+function RankingList({
+  rankings,
+  selected,
+  onSelect,
+}: {
+  rankings: TrackRanking[]
+  selected?: string
+  onSelect: (projectId: string) => void
+}) {
+  const rows = React.useMemo(() => flattenRankings(rankings), [rankings])
+
+  return (
+    <Virtuoso
+      data={rows}
+      className="h-full"
+      computeItemKey={(_index, row) => (row.kind === 'track' ? `track:${row.track}` : `entry:${row.entry.projectId}`)}
+      itemContent={(_index, row) =>
+        row.kind === 'track' ? (
+          <div className="flex items-center justify-between border-b border-border bg-muted/60 px-3 py-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{row.track}</span>
+            <span className="text-[10px] text-muted-foreground">{row.count} project(s)</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onSelect(row.entry.projectId)}
+            className={cn(
+              'flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-left hover:bg-muted/50',
+              selected === row.entry.projectId && 'bg-brand-primary/5',
+            )}
+          >
+            <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground">
+              {row.entry.rank}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12px] font-medium">{row.entry.name}</span>
+              <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>{row.entry.status}</span>
+                <span>·</span>
+                <span>conf {pct(row.entry.confidence)}</span>
+                {row.entry.providedRank !== undefined ? (
+                  <>
+                    <span>·</span>
+                    <span>was #{row.entry.providedRank}</span>
+                    <DeltaPill delta={row.entry.rankDelta} />
+                  </>
+                ) : null}
+              </span>
+            </span>
+            <Badge tone={scoreTone(row.entry.overall)} className="tabular-nums">
+              {row.entry.overall.toFixed(1)}
+            </Badge>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          </button>
+        )
+      }
+    />
+  )
+}
+
 export function ResultsPanel({
   report,
   rubric,
@@ -147,54 +224,11 @@ export function ResultsPanel({
             {sourceOfRanks}
           </Badge>
         </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-auto p-0">
+        <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
           {manifest.length === 0 ? (
             <p className="p-4 text-xs text-muted-foreground">Upload a manifest to see projects here.</p>
           ) : (
-            <div className="divide-y divide-border">
-              {rankings.map((track) => (
-                <div key={track.track}>
-                  <div className="sticky top-0 z-10 flex items-center justify-between bg-muted/60 px-3 py-1.5 backdrop-blur">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{track.track}</span>
-                    <span className="text-[10px] text-muted-foreground">{track.entries.length} project(s)</span>
-                  </div>
-                  {track.entries.map((entry) => (
-                    <button
-                      key={entry.projectId}
-                      type="button"
-                      onClick={() => onSelect(entry.projectId)}
-                      className={cn(
-                        'flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted/50',
-                        selected === entry.projectId && 'bg-brand-primary/5',
-                      )}
-                    >
-                      <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground">
-                        {entry.rank}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-medium">{entry.name}</span>
-                        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                          <span>{entry.status}</span>
-                          <span>·</span>
-                          <span>conf {pct(entry.confidence)}</span>
-                          {entry.providedRank !== undefined ? (
-                            <>
-                              <span>·</span>
-                              <span>was #{entry.providedRank}</span>
-                              <DeltaPill delta={entry.rankDelta} />
-                            </>
-                          ) : null}
-                        </span>
-                      </span>
-                      <Badge tone={scoreTone(entry.overall)} className="tabular-nums">
-                        {entry.overall.toFixed(1)}
-                      </Badge>
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
+            <RankingList rankings={rankings} selected={selected} onSelect={onSelect} />
           )}
         </CardContent>
       </Card>

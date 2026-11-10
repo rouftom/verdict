@@ -2,14 +2,24 @@
 
 import type { ThemePack } from './types'
 
-export type ThemeMode = 'light' | 'dark'
+export type ThemeMode = 'light' | 'dark' | 'system'
+export type ResolvedMode = 'light' | 'dark'
+
+export const DEFAULT_THEME_MODE: ThemeMode = 'system'
 
 /**
- * Light is the console default. `system` remains an explicit operator choice,
- * but the absence of a stored preference never silently flips the demo to dark.
+ * `system` is the default: the console follows the OS on first visit, and an
+ * explicit light or dark choice wins afterwards.
  */
 export function resolveMode(preferred?: string | null): ThemeMode {
-  return preferred === 'dark' ? 'dark' : 'light'
+  return preferred === 'light' || preferred === 'dark' || preferred === 'system'
+    ? preferred
+    : DEFAULT_THEME_MODE
+}
+
+/** Collapse a preference to the mode actually painted. */
+export function resolveModeValue(mode: ThemeMode, prefersDark = false): ResolvedMode {
+  return mode === 'dark' || (mode === 'system' && prefersDark) ? 'dark' : 'light'
 }
 
 function upsertMeta(name: string): HTMLMetaElement {
@@ -22,13 +32,13 @@ function upsertMeta(name: string): HTMLMetaElement {
   return meta
 }
 
-/** Page background of a pack for a given mode (chrome bar / tile colour). */
-export function surfaceFor(pack: ThemePack, mode: ThemeMode): string {
+/** Page background of a pack for a given resolved mode (chrome bar / tile colour). */
+export function surfaceFor(pack: ThemePack, mode: ResolvedMode): string {
   return (mode === 'dark' ? pack.tokens.dark['--background'] : pack.tokens.light['--background']) ?? pack.preview.surface
 }
 
 /** Push the active pack colors onto the browser chrome metas. */
-export function applyBrowserChrome(pack: ThemePack, mode: ThemeMode): void {
+export function applyBrowserChrome(pack: ThemePack, mode: ResolvedMode): void {
   if (typeof document === 'undefined') return
   const isDark = mode === 'dark'
   const color = surfaceFor(pack, mode)
@@ -86,13 +96,14 @@ export function buildChromeBootstrapScript(options: ChromeBootstrapOptions): str
   return `(function(){try{
 var sl=${JSON.stringify(surfaceLight)};var sd=${JSON.stringify(surfaceDark)};var p=${JSON.stringify(primary)};
 var id=localStorage.getItem(${JSON.stringify(themeStorageKey)})||${JSON.stringify(defaultThemeId)};
-var mode=localStorage.getItem(${JSON.stringify(modeStorageKey)})||'light';
-var dark=mode==='dark';
-var root=document.documentElement;root.setAttribute('data-theme-pack',id);
+var mode=localStorage.getItem(${JSON.stringify(modeStorageKey)})||'system';
+var systemDark=!!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+var dark=mode==='dark'||(mode==='system'&&systemDark);
+var root=document.documentElement;root.setAttribute('data-theme-pack',id);root.setAttribute('data-mode',mode);
 if(dark)root.classList.add('dark');else root.classList.remove('dark');
 ${
     radiusStorageKey
-      ? `var radius=localStorage.getItem(${JSON.stringify(radiusStorageKey)})||${JSON.stringify(defaultRadius ?? 'rounded')};root.setAttribute('data-radius',radius==='square'?'square':'rounded');`
+      ? `var radius=localStorage.getItem(${JSON.stringify(radiusStorageKey)})||${JSON.stringify(defaultRadius ?? 'square')};root.setAttribute('data-radius',radius==='rounded'?'rounded':'square');`
       : ''
   }
 var color=(dark?sd:sl)[id]||(dark?sd:sl)[${JSON.stringify(defaultThemeId)}];

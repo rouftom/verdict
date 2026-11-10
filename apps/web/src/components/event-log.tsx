@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { Virtuoso } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
 import { Terminal, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
@@ -14,11 +15,6 @@ function toneOf(event: RunEvent): string {
 }
 
 export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: () => void }) {
-  const end = React.useRef<HTMLDivElement>(null)
-  React.useEffect(() => {
-    end.current?.scrollIntoView({ block: 'end' })
-  }, [events.length])
-
   return (
     <Card className="flex h-full min-h-0 flex-col overflow-hidden">
       <CardHeader className="border-b border-border">
@@ -31,13 +27,17 @@ export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: ()
           </Button>
         ) : null}
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 overflow-auto p-2">
+      <CardContent className="min-h-0 flex-1 p-0">
         {events.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground">Nothing yet. Start a run to stream stages and model verdicts.</p>
+          <p className="p-2 text-[11px] text-muted-foreground">Nothing yet. Start a run to stream stages and model verdicts.</p>
         ) : (
-          <ul className="flex flex-col gap-0.5 font-mono text-[10px] leading-relaxed">
-            {events.map((event, index) => (
-              <li key={`${event.at}-${index}`} className={cn('flex gap-2', toneOf(event))}>
+          <Virtuoso
+            data={events}
+            className="h-full"
+            followOutput="smooth"
+            initialTopMostItemIndex={Math.max(0, events.length - 1)}
+            itemContent={(_index, event) => (
+              <div className={cn('flex gap-2 px-2 py-0.5 font-mono text-[10px] leading-relaxed', toneOf(event))}>
                 <span className="shrink-0 tabular-nums text-muted-foreground/70">
                   {new Date(event.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
@@ -46,11 +46,10 @@ export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: ()
                   {event.projectId ? <span className="text-muted-foreground">{event.projectId}: </span> : null}
                   {event.message}
                 </span>
-              </li>
-            ))}
-          </ul>
+              </div>
+            )}
+          />
         )}
-        <div ref={end} />
       </CardContent>
     </Card>
   )

@@ -17,10 +17,6 @@ import {
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Label,
   cn,
@@ -57,6 +53,7 @@ import { PipelineGraph, StatusPill } from './pipeline-graph'
 import { ResultsPanel } from './results-panel'
 import { EventLog } from './event-log'
 import { AppearanceMenu } from './appearance-menu'
+import { SectionCard } from './section-card'
 
 const RUNNING: RunStatus[] = ['queued', 'parsing', 'harvesting', 'evaluating', 'reviewing', 'consensus', 'verifying']
 
@@ -489,18 +486,19 @@ export function VerdictWorkspace() {
       </header>
 
       <main className="mx-auto flex w-full max-w-[1800px] flex-col gap-2 p-2">
-        <Card>
-          <CardHeader>
-            <Layers className="h-3.5 w-3.5 text-brand-primary" />
-            <CardTitle>Inputs</CardTitle>
+        <SectionCard
+          title="Inputs"
+          icon={<Layers className="h-3.5 w-3.5 text-brand-primary" />}
+          aside={
             <span className="ml-auto flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
               <span>
                 {projects.length} project{projects.length === 1 ? '' : 's'}
               </span>
               {preview ? <span>{preview.rulesChars.toLocaleString()} rule chars</span> : null}
             </span>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 pt-0">
+          }
+          contentClassName="flex flex-col gap-3 pt-0"
+        >
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <UploadCard
                 id="manifest"
@@ -660,17 +658,16 @@ export function VerdictWorkspace() {
                 <p className="text-[11px] text-muted-foreground">Upload or paste a manifest to validate it.</p>
               ) : null}
             </div>
-          </CardContent>
-        </Card>
+        </SectionCard>
 
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
-          <Card className="xl:col-span-3">
-            <CardHeader>
-              <Settings2 className="h-3.5 w-3.5 text-brand-primary" />
-              <CardTitle>Models</CardTitle>
-              <span className="ml-auto text-[10px] text-muted-foreground">per-agent model and reasoning effort</span>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 pt-0 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-5">
+          <SectionCard
+            title="Models"
+            icon={<Settings2 className="h-3.5 w-3.5 text-brand-primary" />}
+            aside={<span className="ml-auto text-[10px] text-muted-foreground">per-agent model and reasoning effort</span>}
+            className="lg:col-span-3"
+            contentClassName="grid grid-cols-1 gap-3 pt-0 md:grid-cols-2"
+          >
               <div className="flex min-w-0 flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">6 evaluators</Label>
@@ -688,15 +685,14 @@ export function VerdictWorkspace() {
               {providersError ? (
                 <p className="text-[10px] text-destructive md:col-span-2">Could not reach the API: {providersError}</p>
               ) : null}
-            </CardContent>
-          </Card>
+          </SectionCard>
 
-          <Card className="xl:col-span-2">
-            <CardHeader>
-              <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <CardTitle>Options</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
+          <SectionCard
+            title="Options"
+            icon={<Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}
+            className="lg:col-span-2"
+            contentClassName="flex flex-col gap-2 pt-0"
+          >
               <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
                 <Checkbox checked={showRanks} onCheckedChange={(value) => setShowRanks(value === true)} className="mt-0.5" />
                 <span>
@@ -740,8 +736,7 @@ export function VerdictWorkspace() {
               <p className="text-[10px] leading-tight text-muted-foreground">
                 Runs stream over SSE. Snapshots are kept in this browser's IndexedDB, no account and no server database.
               </p>
-            </CardContent>
-          </Card>
+          </SectionCard>
         </div>
 
         {runId ? (

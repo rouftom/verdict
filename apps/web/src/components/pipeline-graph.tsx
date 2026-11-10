@@ -493,7 +493,7 @@ export function PipelineGraph({
     const verifierNodes = verifierSummaries.map((summary, index) => ({
       id: `agent-${summary.agent.id}`,
       type: 'agent',
-      position: { x: 1166, y: 62 + index * 92 },
+      position: { x: 200 + index * 188, y: 232 },
       data: {
         ...summary,
         criteria,
@@ -582,7 +582,7 @@ export function PipelineGraph({
   }, [evaluatorSummaries, status, verifierSummaries])
 
   return (
-    <div className="h-[280px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[300px]">
+    <div className="h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -590,6 +590,7 @@ export function PipelineGraph({
         fitView
         fitViewOptions={{ padding: 0.16 }}
         minZoom={0.35}
+        onlyRenderVisibleElements
         panOnDrag
         zoomOnScroll={false}
         zoomOnPinch={false}

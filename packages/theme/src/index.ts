@@ -30,13 +30,13 @@ export function isThemePackId(id?: string | null): boolean {
 export const THEME_PACK_STORAGE_KEY = 'sps-theme-pack'
 export const MODE_STORAGE_KEY = 'sps-theme-mode'
 
-/** Corner treatment of the whole console: rounded by default, or square. */
+/** Corner treatment of the whole console: square by default, or rounded. */
 export type CornerStyle = 'square' | 'rounded'
-export const DEFAULT_CORNER_STYLE: CornerStyle = 'rounded'
+export const DEFAULT_CORNER_STYLE: CornerStyle = 'square'
 export const RADIUS_STORAGE_KEY = 'sps.radius'
 
 export function resolveCornerStyle(preferred?: string | null): CornerStyle {
-  return preferred === 'square' ? 'square' : DEFAULT_CORNER_STYLE
+  return preferred === 'rounded' ? 'rounded' : DEFAULT_CORNER_STYLE
 }
 
 export * from './types'

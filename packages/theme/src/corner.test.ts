@@ -8,12 +8,12 @@ import {
 } from './index'
 
 describe('corner style option', () => {
-  test('accepts rounded and square, rounded by default', () => {
-    expect(DEFAULT_CORNER_STYLE).toBe('rounded')
-    expect(resolveCornerStyle('square')).toBe('square')
+  test('accepts rounded and square, square by default', () => {
+    expect(DEFAULT_CORNER_STYLE).toBe('square')
     expect(resolveCornerStyle('rounded')).toBe('rounded')
-    expect(resolveCornerStyle('pill')).toBe('rounded')
-    expect(resolveCornerStyle(null)).toBe('rounded')
+    expect(resolveCornerStyle('square')).toBe('square')
+    expect(resolveCornerStyle('pill')).toBe('square')
+    expect(resolveCornerStyle(null)).toBe('square')
   })
 
   test('the pre-paint bootstrap applies the stored radius', () => {
