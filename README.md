@@ -322,7 +322,8 @@ The workspace has:
 - a single appearance menu in the header: theme pack, light, dark or **system**
   mode (automatic, follows the OS) and **rounded or square corners** applied to
   the whole interface, pills included;
-- a globe **language selector** in the header with English, French, Mandarin
+- a globe **language selector** in the header, after the History button and
+  kept compact with short codes only, with English, French, Mandarin
   Chinese and Hindi. The choice persists in `localStorage` and the
   `verdict-language` cookie, updates `<html lang>`, and defaults to English for
   the first server render so hydration stays stable;
