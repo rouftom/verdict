@@ -243,7 +243,7 @@ forwarded to an API that would reject it.
 
 | Input | Formats | Notes |
 | --- | --- | --- |
-| Manifest | JSON, YAML | Array, `{ projects: [] }`, or a single object. Fields: `name`, `track`, `github`/`repo`, `youtube`/`video`, `rank`, `description`, `team`. |
+| Manifest | JSON, YAML | Array, `{ projects: [] }`, or a single object. Fields: `name`, `track` (single), `tracks` (array), `github`/`repo`, `youtube`/`video`, `rank`, `description`, `team`. |
 | Evaluation rules | Markdown, TXT | Passed verbatim to every agent as untrusted context. Optional. |
 | Rubric | YAML, JSON, Markdown table | Optional; the built-in neutral rubric is used when empty. |
 
@@ -257,9 +257,12 @@ Example inputs ship inside the repository:
   tracks (Indie Developer, Startup) and three award tracks (Best agentic use
   case, Best creative build, Best build on Open Weight).
 
-Track values are free-form: whatever string a project carries in `track`
-becomes its ranking group. Every track, participant or award, gets its own
-ranking, and a supplied rank restarts at 1 in each.
+Track values are free-form: whatever string a project carries in `track` or
+`tracks` becomes a ranking group. `tracks` is the multi-track field, so a
+project can be ranked in a participant track and several award tracks at the
+same time; the first entry is the primary track. Every track, participant or
+award, gets its own ranking, and a supplied `rank` applies to the primary track
+of that project only. Other tracks are ranked from the scores alone.
 
 The example manifest (`winners.json`) is deliberately kept **outside** this
 repository, next to the organiser rubric, so frequent edits to it never cause a
@@ -304,6 +307,8 @@ The workspace has:
 - a per-track ranking and a project detail table, shown as soon as results
   start arriving (consensus, spread, final
   scores, evaluator matrix, verifier adjustments, harvest errors);
+- one bottom-bar toggle that switches between the pipeline view and the results
+  view, so only one of them is on screen at a time;
 - a streaming run log in a floating panel opened from the bottom bar, a
   history drawer and a JSON report export;
 - a single appearance menu in the header: theme pack, light, dark or **system**

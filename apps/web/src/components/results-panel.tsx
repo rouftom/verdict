@@ -14,15 +14,17 @@ import {
   Trophy,
 } from 'lucide-react'
 import { Badge, Card, CardContent, CardHeader, CardTitle, cn } from '@verdict/ui'
-import type {
-  CriterionScore,
-  ProjectConsensus,
-  ProjectEvaluation,
-  ProjectInput,
-  ProjectVerification,
-  Report,
-  Rubric,
-  TrackRanking,
+import {
+  primaryTrack,
+  projectTracks,
+  type CriterionScore,
+  type ProjectConsensus,
+  type ProjectEvaluation,
+  type ProjectInput,
+  type ProjectVerification,
+  type Report,
+  type Rubric,
+  type TrackRanking,
 } from '@verdict/shared'
 import { formatDate, pct, scoreTone } from '@/lib/format'
 
@@ -59,8 +61,9 @@ function provisionalRankings(manifest: ProjectInput[], consensus: ProjectConsens
   const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
   const groups = new Map<string, ProjectInput[]>()
   for (const project of manifest) {
-    const track = project.track?.trim() || 'default'
-    groups.set(track, [...(groups.get(track) ?? []), project])
+    for (const track of projectTracks(project)) {
+      groups.set(track, [...(groups.get(track) ?? []), project])
+    }
   }
   const tieBreakers = rubric?.ranking.tieBreakers ?? []
   return [...groups.entries()].map(([track, projects]) => {
@@ -84,7 +87,9 @@ function provisionalRankings(manifest: ProjectInput[], consensus: ProjectConsens
         track,
         rank: index + 1,
         overall: byId.get(project.id)?.overall ?? 0,
-        ...(project.rank !== undefined ? { providedRank: project.rank, rankDelta: project.rank - (index + 1) } : {}),
+        ...(project.rank !== undefined && primaryTrack(project) === track
+          ? { providedRank: project.rank, rankDelta: project.rank - (index + 1) }
+          : {}),
         confidence: byId.get(project.id)?.confidence ?? 0,
         status: byId.get(project.id)?.status ?? 'escalated',
       })),

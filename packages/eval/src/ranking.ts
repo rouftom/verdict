@@ -1,6 +1,7 @@
 import { createLanguageModel, modelRefKey, type ModelRef } from '@verdict/providers'
 import {
   bordaCount,
+  primaryTrack,
   rankingOutputSchema,
   type ProjectConsensus,
   type ProjectEvidence,
@@ -79,9 +80,10 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
     .filter((project): project is ProjectInput => Boolean(project))
     .map((project) => compactDossier(project, allById.get(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
   // Ranks are shown to this pass only, after every criterion score is fixed.
+  // A supplied rank belongs to the primary track; other tracks never see it.
   const suppliedRanks = showProvidedRanks
     ? projects
-        .filter((project) => typeof project.rank === 'number')
+        .filter((project) => typeof project.rank === 'number' && primaryTrack(project) === track)
         .map((project) => ({ id: project.id, name: project.name, rank: project.rank as number }))
     : []
   const orders: string[][] = []

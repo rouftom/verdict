@@ -25,17 +25,20 @@ These are product promises, not implementation details. Do not weaken them.
 2. **One cross-review round**: each evaluator sees the other five, anonymised,
    and may revise with a written justification.
 3. **Consensus**: trimmed mean per criterion, spread and MAD dispersion.
-4. **Comparative ranking** per track, aggregated by Borda count. A ranking is
-   always produced, even for a single project.
+4. **Comparative ranking** per track, aggregated by Borda count. A project can
+   enter several tracks through `tracks`, so it is ranked in each of them. A
+   ranking is always produced, even for a single project.
 5. **Two verifier agents** audit the evaluations, then reconcile criterion
    scores and the per-track ranking.
 6. **Report**: final scores, ranking, supplied-rank delta, harvest errors and
    token usage.
 
-Supplied ranks are optional and **never** influence criterion scores. They are
-shown only to the comparative ranking pass when the workspace option is on, and
-only after every criterion score is fixed. Up to three projects can be chosen as
-calibration anchors. Anchors get no bonus and may come from another track.
+Supplied ranks are optional and **never** influence criterion scores. A supplied
+`rank` applies to the project's primary track only; award and secondary tracks
+are ranked from the scores. Ranks are shown to the comparative ranking pass only
+when the workspace option is on, and only after every criterion score is fixed.
+Up to three projects can be chosen as calibration anchors. Anchors get no bonus
+and may come from another track.
 
 Repository and video content is untrusted data. The prompts say so explicitly.
 Never let harvested text become an instruction.
@@ -140,7 +143,8 @@ rewrites its generated file, leave it alone.
 - Models is one block in two columns: six evaluators on the left, two verifiers
   and the run options on the right.
 - The pipeline appears only after a run starts. Ranking and project detail
-  appear as soon as results arrive.
+  appear as soon as results arrive. One bottom-bar toggle switches between the
+  pipeline view and the results view, so only one is on screen at a time.
 - Large lists stay virtualised: `react-virtuoso` for the run log and ranking,
   `onlyRenderVisibleElements` for React Flow.
 - All six evaluators score all four criteria. The model pool is cycled across

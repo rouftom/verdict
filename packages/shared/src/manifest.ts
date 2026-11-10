@@ -45,6 +45,20 @@ function toRank(value: unknown): number | undefined {
   return undefined
 }
 
+/** Merge the legacy `track` with the multi-track `tracks`, primary first. */
+function normaliseTracks(track: string | undefined, tracks: unknown): string[] {
+  const primary = (track ?? '').trim()
+  const listed = toStringArray(tracks)
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of [...(primary ? [primary] : []), ...listed]) {
+    if (seen.has(value)) continue
+    seen.add(value)
+    result.push(value)
+  }
+  return result
+}
+
 /**
  * Parse a manifest from JSON or YAML, accepting an array or `{ projects: [] }`.
  * Field aliases are normalised so the sample `winners.json` and hand-written
@@ -75,18 +89,21 @@ export function parseManifestText(text: string): ManifestParseResult {
   const warnings: string[] = []
   const projects: ProjectInput[] = []
   const seenIds = new Set<string>()
+  let multiTrackRanks = 0
 
   for (const [index, entry] of entries.entries()) {
     const candidate = rawProjectSchema.parse(entry)
     const name = (candidate.name ?? candidate.title ?? candidate.project ?? '').trim()
     const github = cleanUrl(candidate.github ?? candidate.repo ?? candidate.repository)
     const youtube = cleanUrl(candidate.youtube ?? candidate.video ?? candidate.demo ?? candidate.demo_video)
-    const track = (candidate.track ?? '').trim() || undefined
+    const tracks = normaliseTracks(candidate.track, candidate.tracks)
+    const track = tracks[0]
     const rank = toRank(candidate.rank)
     const description = candidate.description?.trim() || undefined
 
     if (!name) warnings.push(`Project ${index + 1}: no name.`)
     if (!github && !youtube) warnings.push(`Project ${index + 1} (${name || 'unnamed'}): no repository and no video.`)
+    if (rank !== undefined && tracks.length > 1) multiTrackRanks += 1
 
     const seed = github ?? youtube ?? name ?? `project-${index}`
     let id = (candidate.id ?? '').trim() || `${slug(name || 'project')}-${shortHash(seed)}`
@@ -98,7 +115,7 @@ export function parseManifestText(text: string): ManifestParseResult {
 
     const extra: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(candidate)) {
-      if (!['id', 'name', 'title', 'project', 'rank', 'track', 'github', 'repo', 'repository', 'youtube', 'video', 'demo', 'demo_video', 'description', 'team'].includes(key)) {
+      if (!['id', 'name', 'title', 'project', 'rank', 'track', 'tracks', 'github', 'repo', 'repository', 'youtube', 'video', 'demo', 'demo_video', 'description', 'team'].includes(key)) {
         extra[key] = value
       }
     }
@@ -108,6 +125,7 @@ export function parseManifestText(text: string): ManifestParseResult {
       name: name || `Project ${index + 1}`,
       ...(rank !== undefined ? { rank } : {}),
       ...(track ? { track } : {}),
+      ...(tracks.length > 0 ? { tracks } : {}),
       ...(github ? { github } : {}),
       ...(youtube ? { youtube } : {}),
       ...(description ? { description } : {}),
@@ -117,6 +135,10 @@ export function parseManifestText(text: string): ManifestParseResult {
   }
 
   if (projects.length === 0) throw new Error('The manifest contains no projects.')
+
+  if (multiTrackRanks > 0) {
+    warnings.push(`${multiTrackRanks} project${multiTrackRanks === 1 ? '' : 's'} carry a supplied rank with several tracks. The rank applies to the primary track only; other tracks are ranked from the scores.`)
+  }
 
   const perTrack = new Map<string, Set<number>>()
   for (const project of projects) {

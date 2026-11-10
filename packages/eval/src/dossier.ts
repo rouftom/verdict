@@ -1,6 +1,13 @@
-import type { ProjectConsensus, ProjectEvidence, ProjectEvaluation, ProjectInput, Rubric } from '@verdict/shared'
+import { projectTracks, type ProjectConsensus, type ProjectEvidence, type ProjectEvaluation, type ProjectInput, type Rubric } from '@verdict/shared'
 
 const MAX_DOSSIER_CHARS = 42_000
+
+/** Human label for every track a project is entered in. */
+function trackLabel(project: ProjectInput): string {
+  const tracks = projectTracks(project)
+  if (tracks.length === 1 && tracks[0] === 'default') return 'unspecified'
+  return tracks.join(', ')
+}
 
 function clip(value: string, max: number): string {
   if (value.length <= max) return value
@@ -32,7 +39,7 @@ export function buildDossier(project: ProjectInput, evidence: ProjectEvidence): 
       'PROJECT',
       `name: ${project.name}`,
       `id: ${project.id}`,
-      `track: ${project.track ?? 'unspecified'}`,
+      `track: ${trackLabel(project)}`,
       project.description ? `description: ${clip(project.description, 2_000)}` : 'description: (none supplied)',
       'The provided rank, if any, is deliberately withheld from this packet. Do not infer one.',
     ].join('\n'),
@@ -123,7 +130,7 @@ export function compactDossier(
   return [
     `- id: ${project.id}`,
     `  name: ${project.name}`,
-    `  track: ${project.track ?? 'unspecified'}`,
+    `  track: ${trackLabel(project)}`,
     `  overall: ${consensus?.overall ?? 'n/a'} (dispersion ${consensus?.dispersion ?? 'n/a'}, ${consensus?.status ?? 'n/a'})`,
     `  criteria: ${scores}`,
     `  evidence: ${repo}; ${video}`,

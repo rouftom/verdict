@@ -1,6 +1,8 @@
 import { modelRefKey, type ModelRef } from '@verdict/providers'
 import {
   buildConsensus,
+  primaryTrack,
+  projectTracks,
   rankProjects,
   verifierFinalScores,
   weightedOverall,
@@ -358,14 +360,15 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       ordered.map((project, index) => {
         const projectConsensus = consensus.find((entry) => entry.projectId === project.id)
         const rank = index + 1
+        const hasProvidedRank = project.rank !== undefined && primaryTrack(project) === track
         return {
           projectId: project.id,
           name: project.name,
-          track: project.track ?? track,
+          track,
           rank,
           overall: finalScores.get(project.id) ?? 0,
-          ...(project.rank !== undefined ? { providedRank: project.rank } : {}),
-          ...(project.rank !== undefined ? { rankDelta: project.rank - rank } : {}),
+          ...(hasProvidedRank ? { providedRank: project.rank } : {}),
+          ...(hasProvidedRank ? { rankDelta: (project.rank as number) - rank } : {}),
           confidence: projectConsensus?.confidence ?? 0,
           status: projectConsensus?.status ?? 'escalated',
         } satisfies RankedProject
@@ -400,7 +403,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       return {
         projectId: project.id,
         name: project.name,
-        track: project.track ?? 'default',
+        track: primaryTrack(project),
         consensus: projectConsensus,
         verifications: projectVerifications,
         finalScores: final.scores,
@@ -423,10 +426,11 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
 function groupByTrack(manifest: ProjectInput[]): Map<string, ProjectInput[]> {
   const groups = new Map<string, ProjectInput[]>()
   for (const project of manifest) {
-    const track = project.track?.trim() || 'default'
-    const bucket = groups.get(track) ?? []
-    bucket.push(project)
-    groups.set(track, bucket)
+    for (const track of projectTracks(project)) {
+      const bucket = groups.get(track) ?? []
+      bucket.push(project)
+      groups.set(track, bucket)
+    }
   }
   return groups
 }

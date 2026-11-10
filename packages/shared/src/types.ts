@@ -72,7 +72,10 @@ export interface ProjectInput {
   id: string
   name: string
   rank?: number
+  /** Primary track, always the first entry of `tracks`. */
   track?: string
+  /** Every track the project is entered in, primary track first. */
+  tracks?: string[]
   github?: string
   youtube?: string
   description?: string
