@@ -34,6 +34,24 @@ Every project enters exactly **one** track.
 
 A project submission may be entered in one track only.
 
+## Award tracks
+
+Beyond the two participant tracks, three award tracks recognise specific
+kinds of work. A project may opt into any award track on the submission
+form, and it can win its participant track and an award track at the same
+time. A project that does not opt in is simply not considered for that
+award.
+
+| Award track | What judges look for |
+| --- | --- |
+| **Best agentic use case** | An agent that plans, calls tools and acts on its own toward a real outcome, rather than a single prompt wrapped in a chat box. Judges look for tool use that changes the result, sensible guardrails and a task that genuinely needs an agent. |
+| **Best creative build** | A surprising, expressive or culturally rich use of the models: interactive art, generative music, narrative, games or a craft nobody expected. Judges look for originality and finish, not novelty alone. |
+| **Best build on Open Weight** | A project that runs open-weight models in the product, not only in a demo. Judges look for deliberate model choice, a credible deployment story (quantisation, hosting, latency, cost) and a result that would not be possible with a closed model alone. |
+
+Award tracks are ranked separately from participant tracks. A project's
+position in one ranking never changes its criterion scores or its position
+in another ranking.
+
 ## Project themes
 
 Regardless of the track, projects must fit one of two problem statements.
@@ -132,8 +150,9 @@ the event page.
 | 5th | $25,000 |
 
 Bonus prizes of up to $50,000 in aggregate may be awarded for standout
-projects or community achievements. Total anticipated prize pool:
-**$1,000,000**.
+projects or community achievements, including the Best agentic use case,
+Best creative build and Best build on Open Weight award tracks. Total
+anticipated prize pool: **$1,000,000**.
 
 ## Conduct
 

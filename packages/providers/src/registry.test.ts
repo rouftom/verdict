@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { listProviders } from './registry'
 
-const ENV_KEYS = ['MODEL_API_KEY', 'META_MODELS', 'META_REASONING_MODEL', 'META_VISION_MODEL']
+const ENV_KEYS = ['MODEL_API_KEY', 'META_MODELS', 'META_REASONING_MODEL', 'META_VISION_MODEL', 'GROQ_MODELS']
 
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key]
@@ -20,5 +20,13 @@ describe('provider catalog', () => {
     delete process.env.MODEL_API_KEY
     const meta = listProviders().find((provider) => provider.id === 'meta')
     expect(meta?.configured).toBe(false)
+  })
+
+  test('Groq defaults to gpt-oss-120b', () => {
+    delete process.env.GROQ_MODELS
+    const groq = listProviders().find((provider) => provider.id === 'groq')
+    const models = groq?.models.map((model) => model.id) ?? []
+    expect(models).toContain('openai/gpt-oss-120b')
+    expect(models).not.toContain('openai/gpt-oss-20b')
   })
 })

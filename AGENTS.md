@@ -157,6 +157,22 @@ rewrites its generated file, leave it alone.
   JSON file and importing it in `packages/theme/src/index.ts`. Keep the stored
   preference key stable; add a fallback when renaming an id.
 
+### Languages
+
+- UI text goes through `react-i18next`; resources live in
+  `apps/web/src/locales/{en,fr,zh,hi}.json` and all four files must carry the
+  same keys. `bun run test` checks key parity and rejects em dashes.
+- The first render is English on both the server and the client; `I18nProvider`
+  applies the stored preference right after hydration and keeps `<html lang>`
+  in sync. Do not read `localStorage` during render, it would reintroduce a
+  hydration mismatch.
+- The header globe selector writes the `verdict-language` cookie plus the same
+  `localStorage` key. Add a language by adding its JSON file, its entry in
+  `src/lib/i18n.ts`, and its section in the parity test.
+- Agent names and lenses are translated by id under `agents.*`; server-provided
+  summaries, rationales, project names and other evidence stay data, not UI
+  copy. Never translate user content.
+
 ### Service worker
 
 - Edit `apps/web/sw/sw.template.js`, never `apps/web/public/sw.js`. The latter

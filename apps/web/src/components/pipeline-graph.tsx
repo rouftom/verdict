@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Background,
   Controls,
@@ -97,11 +98,12 @@ function scoreClass(score: number): string {
   return 'text-destructive'
 }
 
-function modelName(model?: ModelRef): string {
-  return model ? model.model : 'model not set'
+function modelName(model: ModelRef | undefined, notSet: string): string {
+  return model ? model.model : notSet
 }
 
 function AgentCard({ data }: { data: AgentData }) {
+  const { t } = useTranslation()
   const latest = data.revision ?? data.evaluation
   const criteriaScores = React.useMemo(() => {
     const map = new Map<string, { score: number; confidence: number; rationale?: string }>()
@@ -134,48 +136,54 @@ function AgentCard({ data }: { data: AgentData }) {
           {data.role === 'evaluator' ? <UserRound className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-semibold leading-tight">{data.agent.name}</p>
-          <p className="text-[10px] text-muted-foreground">{data.agent.lens}</p>
+          <p className="truncate text-[12px] font-semibold leading-tight">
+            {t(`agents.${data.agent.id}.name`, { defaultValue: data.agent.name })}
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            {t(`agents.${data.agent.id}.lens`, { defaultValue: data.agent.lens })}
+          </p>
         </div>
         <Badge tone={data.status === 'done' ? 'success' : data.status === 'active' ? 'brand' : data.status === 'error' ? 'danger' : 'neutral'}>
-          {data.role}
+          {t(`role.${data.role}`)}
         </Badge>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge tone="neutral" className="max-w-full truncate font-mono text-[10px]">
-          {modelName(data.model)}
+          {modelName(data.model, t('pipeline.modelNotSet'))}
         </Badge>
         {data.model?.reasoningEffort ? (
           <Badge tone="brand" className="text-[10px]">
-            effort {data.model.reasoningEffort}
+            {t('pipeline.effort', { effort: data.model.reasoningEffort })}
           </Badge>
         ) : null}
         {data.revision ? (
           <Badge tone="warning" className="text-[10px]">
-            revised · round {data.revision.round}
+            {t('pipeline.revised', { round: data.revision.round })}
           </Badge>
         ) : null}
         {data.verification ? (
           <Badge tone={data.verification.approved ? 'success' : 'danger'} className="text-[10px]">
-            {data.verification.approved ? 'approved' : 'flagged'}
+            {data.verification.approved ? t('pipeline.approved') : t('pipeline.flagged')}
           </Badge>
         ) : null}
       </div>
 
-      <p className="text-[10px] leading-tight text-muted-foreground">{data.agent.focus}</p>
+      <p className="text-[10px] leading-tight text-muted-foreground">
+        {t(`agents.${data.agent.id}.focus`, { defaultValue: data.agent.focus })}
+      </p>
 
       {overall !== undefined ? (
         <>
           <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[10px] text-muted-foreground">{data.projectName ?? 'latest project'}</p>
+              <p className="truncate text-[10px] text-muted-foreground">{data.projectName ?? t('pipeline.latestProject')}</p>
               <p className="text-[9px] text-muted-foreground">
                 {data.verification
-                  ? 'verifier final score'
+                  ? t('pipeline.verifierFinalScore')
                   : confidence !== undefined
-                    ? `confidence ${Math.round(confidence * 100)}%`
-                    : 'evaluator score'}
+                    ? t('pipeline.confidence', { value: Math.round(confidence * 100) })
+                    : t('pipeline.evaluatorScore')}
               </p>
             </div>
             <span className={cn('text-xl font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
@@ -197,7 +205,7 @@ function AgentCard({ data }: { data: AgentData }) {
 
           {summary ? (
             <div className="rounded-md border border-border bg-muted/20 p-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Synthesis</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.synthesis')}</p>
               <p className="mt-0.5 text-[10px] leading-snug text-foreground">{summary}</p>
             </div>
           ) : null}
@@ -205,7 +213,7 @@ function AgentCard({ data }: { data: AgentData }) {
           {redFlags.length > 0 ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
               <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-destructive">
-                <Flag className="h-2.5 w-2.5" /> Red flags
+                <Flag className="h-2.5 w-2.5" /> {t('pipeline.redFlags')}
               </p>
               <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
                 {redFlags.slice(0, 6).map((flag) => (
@@ -217,7 +225,7 @@ function AgentCard({ data }: { data: AgentData }) {
 
           {data.verification && data.verification.adjustments.length > 0 ? (
             <div className="rounded-md border border-border p-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Adjustments</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.adjustments')}</p>
               <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
                 {data.verification.adjustments.map((adjustment) => (
                   <li key={adjustment.criterionId}>
@@ -230,19 +238,20 @@ function AgentCard({ data }: { data: AgentData }) {
         </>
       ) : (
         <p className="rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
-          Waiting for this agent&apos;s first result. The card updates as the run streams.
+          {t('pipeline.waiting')}
         </p>
       )}
 
       <p className="flex items-center gap-1 text-[9px] text-muted-foreground">
         <Activity className="h-2.5 w-2.5" />
-        {data.count} result{data.count === 1 ? '' : 's'} across project{data.count === 1 ? '' : 's'} · live
+        {t('pipeline.resultCount', { count: data.count })}
       </p>
     </div>
   )
 }
 
 function AgentNode({ data }: NodeProps) {
+  const { t } = useTranslation()
   const agent = data as AgentData
   const latest = agent.revision ?? agent.evaluation
   const overall = agent.verification?.finalOverall ?? latest?.overall
@@ -263,13 +272,17 @@ function AgentNode({ data }: NodeProps) {
           <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
           <div className="flex items-center gap-1.5">
             <StatusIcon status={agent.status} className="h-3 w-3" />
-            <span className="truncate text-[11px] font-semibold">{agent.agent.name}</span>
+            <span className="truncate text-[11px] font-semibold">
+              {t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
+            </span>
             {overall !== undefined ? (
               <span className={cn('ml-auto text-[10px] font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
             ) : null}
           </div>
           <div className="mt-0.5 flex items-center gap-1 pl-[18px]">
-            <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">{modelName(agent.model)}</span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
+              {modelName(agent.model, t('pipeline.modelNotSet'))}
+            </span>
             {agent.count > 1 ? <span className="text-[9px] tabular-nums text-muted-foreground">×{agent.count}</span> : null}
           </div>
           <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
@@ -285,11 +298,11 @@ function AgentNode({ data }: NodeProps) {
 const nodeTypes = { stage: StageNode, agent: AgentNode }
 
 const STAGES = [
-  { id: 'harvest', title: 'Harvest', detail: 'GitHub tarball + video' },
-  { id: 'review', title: 'Cross-review', detail: 'anonymised revision' },
-  { id: 'consensus', title: 'Consensus', detail: 'trimmed mean + spread' },
-  { id: 'rank', title: 'Comparative rank', detail: 'ordinal, per track' },
-  { id: 'report', title: 'Report', detail: 'ranking + rank delta' },
+  { id: 'harvest', titleKey: 'pipeline.harvest', detailKey: 'pipeline.harvestDetail' },
+  { id: 'review', titleKey: 'pipeline.review', detailKey: 'pipeline.reviewDetail' },
+  { id: 'consensus', titleKey: 'pipeline.consensus', detailKey: 'pipeline.consensusDetail' },
+  { id: 'rank', titleKey: 'pipeline.rank', detailKey: 'pipeline.rankDetail' },
+  { id: 'report', titleKey: 'pipeline.report', detailKey: 'pipeline.reportDetail' },
 ] as const
 
 type Phase = 'before' | 'active' | 'after'
@@ -404,6 +417,7 @@ export function PipelineGraph({
   hasReport,
   failed = false,
 }: PipelineGraphProps) {
+  const { t } = useTranslation()
   const activeIndex = statusIndex(status)
   const evaluatorPool = agents?.evaluators ?? []
   const verifierPool = agents?.verifiers ?? []
@@ -452,10 +466,10 @@ export function PipelineGraph({
 
       const detail =
         stage.id === 'review' && revisions.length > 0
-          ? `${revisions.length} revisions`
+          ? t('pipeline.revisionCount', { count: revisions.length })
           : stage.id === 'report' && hasReport
-            ? 'ranking + rank delta'
-            : stage.detail
+            ? t('pipeline.reportDetail')
+            : t(stage.detailKey)
 
       return {
         id: stage.id,
@@ -470,7 +484,7 @@ export function PipelineGraph({
                 : stage.id === 'rank'
                   ? { x: 976, y: 96 }
                   : { x: 1356, y: 96 },
-        data: { title: stage.title, detail, status: stageStatus } satisfies StageData,
+        data: { title: t(stage.titleKey), detail, status: stageStatus } satisfies StageData,
       }
     })
 
@@ -513,6 +527,7 @@ export function PipelineGraph({
     projectNames,
     revisions.length,
     status,
+    t,
     verifierSummaries,
   ])
 
@@ -608,6 +623,7 @@ export function PipelineGraph({
 }
 
 export function StatusPill({ status, error }: { status?: RunStatus; error?: string }) {
+  const { t } = useTranslation()
   const tone =
     status === 'done'
       ? 'success'
@@ -616,13 +632,13 @@ export function StatusPill({ status, error }: { status?: RunStatus; error?: stri
         : status
           ? 'brand'
           : 'neutral'
-  const label = error ? 'failed' : (status ?? 'idle')
+  const key = error ? 'failed' : (status ?? 'idle')
   return (
     <Badge tone={tone as 'success' | 'danger' | 'brand' | 'neutral'} className="capitalize">
       {status && !['done', 'failed', 'cancelled', 'queued'].includes(status) ? (
         <Loader2 className="h-3 w-3 animate-spin" />
       ) : null}
-      {label}
+      {t(`status.${key}`, { defaultValue: key })}
     </Badge>
   )
 }

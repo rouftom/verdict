@@ -1,11 +1,12 @@
 'use client'
 
 import * as React from 'react'
+import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { Shuffle } from 'lucide-react'
 import { Button, SearchSelect, cn, type SearchSelectGroup } from '@verdict/ui'
 import {
   REASONING_EFFORTS,
-  REASONING_EFFORT_LABELS,
   reasoningEffortsFor,
   type ModelRef,
   type ProviderInfo,
@@ -28,16 +29,16 @@ interface FlatModel {
   label: string
 }
 
-function reasoningGroup(efforts: readonly ReasoningEffort[]): SearchSelectGroup[] {
+function reasoningGroup(efforts: readonly ReasoningEffort[], t: TFunction): SearchSelectGroup[] {
   return [
     {
       id: 'effort',
-      label: 'Reasoning effort',
+      label: t('modelSlots.reasoning'),
       options: [
-        { value: 'default', label: 'Auto', hint: 'env default' },
+        { value: 'default', label: t('modelSlots.auto'), hint: t('modelSlots.envDefault') },
         ...efforts.map((effort) => ({
           value: effort,
-          label: REASONING_EFFORT_LABELS[effort],
+          label: t(`reasoning.${effort}`),
         })),
       ],
     },
@@ -82,6 +83,7 @@ function withReasoning(provider: ModelRef['provider'], model: string, effort: st
 }
 
 export function ModelSlots({ providers, value, slots, onChange, idPrefix, compact = false }: ModelSlotsProps) {
+  const { t } = useTranslation()
   const flat = React.useMemo(() => flatten(providers), [providers])
   const groups = React.useMemo(() => modelGroups(providers), [providers])
   const providerCount = groups.length
@@ -120,8 +122,7 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
   if (flat.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-2.5 text-[11px] text-muted-foreground">
-        No provider is configured. Add a key to <code className="font-mono">.env</code> (for example{' '}
-        <code className="font-mono">MODEL_API_KEY</code> or <code className="font-mono">OPENAI_API_KEY</code>), then reload.
+        {t('modelSlots.noProvider')}
       </div>
     )
   }
@@ -132,10 +133,10 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
     <div className={cn('flex flex-col gap-1.5', compact && 'gap-1')}>
       <div className="flex items-center justify-between">
         <span className="text-[11px] text-muted-foreground">
-          {flat.length} model{flat.length === 1 ? '' : 's'} · {providerCount} provider{providerCount === 1 ? '' : 's'}
+          {t('modelSlots.modelCount', { count: flat.length })} · {t('modelSlots.providerCount', { count: providerCount })}
         </span>
         <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={cycle}>
-          <Shuffle className="h-3 w-3" /> Diversify
+          <Shuffle className="h-3 w-3" /> {t('modelSlots.diversify')}
         </Button>
       </div>
       <div className="flex flex-col gap-1">
@@ -144,6 +145,7 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
           const key = current ? `${current.provider}:${current.model}` : ''
           const effort = current?.reasoningEffort ?? 'default'
           const efforts = current ? reasoningEffortsFor(current.provider, current.model) : REASONING_EFFORTS
+          const slotLabel = idPrefix === 'eval' ? t('role.evaluator') : t('role.verifier')
           return (
             <div key={`${idPrefix}-${index}`} className="flex min-w-0 items-center gap-1.5">
               <span className="w-6 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
@@ -154,9 +156,9 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
                 value={key}
                 onValueChange={(next) => updateModel(index, next)}
                 groups={groups}
-                ariaLabel={`${idPrefix} model ${index + 1}`}
-                placeholder="Search a model"
-                emptyLabel="No configured model matches."
+                ariaLabel={t('modelSlots.modelAria', { slot: slotLabel, index: index + 1 })}
+                placeholder={t('modelSlots.searchModel')}
+                emptyLabel={t('modelSlots.noMatch')}
                 className="min-w-0 flex-1"
                 triggerClassName="w-full min-w-0"
                 size="sm"
@@ -164,9 +166,9 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
               <SearchSelect
                 value={effort}
                 onValueChange={(next) => updateReasoning(index, next)}
-                groups={reasoningGroup(efforts)}
-                ariaLabel={`${idPrefix} reasoning effort ${index + 1}`}
-                placeholder="Auto"
+                groups={reasoningGroup(efforts, t)}
+                ariaLabel={t('modelSlots.reasoningAria', { slot: slotLabel, index: index + 1 })}
+                placeholder={t('modelSlots.auto')}
                 searchable={false}
                 className="w-[84px] shrink-0"
                 triggerClassName="w-full"
@@ -179,7 +181,7 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
       </div>
       {hidden > 0 ? (
         <p className="text-[10px] text-muted-foreground">
-          {hidden} provider{hidden === 1 ? '' : 's'} without a key {hidden === 1 ? 'is' : 'are'} hidden.
+          {t('modelSlots.hidden', { count: hidden })}
         </p>
       ) : null}
     </div>

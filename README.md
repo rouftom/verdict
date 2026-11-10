@@ -253,7 +253,13 @@ Example inputs ship inside the repository:
   same weights as the organiser rubric (Impact 30%, Use of AI Tooling 25%,
   Technical Depth & Execution 20%, Demo 25%).
 - `apps/web/public/rules/hackathon-rules.example.md`: generic example rules
-  upload, with no organiser or provider branding.
+  upload, with no organiser or provider branding. It defines two participant
+  tracks (Indie Developer, Startup) and three award tracks (Best agentic use
+  case, Best creative build, Best build on Open Weight).
+
+Track values are free-form: whatever string a project carries in `track`
+becomes its ranking group. Every track, participant or award, gets its own
+ranking, and a supplied rank restarts at 1 in each.
 
 The example manifest (`winners.json`) is deliberately kept **outside** this
 repository, next to the organiser rubric, so frequent edits to it never cause a
@@ -303,6 +309,10 @@ The workspace has:
 - a single appearance menu in the header: theme pack, light, dark or **system**
   mode (automatic, follows the OS) and **rounded or square corners** applied to
   the whole interface, pills included;
+- a globe **language selector** in the header with English, French, Mandarin
+  Chinese and Hindi. The choice persists in `localStorage` and the
+  `verdict-language` cookie, updates `<html lang>`, and defaults to English for
+  the first server render so hydration stays stable;
 - a run bar pinned to the bottom of the viewport, which stays there even when
   every section is collapsed;
 - an installable PWA: a Workbox service worker caches the shell and an offline

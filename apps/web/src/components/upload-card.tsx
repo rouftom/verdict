@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileText, Upload, X } from 'lucide-react'
 import { Badge, Button, Label, cn } from '@verdict/ui'
 
@@ -30,6 +31,7 @@ export function UploadCard({
   onFile,
   onClear,
 }: UploadCardProps) {
+  const { t } = useTranslation()
   const input = React.useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = React.useState(false)
   const [reading, setReading] = React.useState(false)
@@ -37,7 +39,7 @@ export function UploadCard({
 
   const read = async (file: File) => {
     if (file.size > 8 * 1024 * 1024) {
-      setError('File is larger than 8 MB.')
+      setError(t('upload.tooLarge'))
       return
     }
     setReading(true)
@@ -45,7 +47,7 @@ export function UploadCard({
     try {
       onFile(file.name, await file.text())
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not read the file.')
+      setError(cause instanceof Error ? cause.message : t('upload.unreadable'))
     } finally {
       setReading(false)
     }
@@ -62,7 +64,7 @@ export function UploadCard({
           {required ? <span className="ml-1 text-destructive">*</span> : null}
         </Label>
         {text ? (
-          <Button type="button" variant="ghost" size="icon-sm" aria-label={`Clear ${label}`} onClick={onClear}>
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={t('upload.clear', { label })} onClick={onClear}>
             <X className="h-3.5 w-3.5" />
           </Button>
         ) : null}
@@ -88,7 +90,7 @@ export function UploadCard({
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()} disabled={reading}>
             <Upload className="h-3.5 w-3.5" />
-            {reading ? 'Reading…' : 'Choose file'}
+            {reading ? t('upload.reading') : t('upload.chooseFile')}
           </Button>
           <input
             ref={input}
@@ -107,11 +109,11 @@ export function UploadCard({
               <FileText className="h-3 w-3 shrink-0" /> {filename}
             </Badge>
           ) : (
-            <span className="text-[11px] text-muted-foreground">drop or choose a file</span>
+            <span className="text-[11px] text-muted-foreground">{t('upload.dropOrChoose')}</span>
           )}
           {chars > 0 ? (
             <span className="text-[11px] tabular-nums text-muted-foreground">
-              {lines} lines · {chars.toLocaleString()} chars
+              {t('upload.linesChars', { lines, chars: chars.toLocaleString() })}
             </span>
           ) : null}
           {actions ? <div className="ml-auto flex flex-wrap items-center gap-1.5">{actions}</div> : null}

@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
 import { Terminal, X } from 'lucide-react'
@@ -15,21 +16,22 @@ function toneOf(event: RunEvent): string {
 }
 
 export function EventLog({ events, onClose }: { events: RunEvent[]; onClose?: () => void }) {
+  const { t } = useTranslation()
   return (
     <Card className="flex h-full min-h-0 flex-col overflow-hidden">
       <CardHeader className="border-b border-border">
         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-        <CardTitle>Run log</CardTitle>
-        <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{events.length} events</span>
+        <CardTitle>{t('log.title')}</CardTitle>
+        <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{t('log.events', { count: events.length })}</span>
         {onClose ? (
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Close run log" onClick={onClose}>
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={t('log.close')} onClick={onClose}>
             <X className="h-3.5 w-3.5" />
           </Button>
         ) : null}
       </CardHeader>
       <CardContent className="min-h-0 flex-1 p-0">
         {events.length === 0 ? (
-          <p className="p-2 text-[11px] text-muted-foreground">Nothing yet. Start a run to stream stages and model verdicts.</p>
+          <p className="p-2 text-[11px] text-muted-foreground">{t('log.empty')}</p>
         ) : (
           <Virtuoso
             data={events}

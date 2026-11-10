@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { ServiceWorkerRegister } from '@/components/service-worker-register'
+import { I18nProvider } from '@/components/i18n-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import {
   DEFAULT_CORNER_STYLE,
@@ -61,8 +62,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style id="verdict-theme-packs" dangerouslySetInnerHTML={{ __html: themeCss }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
-        <ServiceWorkerRegister />
+        <ThemeProvider>
+          <I18nProvider>
+            {children}
+            <ServiceWorkerRegister />
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

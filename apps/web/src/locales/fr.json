@@ -1,0 +1,241 @@
+{
+  "app": {
+    "tagline": "6 évaluateurs · 2 vérificateurs · classement par piste",
+    "history": "Historique",
+    "language": "Langue",
+    "appearance": "Apparence"
+  },
+  "appearance": {
+    "theme": "Thème",
+    "mode": "Mode",
+    "corners": "Angles",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système",
+    "square": "Carré",
+    "rounded": "Arrondi"
+  },
+  "inputs": {
+    "title": "Entrées",
+    "projectCount_one": "{{count}} projet",
+    "projectCount_other": "{{count}} projets",
+    "ruleChars": "{{count}} caractères de règles",
+    "manifestLabel": "Manifeste des projets",
+    "manifestHint": "JSON ou YAML. Accepte un tableau ou { projects: [] }. Rangs facultatifs et par piste.",
+    "rulesLabel": "Règles d'évaluation",
+    "rulesHint": "Markdown ou TXT. Transmis mot pour mot à chaque agent, comme contexte non fiable.",
+    "rubricLabel": "Rubrique",
+    "rubricHint": "YAML, JSON ou le tableau de critères Markdown. Sans fichier, la rubrique neutre intégrée est utilisée.",
+    "builtIn": "Intégrée",
+    "genericYaml": "YAML générique",
+    "rubricBadge": "Rubrique · {{name}}",
+    "anchors": "Ancrages de calibration (max 3)",
+    "chooseManifest": "Choisissez un fichier de manifeste pour le valider.",
+    "presetError": "Le préréglage {{label}} a renvoyé {{status}}."
+  },
+  "upload": {
+    "tooLarge": "Le fichier dépasse 8 Mo.",
+    "unreadable": "Impossible de lire le fichier.",
+    "chooseFile": "Choisir un fichier",
+    "reading": "Lecture…",
+    "dropOrChoose": "déposez ou choisissez un fichier",
+    "linesChars": "{{lines}} lignes · {{chars}} caractères",
+    "clear": "Effacer {{label}}"
+  },
+  "models": {
+    "title": "Modèles",
+    "aside": "modèle et effort de raisonnement par agent, puis options d'exécution",
+    "evaluators": "6 évaluateurs",
+    "allCriteria": "les 4 critères",
+    "verifiers": "2 vérificateurs",
+    "auditFinal": "audit + classement final",
+    "options": "Options",
+    "rankingHarvest": "classement et collecte",
+    "showRanks": "Montrer les rangs fournis à la passe de classement",
+    "showRanksHint": "Audit uniquement. Les scores des critères sont figés avant le classement et ne changent jamais à cause d'un rang fourni.",
+    "maxVideo": "Vidéo max (min)",
+    "temperature": "Température",
+    "persistence": "Les exécutions arrivent en SSE. Les instantanés restent dans l'IndexedDB de ce navigateur, sans compte ni base de données serveur.",
+    "apiError": "API injoignable : {{error}}"
+  },
+  "modelSlots": {
+    "reasoning": "Effort de raisonnement",
+    "auto": "Auto",
+    "envDefault": "défaut de l'environnement",
+    "modelCount_one": "{{count}} modèle",
+    "modelCount_other": "{{count}} modèles",
+    "providerCount_one": "{{count}} fournisseur",
+    "providerCount_other": "{{count}} fournisseurs",
+    "diversify": "Diversifier",
+    "searchModel": "Rechercher un modèle",
+    "noMatch": "Aucun modèle configuré ne correspond.",
+    "noProvider": "Aucun fournisseur n'est configuré. Ajoutez une clé dans .env (par exemple MODEL_API_KEY ou OPENAI_API_KEY), puis rechargez.",
+    "hidden_one": "{{count}} fournisseur sans clé est masqué.",
+    "hidden_other": "{{count}} fournisseurs sans clé sont masqués.",
+    "modelAria": "modèle {{index}} du {{slot}}",
+    "reasoningAria": "effort de raisonnement {{index}} du {{slot}}"
+  },
+  "reasoning": {
+    "none": "Aucun",
+    "minimal": "Minimal",
+    "low": "Faible",
+    "medium": "Moyen",
+    "high": "Élevé",
+    "xhigh": "Très élevé",
+    "max": "Max"
+  },
+  "pipeline": {
+    "title": "Pipeline",
+    "hint": "cliquez sur un nœud évaluateur ou vérificateur pour voir sa synthèse en direct",
+    "harvest": "Collecte",
+    "harvestDetail": "archive GitHub + vidéo",
+    "review": "Contre-revue",
+    "reviewDetail": "révision anonymisée",
+    "consensus": "Consensus",
+    "consensusDetail": "moyenne élaguée + dispersion",
+    "rank": "Classement comparatif",
+    "rankDetail": "ordinal, par piste",
+    "report": "Rapport",
+    "reportDetail": "classement + écart de rang",
+    "revisionCount_one": "{{count}} révision",
+    "revisionCount_other": "{{count}} révisions",
+    "modelNotSet": "modèle non défini",
+    "effort": "effort {{effort}}",
+    "revised": "révisé · tour {{round}}",
+    "approved": "approuvé",
+    "flagged": "signalé",
+    "resultCount_one": "{{count}} résultat sur un projet · en direct",
+    "resultCount_other": "{{count}} résultats sur des projets · en direct",
+    "latestProject": "dernier projet",
+    "verifierFinalScore": "score final du vérificateur",
+    "confidence": "confiance {{value}} %",
+    "evaluatorScore": "score de l'évaluateur",
+    "synthesis": "Synthèse",
+    "redFlags": "Signaux d'alerte",
+    "adjustments": "Ajustements",
+    "waiting": "En attente du premier résultat de cet agent. La carte se met à jour pendant l'exécution."
+  },
+  "role": {
+    "evaluator": "évaluateur",
+    "verifier": "vérificateur"
+  },
+  "status": {
+    "idle": "inactif",
+    "queued": "en file",
+    "parsing": "analyse",
+    "harvesting": "collecte",
+    "evaluating": "évaluation",
+    "reviewing": "contre-revue",
+    "consensus": "consensus",
+    "verifying": "vérification",
+    "done": "terminé",
+    "failed": "échec",
+    "cancelled": "annulé",
+    "escalated": "escaladé"
+  },
+  "run": {
+    "evaluate": "Évaluer",
+    "starting": "Démarrage…",
+    "cancel": "Annuler l'exécution",
+    "refresh": "Rafraîchir l'exécution",
+    "export": "Exporter le rapport",
+    "log": "Journal d'exécution",
+    "reportReady": "rapport prêt · {{date}}",
+    "failed": "L'exécution a échoué."
+  },
+  "history": {
+    "title": "Exécutions enregistrées",
+    "stored": "Stockées uniquement dans l'IndexedDB de ce navigateur.",
+    "empty": "Aucune exécution enregistrée.",
+    "projects": "{{count}} projets",
+    "tracks_one": "{{count}} piste",
+    "tracks_other": "{{count}} pistes",
+    "delete": "Supprimer",
+    "close": "Fermer l'historique"
+  },
+  "results": {
+    "ranking": "Classement",
+    "final": "final",
+    "provisional": "provisoire",
+    "uploadManifest": "Importez un manifeste pour voir les projets ici.",
+    "projectDetail": "Détail du projet",
+    "selectProject": "Sélectionnez un projet pour examiner ses preuves et ses scores.",
+    "finalOverall": "Note finale globale",
+    "consensus": "Consensus",
+    "dispersion": "Dispersion",
+    "files_one": "{{count}} fichier",
+    "files_other": "{{count}} fichiers",
+    "segments_one": "{{count}} segment",
+    "segments_other": "{{count}} segments",
+    "criterion": "Critère",
+    "weight": "Poids",
+    "spread": "Écart",
+    "finalColumn": "Final",
+    "evaluator": "Évaluateur",
+    "verifierAudit": "Audit du vérificateur",
+    "approved": "approuvé",
+    "flagged": "signalé",
+    "noAdjustment": "Aucun ajustement.",
+    "disagreement": "Désaccord au-delà de la tolérance",
+    "harvestErrors": "Erreurs de collecte",
+    "reportGenerated": "Rapport généré le {{date}} · {{evaluators}} modèles évaluateurs · {{verifiers}} modèles vérificateurs",
+    "trackProjects_one": "{{count}} projet",
+    "trackProjects_other": "{{count}} projets",
+    "conf": "conf. {{value}}",
+    "wasRank": "était n°{{rank}}"
+  },
+  "log": {
+    "title": "Journal d'exécution",
+    "events_one": "{{count}} événement",
+    "events_other": "{{count}} événements",
+    "empty": "Rien pour l'instant. Lancez une exécution pour voir les étapes et les verdicts des modèles.",
+    "close": "Fermer le journal"
+  },
+  "sw": {
+    "ready": "Une nouvelle version est prête.",
+    "refresh": "Rafraîchir",
+    "dismiss": "Ignorer la notification de mise à jour"
+  },
+  "agents": {
+    "e1": {
+      "name": "Impact et adéquation au problème",
+      "lens": "Impact",
+      "focus": "Qui en bénéficie, à quel point cela compte, et si le projet correspond à un énoncé de problème publié."
+    },
+    "e2": {
+      "name": "Outillage IA",
+      "lens": "Usage de l'outillage IA",
+      "focus": "Quels modèles sont réellement utilisés à l'exécution, avec quelle intention ils sont choisis, et si l'intégration dépasse une simple enveloppe."
+    },
+    "e3": {
+      "name": "Profondeur technique",
+      "lens": "Profondeur technique et exécution",
+      "focus": "Architecture, qualité du code, gestion des erreurs, tests, récit de construction et preuves d'un vrai savoir-faire."
+    },
+    "e4": {
+      "name": "Démo et vidéo",
+      "lens": "Démo",
+      "focus": "Si la démo montre le produit fonctionner de bout en bout, si la vidéo est crédible et bien rythmée, et si elle correspond au dépôt."
+    },
+    "e5": {
+      "name": "Preuves et règles",
+      "lens": "Intégrité transversale",
+      "focus": "Si les affirmations sont étayées par des artefacts, si le travail est nouveau et si les règles impératives sont respectées."
+    },
+    "e6": {
+      "name": "Président transversal",
+      "lens": "Cohérence d'ensemble",
+      "focus": "Cohérence du projet entier, contradictions entre les sources et angles morts que les spécialistes peuvent manquer."
+    },
+    "v1": {
+      "name": "Vérificateur de rubrique et de notation",
+      "lens": "Conformité à la rubrique",
+      "focus": "Pondérations, échelle, preuves par critère, arithmétique et cohérence entre les scores des critères et la note globale."
+    },
+    "v2": {
+      "name": "Vérificateur de preuves et d'intégrité",
+      "lens": "Intégrité des preuves",
+      "focus": "Affirmations non étayées, citations inventées, ancrage sur des rangs fournis, exclusions et preuves manquantes."
+    }
+  }
+}

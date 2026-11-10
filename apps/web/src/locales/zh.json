@@ -1,0 +1,230 @@
+{
+  "app": {
+    "tagline": "6 位评估员 · 2 位校验员 · 按赛道排名",
+    "history": "历史",
+    "language": "语言",
+    "appearance": "外观"
+  },
+  "appearance": {
+    "theme": "主题",
+    "mode": "模式",
+    "corners": "圆角",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统",
+    "square": "直角",
+    "rounded": "圆角"
+  },
+  "inputs": {
+    "title": "输入",
+    "projectCount_other": "{{count}} 个项目",
+    "ruleChars": "{{count}} 个规则字符",
+    "manifestLabel": "项目清单",
+    "manifestHint": "JSON 或 YAML。接受数组或 { projects: [] }。名次可选，按赛道计算。",
+    "rulesLabel": "评估规则",
+    "rulesHint": "Markdown 或 TXT。原文传给每个智能体，作为不可信上下文。",
+    "rubricLabel": "评分标准",
+    "rubricHint": "YAML、JSON 或 Markdown 标准表。不选文件时使用内置中立标准。",
+    "builtIn": "内置",
+    "genericYaml": "通用 YAML",
+    "rubricBadge": "评分标准 · {{name}}",
+    "anchors": "校准锚点（最多 3 个）",
+    "chooseManifest": "选择清单文件以进行校验。",
+    "presetError": "预设 {{label}} 返回了 {{status}}。"
+  },
+  "upload": {
+    "tooLarge": "文件超过 8 MB。",
+    "unreadable": "无法读取文件。",
+    "chooseFile": "选择文件",
+    "reading": "正在读取…",
+    "dropOrChoose": "拖放或选择文件",
+    "linesChars": "{{lines}} 行 · {{chars}} 个字符",
+    "clear": "清除 {{label}}"
+  },
+  "models": {
+    "title": "模型",
+    "aside": "每个智能体的模型与推理强度，然后是运行选项",
+    "evaluators": "6 位评估员",
+    "allCriteria": "全部 4 项标准",
+    "verifiers": "2 位校验员",
+    "auditFinal": "审计 + 最终排名",
+    "options": "选项",
+    "rankingHarvest": "排名与采集",
+    "showRanks": "向排名环节展示提供的名次",
+    "showRanksHint": "仅用于审计。标准分数在排名前已固定，绝不会因提供的名次而改变。",
+    "maxVideo": "视频上限（分钟）",
+    "temperature": "温度",
+    "persistence": "运行通过 SSE 流式传输。快照仅保存在此浏览器的 IndexedDB 中，无需账号，也没有服务器数据库。",
+    "apiError": "无法连接 API：{{error}}"
+  },
+  "modelSlots": {
+    "reasoning": "推理强度",
+    "auto": "自动",
+    "envDefault": "环境默认",
+    "modelCount_other": "{{count}} 个模型",
+    "providerCount_other": "{{count}} 个提供方",
+    "diversify": "打散",
+    "searchModel": "搜索模型",
+    "noMatch": "没有匹配的已配置模型。",
+    "noProvider": "未配置任何提供方。请在 .env 中添加密钥（例如 MODEL_API_KEY 或 OPENAI_API_KEY），然后重新加载。",
+    "hidden_other": "已隐藏 {{count}} 个没有密钥的提供方。",
+    "modelAria": "{{slot}}模型 {{index}}",
+    "reasoningAria": "{{slot}}推理强度 {{index}}"
+  },
+  "reasoning": {
+    "none": "无",
+    "minimal": "最低",
+    "low": "低",
+    "medium": "中",
+    "high": "高",
+    "xhigh": "极高",
+    "max": "最高"
+  },
+  "pipeline": {
+    "title": "流水线",
+    "hint": "点击评估员或校验员节点查看其实时综合",
+    "harvest": "采集",
+    "harvestDetail": "GitHub 压缩包 + 视频",
+    "review": "交叉复审",
+    "reviewDetail": "匿名修订",
+    "consensus": "共识",
+    "consensusDetail": "截尾均值 + 离散度",
+    "rank": "比较排名",
+    "rankDetail": "序数排名，按赛道",
+    "report": "报告",
+    "reportDetail": "排名 + 名次变化",
+    "revisionCount_other": "{{count}} 次修订",
+    "modelNotSet": "未设置模型",
+    "effort": "强度 {{effort}}",
+    "revised": "已修订 · 第 {{round}} 轮",
+    "approved": "已批准",
+    "flagged": "已标记",
+    "resultCount_other": "{{count}} 条结果，跨项目 · 实时",
+    "latestProject": "最新项目",
+    "verifierFinalScore": "校验员最终分数",
+    "confidence": "置信度 {{value}}%",
+    "evaluatorScore": "评估员分数",
+    "synthesis": "综合",
+    "redFlags": "风险信号",
+    "adjustments": "调整",
+    "waiting": "等待此智能体的首个结果。卡片会随运行实时更新。"
+  },
+  "role": {
+    "evaluator": "评估员",
+    "verifier": "校验员"
+  },
+  "status": {
+    "idle": "空闲",
+    "queued": "排队中",
+    "parsing": "解析中",
+    "harvesting": "采集中",
+    "evaluating": "评估中",
+    "reviewing": "复审中",
+    "consensus": "共识中",
+    "verifying": "校验中",
+    "done": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消",
+    "escalated": "已升级"
+  },
+  "run": {
+    "evaluate": "评估",
+    "starting": "正在启动…",
+    "cancel": "取消运行",
+    "refresh": "刷新运行",
+    "export": "导出报告",
+    "log": "运行日志",
+    "reportReady": "报告已就绪 · {{date}}",
+    "failed": "运行失败。"
+  },
+  "history": {
+    "title": "已保存的运行",
+    "stored": "仅保存在此浏览器的 IndexedDB 中。",
+    "empty": "尚未保存任何运行。",
+    "projects": "{{count}} 个项目",
+    "tracks_other": "{{count}} 条赛道",
+    "delete": "删除",
+    "close": "关闭历史"
+  },
+  "results": {
+    "ranking": "排名",
+    "final": "最终",
+    "provisional": "暂定",
+    "uploadManifest": "上传清单以在此查看项目。",
+    "projectDetail": "项目详情",
+    "selectProject": "选择一个项目以检查其证据和分数。",
+    "finalOverall": "最终总分",
+    "consensus": "共识",
+    "dispersion": "离散度",
+    "files_other": "{{count}} 个文件",
+    "segments_other": "{{count}} 个片段",
+    "criterion": "标准",
+    "weight": "权重",
+    "spread": "离散",
+    "finalColumn": "最终",
+    "evaluator": "评估员",
+    "verifierAudit": "校验员审计",
+    "approved": "已批准",
+    "flagged": "已标记",
+    "noAdjustment": "无调整。",
+    "disagreement": "分歧超出容差",
+    "harvestErrors": "采集错误",
+    "reportGenerated": "报告生成于 {{date}} · {{evaluators}} 个评估模型 · {{verifiers}} 个校验模型",
+    "trackProjects_other": "{{count}} 个项目",
+    "conf": "置信度 {{value}}",
+    "wasRank": "原为第 {{rank}} 名"
+  },
+  "log": {
+    "title": "运行日志",
+    "events_other": "{{count}} 个事件",
+    "empty": "暂无内容。启动运行以流式查看阶段和模型判定。",
+    "close": "关闭运行日志"
+  },
+  "sw": {
+    "ready": "新版本已就绪。",
+    "refresh": "刷新",
+    "dismiss": "忽略更新提示"
+  },
+  "agents": {
+    "e1": {
+      "name": "影响与问题契合度",
+      "lens": "影响力",
+      "focus": "谁受益、问题有多重要，以及项目是否契合已发布的问题陈述。"
+    },
+    "e2": {
+      "name": "AI 工具运用",
+      "lens": "AI 工具使用",
+      "focus": "运行时实际使用了哪些模型、选择是否有意为之，以及集成是否超越了简单的封装。"
+    },
+    "e3": {
+      "name": "技术深度",
+      "lens": "技术深度与执行",
+      "focus": "架构、代码质量、错误处理、测试、构建过程，以及真实功力的证据。"
+    },
+    "e4": {
+      "name": "演示与视频",
+      "lens": "演示",
+      "focus": "演示是否展示了产品端到端可用、视频是否可信且节奏得当，以及是否与仓库一致。"
+    },
+    "e5": {
+      "name": "证据与规则",
+      "lens": "跨领域完整性",
+      "focus": "主张是否有产物支撑、工作是否为新建，以及硬性规则是否满足。"
+    },
+    "e6": {
+      "name": "跨领域主席",
+      "lens": "整体一致性",
+      "focus": "项目整体一致性、来源之间的矛盾，以及专业视角可能遗漏的缺口。"
+    },
+    "v1": {
+      "name": "评分标准与打分校验员",
+      "lens": "评分标准合规",
+      "focus": "权重、量表、各标准的证据、算术，以及标准分数与总分的一致性。"
+    },
+    "v2": {
+      "name": "证据与诚信校验员",
+      "lens": "证据完整性",
+      "focus": "无依据的主张、伪造引用、对提供名次的锚定、取消资格项与缺失证据。"
+    }
+  }
+}
