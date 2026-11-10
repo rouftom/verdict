@@ -182,18 +182,32 @@ UI always offers six evaluator slots and two verifier slots; the same model can
 fill several slots (useful for a single-provider demo), but diversity is
 recommended.
 
+Each slot has a searchable model select — models are grouped by provider — and
+its own reasoning selector (`Auto`, `None`, `Minimal`, `Low`, `Medium`, `High`,
+`Extra high`, `Max`). `Auto` keeps the environment default; any other value is
+stored on that agent's `ModelRef` and overrides the env for that call only. The
+choice is persisted with the workspace settings and the run snapshot.
+
 ### Reasoning effort
 
-`REASONING_EFFORT_<PROVIDER>` (or the global `REASONING_EFFORT`) is translated
-to each provider's own knob:
+A per-agent selector (above) wins. Otherwise `REASONING_EFFORT_<PROVIDER>` is
+used, then the global `REASONING_EFFORT`. The value is translated to each
+provider's own knob:
 
 | Provider | Mapping |
 | --- | --- |
-| Anthropic | `low…max` → `effort`; `none`/`minimal` → thinking disabled; a number → `thinking.budgetTokens` |
-| Google | `minimal…high` → `thinkingLevel`; `none` → budget 0; `xhigh`/`max` → `high`; a number → `thinkingBudget` |
-| OpenAI | `reasoningEffort` |
-| xAI | `reasoningEffort` (`minimal`→`low`, `max`→`xhigh`) |
-| OpenAI-compatible: Meta, Groq, DeepSeek, Nebius, NVIDIA, Runware, Ollama | `reasoning_effort` |
+| Anthropic | `none`/`minimal` → thinking disabled; `low…max` → `effort`; a number → `thinking.budgetTokens` |
+| Google | `none` → budget 0; `minimal…high` → `thinkingLevel`; `xhigh`/`max` → `high`; a number → `thinkingBudget` |
+| OpenAI | `reasoningEffort`, full range |
+| xAI | `reasoningEffort`, `none…xhigh` (`minimal`→`low`, `max`→`xhigh`) |
+| Groq | `reasoning_effort`, `low`/`medium`/`high` |
+| Meta, DeepSeek, Nebius, Ollama | `reasoning_effort`, `low`/`medium`/`high` |
+| NVIDIA | `reasoning_effort`, full range |
+| Runware | depends on the AIR family: Anthropic and DeepSeek full range, xAI `low…xhigh`, Google `none`/`low…high`, Kimi/GLM/MiniMax `low…high` |
+
+The UI lists only the levels the selected provider and model accept. An env
+value outside that range is clamped to the nearest supported level before it is
+sent, so a rejected request never reaches the provider.
 
 Leave it empty to send nothing. An unrecognised value is ignored, never
 forwarded to an API that would reject it.
@@ -256,7 +270,7 @@ A completed report is saved to IndexedDB automatically.
 | Route | Purpose |
 | --- | --- |
 | `GET /health` | liveness |
-| `GET /providers` | configured providers and models (never a key) |
+| `GET /providers` | configured providers, models and the env default evaluator/verifier pool (never a key) |
 | `POST /parse/manifest` | parse and validate a manifest |
 | `POST /parse/rubric` | parse a rubric |
 | `POST /runs/preview` | dry parse for the upload preview |

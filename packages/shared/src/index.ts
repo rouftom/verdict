@@ -1,4 +1,5 @@
 export * from './types'
+export * from './reasoning'
 export * from './schemas'
 export * from './manifest'
 export * from './rubric'

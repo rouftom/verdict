@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { REASONING_EFFORTS } from './reasoning'
 
 export const PROVIDER_IDS = [
   'meta',
@@ -14,9 +15,12 @@ export const PROVIDER_IDS = [
   'ollama',
 ] as const
 
+export const reasoningEffortSchema = z.enum(REASONING_EFFORTS)
+
 export const modelRefSchema = z.object({
   provider: z.enum(PROVIDER_IDS),
   model: z.string().min(1),
+  reasoningEffort: reasoningEffortSchema.optional(),
 })
 
 export const runOptionsSchema = z.object({
