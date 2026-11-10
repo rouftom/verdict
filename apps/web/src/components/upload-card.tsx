@@ -57,8 +57,8 @@ export function UploadCard({
   const chars = text.length
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex h-full min-w-0 flex-col gap-1.5">
+      <div className="flex min-h-7 items-center justify-between gap-2">
         <Label htmlFor={id} className="text-xs font-semibold">
           {label}
           {required ? <span className="ml-1 text-destructive">*</span> : null}
@@ -83,7 +83,7 @@ export function UploadCard({
           if (file) void read(file)
         }}
         className={cn(
-          'relative rounded-lg border border-dashed border-border bg-muted/20 p-2.5 transition-colors',
+          'relative flex flex-1 flex-col rounded-lg border border-dashed border-border bg-muted/20 p-2.5 transition-colors',
           dragging && 'border-brand-primary bg-brand-primary/5',
         )}
       >
