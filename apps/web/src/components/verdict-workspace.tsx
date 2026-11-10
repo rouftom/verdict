@@ -57,7 +57,7 @@ import { UploadCard } from './upload-card'
 import { ModelSlots } from './model-slots'
 import { PipelineGraph, StatusPill } from './pipeline-graph'
 import { ResultsPanel } from './results-panel'
-import { EventLog, type LogDock } from './event-log'
+import { EventLog, LogPeek, type LogDock } from './event-log'
 import { AppearanceMenu } from './appearance-menu'
 import { LanguageMenu } from './language-menu'
 import { SectionCard } from './section-card'
@@ -82,11 +82,11 @@ interface LiveState {
 
 const EMPTY_LIVE: LiveState = { evaluations: [], revisions: [], consensus: [], verifications: [] }
 
-const LOG_DOCK_CLASS: Record<LogDock, string> = {
-  bottom: 'fixed bottom-16 left-1/2 z-40 h-[min(38vh,360px)] w-[min(96vw,760px)] -translate-x-1/2',
-  top: 'fixed top-16 left-1/2 z-40 h-[min(38vh,360px)] w-[min(96vw,760px)] -translate-x-1/2',
-  left: 'fixed bottom-16 left-3 top-16 z-40 w-[min(92vw,440px)]',
-  right: 'fixed bottom-16 right-3 top-16 z-40 w-[min(92vw,440px)]',
+const DOCK_PANEL_CLASS: Record<LogDock, string> = {
+  top: 'h-[min(34vh,320px)] w-full border-b',
+  bottom: 'h-[min(34vh,320px)] w-full border-t',
+  left: 'h-full w-[min(92vw,420px)] border-r',
+  right: 'h-full w-[min(92vw,420px)] border-l',
 }
 
 function flatModels(providers: ProviderInfo[]): ModelRef[] {
@@ -178,6 +178,7 @@ export function VerdictWorkspace() {
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [logReduced, setLogReduced] = React.useState(false)
   const [logDock, setLogDock] = React.useState<LogDock>('bottom')
   const [view, setView] = React.useState<'pipeline' | 'results'>('pipeline')
   const [restored, setRestored] = React.useState(false)
@@ -541,9 +542,26 @@ export function VerdictWorkspace() {
     setAnchors((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : current.length >= 3 ? current : [...current, id]))
   }
 
+  const sideDock = logDock === 'left' || logDock === 'right'
+  const docked = logOpen && !logReduced
+  const logPanel = (
+    <div className={cn('flex min-h-0 min-w-0 shrink-0 flex-col border-border bg-card', DOCK_PANEL_CLASS[logDock])}>
+      <EventLog
+        events={events}
+        onClose={() => setLogOpen(false)}
+        onReduce={() => setLogReduced(true)}
+        dock={logDock}
+        onDockChange={setLogDock}
+        className="rounded-none border-0 shadow-none"
+      />
+    </div>
+  )
+
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
+    <div className={cn('flex h-dvh overflow-hidden bg-background', sideDock ? 'flex-row' : 'flex-col')}>
+      {docked && logDock === 'left' ? logPanel : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="z-30 flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
           <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
           <div className="leading-none">
@@ -562,7 +580,10 @@ export function VerdictWorkspace() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-2 px-2 pt-2">
+      {docked && logDock === 'top' ? logPanel : null}
+
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-2 px-2 pt-2 pb-2">
         <SectionCard
           title={t('inputs.title')}
           icon={<Layers className="h-3.5 w-3.5 text-brand-primary" />}
@@ -846,8 +867,13 @@ export function VerdictWorkspace() {
             />
           </div>
         ) : null}
+        </div>
+      </main>
 
-        <div className="sticky bottom-0 z-20 -mx-2 mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
+      {docked && logDock === 'bottom' ? logPanel : null}
+
+      <div className="z-20 shrink-0 border-t border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center gap-2 px-2 py-2">
           {running ? (
             <Button type="button" variant="destructive" disabled={cancelling} onClick={() => void stopRun()}>
               {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />} {t('run.cancel')}
@@ -880,7 +906,14 @@ export function VerdictWorkspace() {
             size="icon"
             aria-label={t('run.log')}
             aria-pressed={logOpen}
-            onClick={() => setLogOpen((value) => !value)}
+            onClick={() => {
+              if (logOpen) {
+                setLogOpen(false)
+              } else {
+                setLogReduced(false)
+                setLogOpen(true)
+              }
+            }}
           >
             <Terminal className="h-4 w-4" />
           </Button>
@@ -903,11 +936,14 @@ export function VerdictWorkspace() {
             ) : null}
           </div>
         </div>
-      </main>
+      </div>
+      </div>
 
-      {logOpen ? (
-        <div className={cn('shadow-2xl', LOG_DOCK_CLASS[logDock])}>
-          <EventLog events={events} onClose={() => setLogOpen(false)} dock={logDock} onDockChange={setLogDock} />
+      {docked && logDock === 'right' ? logPanel : null}
+
+      {logOpen && logReduced ? (
+        <div className="fixed right-3 bottom-14 z-40">
+          <LogPeek events={events} onExpand={() => setLogReduced(false)} onClose={() => setLogOpen(false)} />
         </div>
       ) : null}
 

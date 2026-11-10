@@ -185,6 +185,8 @@
     "events_other": "{{count}} 个事件",
     "empty": "暂无内容。启动运行以流式查看阶段和模型判定。",
     "close": "关闭运行日志",
+    "reduce": "缩小运行日志",
+    "expand": "展开运行日志",
     "dockBottom": "将运行日志停靠到底部",
     "dockTop": "将运行日志停靠到顶部",
     "dockLeft": "将运行日志停靠到左侧",

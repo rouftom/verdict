@@ -195,6 +195,8 @@
     "events_other": "{{count}} events",
     "empty": "Nothing yet. Start a run to stream stages and model verdicts.",
     "close": "Close run log",
+    "reduce": "Reduce run log",
+    "expand": "Expand run log",
     "dockBottom": "Dock run log at the bottom",
     "dockTop": "Dock run log at the top",
     "dockLeft": "Dock run log on the left",
