@@ -37,6 +37,8 @@ Supplied ranks are optional and **never** influence criterion scores. A supplied
 `rank` applies to the project's primary track only; award and secondary tracks
 are ranked from the scores. Ranks are shown to the comparative ranking pass only
 when the workspace option is on, and only after every criterion score is fixed.
+Duplicate supplied ranks are normal across tracks: the manifest parser reports
+them as one generic warning and never lists the affected projects or tracks.
 Up to three projects can be chosen as calibration anchors. Anchors get no bonus
 and may come from another track.
 
@@ -138,6 +140,10 @@ rewrites its generated file, leave it alone.
   `SectionCard`; the run bar stays pinned to the bottom of the viewport.
 - Inputs are **file pickers only**. Do not reintroduce textareas for the
   manifest, rules or rubric.
+- The three Inputs pickers live in one responsive grid. Each `UploadCard` is
+  `h-full` with a `flex-1` dashed column, and its title row is `min-h-7`, so the
+  dashed boxes keep the same height even when one column has a clear button, a
+  longer hint or extra shortcuts.
 - The rubric picker carries the Built-in and Generic YAML shortcuts at the flex
   end of the picker row.
 - Models is one block in two columns: six evaluators on the left, two verifiers

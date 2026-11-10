@@ -17,6 +17,14 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-3DA639" />
 </p>
 
+<p align="center">
+  <a href="https://socket.dev"><img alt="Dependencies monitored by Socket" src="https://img.shields.io/badge/Socket-monitored-4B32C3?logo=socket&logoColor=white" /></a>
+  <a href="https://zod.dev"><img alt="Inputs validated with Zod" src="https://img.shields.io/badge/input-Zod-3068B7?logo=zod&logoColor=white" /></a>
+  <img alt="Secrets: environment only" src="https://img.shields.io/badge/secrets-env--only-3DA639" />
+  <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-3DA639" />
+  <img alt="Storage: browser only" src="https://img.shields.io/badge/storage-browser--only-3DA639" />
+</p>
+
 Upload a manifest of projects, the rules, and a rubric. `verdict` harvests each
 project's GitHub repository and demo video, then runs:
 
@@ -34,6 +42,22 @@ project's GitHub repository and demo video, then runs:
 
 No authentication, no database. Run snapshots and the last workspace
 configuration live in the browser's IndexedDB.
+
+## Security
+
+- The browser never holds a provider key. Keys are read from the API process
+  environment, and `/providers` only returns the model catalog plus a
+  `configured` flag per provider.
+- Every manifest, rubric and run request is parsed with a Zod schema before it
+  is used. The manifest parser refuses an empty project list, and the rubric
+  parser refuses a rubric without criteria.
+- Run state lives in the API process memory and in the browser's IndexedDB.
+  There is no account, no cookie session and no server-side user data store.
+- No analytics, telemetry or third-party trackers are loaded. The only outbound
+  calls are the provider APIs and the GitHub/YouTube harvest for the projects in
+  the manifest.
+- Socket scans dependency changes on every pull request. Locally, the gates are
+  `bun run typecheck`, `bun run test` and `bun run build`.
 
 ## Requirements
 
@@ -281,6 +305,10 @@ original text.
   context that must not change a score.
 - The report always shows a supplied-rank delta, compared **per track**. Ranks
   supplied in a manifest restart at 1 in each track.
+- Repeated supplied ranks are expected, since every track restarts at 1. When a
+  manifest carries duplicates, the validation strip shows **one generic
+  warning**: it names no project and no track, however many entries repeat a
+  rank.
 - Up to three projects can be selected as calibration anchors. Anchors are
   ranked normally, get no bonus, and may come from another track (their
   dossier is passed to the ranking pass as calibration only).
@@ -291,11 +319,14 @@ The workspace has:
 
 - inputs in **three responsive columns** (project manifest, evaluation rules
   and rubric), each a file picker, with a live validation strip underneath
-  (project count, criteria and weights, warnings, anchors). The rubric row also
-  carries the **Built-in** and **Generic YAML** shortcuts, aligned to the end
-  of the picker row. **Calibration anchors (max 3)** shows the selected count,
-  truncates long project names and, once a manifest has more than three
-  projects, adds a small filter field above a scrollable chip list;
+  (project count, criteria and weights, warnings, anchors). The three dashed
+  pickers share a height: each card fills its grid cell, the picker grows to
+  fill the card, and the title row keeps a fixed height whether or not a clear
+  button appears. The rubric row also carries the **Built-in** and **Generic
+  YAML** shortcuts, aligned to the end of the picker row. **Calibration anchors
+  (max 3)** shows the selected count, truncates long project names and, once a
+  manifest has more than three projects, adds a small filter field above a
+  scrollable chip list;
 - one **Models** block in two columns: **six evaluators** on the left, the
   **two verifiers** and the run **options** on the right, each agent slot
   carrying its own model and reasoning select;
