@@ -43,6 +43,20 @@ export interface ProviderInfo {
  */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
+/** Public (non-secret) description of an evaluator or verifier persona. */
+export interface AgentInfo {
+  id: string
+  name: string
+  lens: string
+  focus: string
+  evidenceHint: string
+}
+
+export interface AgentPool {
+  evaluators: AgentInfo[]
+  verifiers: AgentInfo[]
+}
+
 export interface ModelRef {
   provider: ProviderId
   model: string
@@ -58,7 +72,10 @@ export interface ProjectInput {
   id: string
   name: string
   rank?: number
+  /** Primary track, always the first entry of `tracks`. */
   track?: string
+  /** Every track the project is entered in, primary track first. */
+  tracks?: string[]
   github?: string
   youtube?: string
   description?: string

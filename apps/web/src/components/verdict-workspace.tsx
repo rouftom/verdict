@@ -1,37 +1,32 @@
 'use client'
 
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  CheckCircle2,
+  BarChart3,
   Download,
   History,
   Layers,
-  Moon,
+  Network,
   Play,
   RefreshCw,
   Settings2,
   Square,
-  Sun,
+  Terminal,
   Trash2,
   X,
 } from 'lucide-react'
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Label,
-  Select,
-  Separator,
   cn,
 } from '@verdict/ui'
-import { useTheme } from '@/components/theme-provider'
 import {
   reasoningEffortsFor,
+  type AgentPool,
   type ModelRef,
   type ProjectConsensus,
   type ProjectEvaluation,
@@ -60,6 +55,9 @@ import { ModelSlots } from './model-slots'
 import { PipelineGraph, StatusPill } from './pipeline-graph'
 import { ResultsPanel } from './results-panel'
 import { EventLog } from './event-log'
+import { AppearanceMenu } from './appearance-menu'
+import { LanguageMenu } from './language-menu'
+import { SectionCard } from './section-card'
 
 const RUNNING: RunStatus[] = ['queued', 'parsing', 'harvesting', 'evaluating', 'reviewing', 'consensus', 'verifying']
 
@@ -129,12 +127,13 @@ function messageOf(error: unknown): string {
 }
 
 export function VerdictWorkspace() {
-  const theme = useTheme()
+  const { t } = useTranslation()
   const [providers, setProviders] = React.useState<ProviderInfo[]>([])
   const [defaults, setDefaults] = React.useState<{ evaluators: ModelRef[]; verifiers: ModelRef[] }>({
     evaluators: [],
     verifiers: [],
   })
+  const [agents, setAgents] = React.useState<AgentPool>()
   const [providersError, setProvidersError] = React.useState<string | null>(null)
 
   const [manifestText, setManifestText] = React.useState('')
@@ -165,13 +164,15 @@ export function VerdictWorkspace() {
 
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [logOpen, setLogOpen] = React.useState(false)
+  const [view, setView] = React.useState<'pipeline' | 'results'>('pipeline')
   const [restored, setRestored] = React.useState(false)
 
   const unsubscribe = React.useRef<(() => void) | null>(null)
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const running = status !== undefined && RUNNING.includes(status)
 
-  // Providers ---------------------------------------------------------------
+  // Providers
   React.useEffect(() => {
     let cancelled = false
     fetchProviders()
@@ -179,6 +180,7 @@ export function VerdictWorkspace() {
         if (cancelled) return
         setProviders(result.providers)
         setDefaults(result.defaults)
+        setAgents(result.agents)
         setProvidersError(null)
       })
       .catch((error) => {
@@ -254,7 +256,7 @@ export function VerdictWorkspace() {
   const loadPreset = async (label: string, url: string, kind: 'manifest' | 'rules' | 'rubric') => {
     try {
       const response = await fetch(url)
-      if (!response.ok) throw new Error(`Preset ${label} returned ${response.status}.`)
+      if (!response.ok) throw new Error(t('inputs.presetError', { label, status: response.status }))
       const text = await response.text()
       const filename = url.split('/').pop() ?? label
       if (kind === 'manifest') {
@@ -310,7 +312,7 @@ export function VerdictWorkspace() {
         break
       }
       case 'error':
-        setRunError(event.message ?? 'Run failed.')
+        setRunError(event.message ?? t('run.failed'))
         setStatus('failed')
         break
       default:
@@ -359,6 +361,7 @@ export function VerdictWorkspace() {
     setEvents([])
     setLive(EMPTY_LIVE)
     setStatus('queued')
+    setView('pipeline')
     unsubscribe.current?.()
     try {
       const payload: RunRequest = {
@@ -459,71 +462,57 @@ export function VerdictWorkspace() {
     setHistory(await listRuns())
   }
 
-  const configuredCount = providers.filter((provider) => provider.configured).length
   const projects = preview?.projects ?? []
-  const criteria = preview?.rubric.criteria ?? []
+  const criteria = preview?.rubric.criteria ?? live.report?.criteria ?? []
+  const hasResults =
+    Boolean(live.report) || live.consensus.length > 0 || live.evaluations.length > 0 || live.verifications.length > 0
+  const canToggleView = Boolean(runId) && hasResults
   const toggleAnchor = (id: string) => {
     setAnchors((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : current.length >= 3 ? current : [...current, id]))
   }
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-background">
-      <header className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+    <div className="flex min-h-dvh flex-col bg-background">
+      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-primary text-[13px] font-black text-primary-foreground">
-            V
-          </span>
+          <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
           <div className="leading-none">
-            <p className="text-[13px] font-bold tracking-tight">verdict</p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">6 evaluators · 2 verifiers · per-track ranking</p>
+            <p className="text-[13px] font-bold tracking-tight">Verdict</p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">{t('app.tagline')}</p>
           </div>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Badge tone={configuredCount > 0 ? 'success' : 'danger'}>
-            {configuredCount} provider{configuredCount === 1 ? '' : 's'}
-          </Badge>
+          <LanguageMenu />
           <Button type="button" variant="outline" size="sm" onClick={() => setHistoryOpen((value) => !value)}>
-            <History className="h-3.5 w-3.5" /> History
+            <History className="h-3.5 w-3.5" /> {t('app.history')}
             {history.length > 0 ? <span className="tabular-nums text-muted-foreground">({history.length})</span> : null}
           </Button>
-          <Select
-            value={theme.packId}
-            onValueChange={theme.setPack}
-            options={theme.packs.map((pack) => ({ value: pack.id, label: pack.name.en }))}
-            ariaLabel="Theme pack"
-            className="w-[120px]"
-            triggerClassName="text-[11px]"
-          />
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Toggle dark mode" onClick={theme.toggleMode}>
-            {theme.mode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <AppearanceMenu />
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="custom-scrollbar flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
-          <Card>
-            <CardHeader>
-              <Layers className="h-3.5 w-3.5 text-brand-primary" />
-              <CardTitle>Inputs</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 pt-0">
+      <main className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-2 px-2 pt-2">
+        <SectionCard
+          title={t('inputs.title')}
+          icon={<Layers className="h-3.5 w-3.5 text-brand-primary" />}
+          aside={
+            <span className="ml-auto flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+              <span>{t('inputs.projectCount', { count: projects.length })}</span>
+              {preview ? <span>{t('inputs.ruleChars', { count: preview.rulesChars.toLocaleString() })}</span> : null}
+            </span>
+          }
+          contentClassName="flex flex-col gap-3 pt-0"
+        >
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <UploadCard
                 id="manifest"
-                label="Project manifest"
-                hint="JSON or YAML. Accepts an array or { projects: [] }. Ranks optional and per track."
+                label={t('inputs.manifestLabel')}
+                hint={t('inputs.manifestHint')}
                 accept=".json,.yaml,.yml,application/json,text/yaml"
                 filename={manifestName}
                 text={manifestText}
-                placeholder={'[\n  { "name": "Project", "track": "startup", "github": "https://github.com/owner/repo", "youtube": "https://youtu.be/…" }\n]'}
                 required
-                rows={5}
-                presets={[{ label: 'winners.json', url: '/samples/winners.json' }]}
-                onText={(text) => {
-                  setManifestText(text)
-                  setManifestName(undefined)
-                }}
                 onFile={(filename, text) => {
                   setManifestText(text)
                   setManifestName(filename)
@@ -532,23 +521,15 @@ export function VerdictWorkspace() {
                   setManifestText('')
                   setManifestName(undefined)
                 }}
-                onPreset={(preset) => void loadPreset(preset.label, preset.url, 'manifest')}
               />
 
               <UploadCard
                 id="rules"
-                label="Evaluation rules"
-                hint="Markdown or TXT. Passed to every agent verbatim, as untrusted context."
+                label={t('inputs.rulesLabel')}
+                hint={t('inputs.rulesHint')}
                 accept=".md,.markdown,.txt,.yaml,.yml"
                 filename={rulesName}
                 text={rulesText}
-                placeholder="Optional. Eligibility rules, problem statements, disqualifiers…"
-                rows={3}
-                presets={[{ label: 'Hackathon rules', url: '/rules/meta-ai-developer-hackathon.md' }]}
-                onText={(text) => {
-                  setRulesText(text)
-                  setRulesName(undefined)
-                }}
                 onFile={(filename, text) => {
                   setRulesText(text)
                   setRulesName(filename)
@@ -557,89 +538,70 @@ export function VerdictWorkspace() {
                   setRulesText('')
                   setRulesName(undefined)
                 }}
-                onPreset={(preset) => void loadPreset(preset.label, preset.url, 'rules')}
               />
 
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs font-semibold">Rubric</Label>
-                  <Badge tone={rubricMode === 'builtin' ? 'brand' : 'neutral'}>
-                    {rubricMode === 'builtin' ? 'built-in neutral' : 'custom'}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <Button
-                    type="button"
-                    variant={rubricMode === 'builtin' ? 'primary' : 'outline'}
-                    size="sm"
-                    className="h-6 rounded-full px-2 text-[11px]"
-                    onClick={() => {
-                      setRubricText('')
-                      setRubricName(undefined)
-                      setRubricMode('builtin')
-                    }}
-                  >
-                    Built-in
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="h-6 rounded-full px-2 text-[11px]" onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}>
-                    Generic YAML
-                  </Button>
-                </div>
-                <UploadCard
-                  id="rubric"
-                  label="Custom rubric"
-                  hint="YAML/JSON, or the markdown criteria table. Empty = the built-in neutral rubric."
-                  accept=".yaml,.yml,.json,.md,.markdown"
-                  filename={rubricName}
-                  text={rubricText}
-                  placeholder="Paste a rubric, or choose a preset above."
-                  rows={3}
-                  onText={(text) => {
-                    setRubricText(text)
-                    setRubricName(undefined)
-                    setRubricMode(text.trim() ? 'custom' : 'builtin')
-                  }}
-                  onFile={(filename, text) => {
-                    setRubricText(text)
-                    setRubricName(filename)
-                    setRubricMode('custom')
-                  }}
-                  onClear={() => {
-                    setRubricText('')
-                    setRubricName(undefined)
-                    setRubricMode('builtin')
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              <UploadCard
+                id="rubric"
+                label={t('inputs.rubricLabel')}
+                hint={t('inputs.rubricHint')}
+                accept=".yaml,.yml,.json,.md,.markdown"
+                filename={rubricName}
+                text={rubricText}
+                actions={
+                  <>
+                    <Button
+                      type="button"
+                      variant={rubricMode === 'builtin' ? 'primary' : 'outline'}
+                      size="sm"
+                      className="h-6 px-2 text-[11px]"
+                      onClick={() => {
+                        setRubricText('')
+                        setRubricName(undefined)
+                        setRubricMode('builtin')
+                      }}
+                    >
+                      {t('inputs.builtIn')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[11px]"
+                      onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}
+                    >
+                      {t('inputs.genericYaml')}
+                    </Button>
+                  </>
+                }
+                onFile={(filename, text) => {
+                  setRubricText(text)
+                  setRubricName(filename)
+                  setRubricMode('custom')
+                }}
+                onClear={() => {
+                  setRubricText('')
+                  setRubricName(undefined)
+                  setRubricMode('builtin')
+                }}
+              />
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CheckCircle2 className={cn('h-3.5 w-3.5', preview ? 'text-emerald-500' : 'text-muted-foreground')} />
-              <CardTitle>Preview</CardTitle>
-              <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
-                {projects.length} project{projects.length === 1 ? '' : 's'}
-              </span>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
               {previewError ? (
-                <p className="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[11px] text-destructive">
+                <p className="flex items-start gap-1.5 text-[11px] text-destructive">
                   <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {previewError}
                 </p>
               ) : null}
               {preview ? (
                 <>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone="success">{t('inputs.rubricBadge', { name: preview.rubric.name })}</Badge>
                     {criteria.map((criterion) => (
                       <Badge key={criterion.id} tone="neutral">
                         {criterion.label} · {Math.round(criterion.weight * 100)}%
                       </Badge>
                     ))}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Rubric: <span className="text-foreground">{preview.rubric.name}</span> · {preview.rulesChars.toLocaleString()} rule chars
-                  </p>
                   {preview.warnings.length > 0 ? (
                     <ul className="list-inside list-disc text-[10px] text-amber-600">
                       {preview.warnings.slice(0, 6).map((warning) => (
@@ -648,152 +610,136 @@ export function VerdictWorkspace() {
                     </ul>
                   ) : null}
                   {projects.length > 0 ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Calibration anchors (max 3)
+                        {t('inputs.anchors')}
                       </Label>
-                      <div className="flex flex-wrap gap-1">
-                        {projects.map((project) => (
-                          <button
-                            key={project.id}
-                            type="button"
-                            onClick={() => toggleAnchor(project.id)}
-                            className={cn(
-                              'rounded-full border px-2 py-0.5 text-[10px]',
-                              anchors.includes(project.id)
-                                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                                : 'border-border text-muted-foreground hover:bg-muted',
-                            )}
-                          >
-                            {project.name}
-                          </button>
-                        ))}
-                      </div>
+                      {projects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => toggleAnchor(project.id)}
+                          className={cn(
+                            'rounded-full border px-2 py-0.5 text-[10px]',
+                            anchors.includes(project.id)
+                              ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                              : 'border-border text-muted-foreground hover:bg-muted',
+                          )}
+                        >
+                          {project.name}
+                        </button>
+                      ))}
                     </div>
                   ) : null}
                 </>
               ) : !previewError ? (
-                <p className="text-[11px] text-muted-foreground">Upload or paste a manifest to validate it.</p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <Settings2 className="h-3.5 w-3.5 text-brand-primary" />
-              <CardTitle>Models</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
-              <div className="flex items-center justify-between">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">6 evaluators</Label>
-                <span className="text-[10px] text-muted-foreground">each scores all 4 criteria</span>
-              </div>
-              <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
-              <Separator className="my-0.5" />
-              <div className="flex items-center justify-between">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">2 verifiers</Label>
-                <span className="text-[10px] text-muted-foreground">audit + final ranking</span>
-              </div>
-              <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
-              {providersError ? <p className="text-[10px] text-destructive">Could not reach the API: {providersError}</p> : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <CardTitle>Options</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-0">
-              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
-                <Checkbox checked={showRanks} onCheckedChange={(value) => setShowRanks(value === true)} className="mt-0.5" />
-                <span>
-                  <span className="block text-[11px] font-medium">Show supplied ranks to the ranking pass</span>
-                  <span className="block text-[10px] leading-tight text-muted-foreground">
-                    Audit only. Criterion scores are fixed before ranking and are never changed by a supplied rank.
-                  </span>
-                </span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="video-cap" className="text-[10px] text-muted-foreground">
-                    Max video (min)
-                  </Label>
-                  <input
-                    id="video-cap"
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={maxVideoMinutes}
-                    onChange={(event) => setMaxVideoMinutes(Math.max(1, Math.min(120, Number(event.target.value) || 20)))}
-                    className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="temperature" className="text-[10px] text-muted-foreground">
-                    Temperature
-                  </Label>
-                  <input
-                    id="temperature"
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={temperature}
-                    onChange={(event) => setTemperature(Math.max(0, Math.min(1, Number(event.target.value) || 0)))}
-                    className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
-                  />
-                </div>
-              </div>
-              <p className="text-[10px] leading-tight text-muted-foreground">
-                Runs stream over SSE. Snapshots are kept in this browser's IndexedDB — no account, no server database.
-              </p>
-            </CardContent>
-          </Card>
-
-          <div className="sticky bottom-0 flex flex-col gap-1.5 bg-background/95 pb-1 pt-1 backdrop-blur">
-            <div className="flex gap-2">
-              {running ? (
-                <Button type="button" variant="destructive" className="flex-1" onClick={() => void stopRun()}>
-                  <Square className="h-4 w-4" /> Cancel run
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="flex-1"
-                  disabled={!manifestText.trim() || evaluatorModels.length === 0 || verifierModels.length === 0 || starting}
-                  onClick={() => void startRun()}
-                >
-                  <Play className="h-4 w-4" /> {starting ? 'Starting…' : 'Evaluate projects'}
-                </Button>
-              )}
-              <Button type="button" variant="outline" size="icon" aria-label="Refresh run" disabled={!runId} onClick={() => runId && void refreshRun(runId)}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" size="icon" aria-label="Export report" disabled={!live.report} onClick={exportReport}>
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusPill status={status} />
-              {runError ? <span className="min-w-0 truncate text-[10px] text-destructive">{runError}</span> : null}
-              {!runError && live.report ? (
-                <span className="text-[10px] text-muted-foreground">report ready · {formatDate(live.report.createdAt)}</span>
+                <p className="text-[11px] text-muted-foreground">{t('inputs.chooseManifest')}</p>
               ) : null}
             </div>
+        </SectionCard>
+
+        <SectionCard
+          title={t('models.title')}
+          icon={<Settings2 className="h-3.5 w-3.5 text-brand-primary" />}
+          aside={<span className="ml-auto text-[10px] text-muted-foreground">{t('models.aside')}</span>}
+          contentClassName="grid grid-cols-1 gap-4 pt-0 md:grid-cols-2"
+        >
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('models.evaluators')}</Label>
+              <span className="text-[10px] text-muted-foreground">{t('models.allCriteria')}</span>
+            </div>
+            <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
           </div>
-        </aside>
 
-        <section className="flex min-h-0 flex-col gap-2">
-          <PipelineGraph
-            status={status}
-            evaluations={live.evaluations.length}
-            revisions={live.revisions.length}
-            verifications={live.verifications.length}
-            hasReport={Boolean(live.report)}
-            failed={status === 'failed'}
-          />
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="flex min-w-0 flex-col gap-2 md:border-l md:border-border md:pl-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('models.verifiers')}</Label>
+              <span className="text-[10px] text-muted-foreground">{t('models.auditFinal')}</span>
+            </div>
+            <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
+
+            <div className="mt-1 h-px bg-border" />
+
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('models.options')}</Label>
+              <span className="text-[10px] text-muted-foreground">{t('models.rankingHarvest')}</span>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
+              <Checkbox checked={showRanks} onCheckedChange={(value) => setShowRanks(value === true)} className="mt-0.5" />
+              <span>
+                <span className="block text-[11px] font-medium">{t('models.showRanks')}</span>
+                <span className="block text-[10px] leading-tight text-muted-foreground">
+                  {t('models.showRanksHint')}
+                </span>
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="video-cap" className="text-[10px] text-muted-foreground">
+                  {t('models.maxVideo')}
+                </Label>
+                <input
+                  id="video-cap"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={maxVideoMinutes}
+                  onChange={(event) => setMaxVideoMinutes(Math.max(1, Math.min(120, Number(event.target.value) || 20)))}
+                  className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="temperature" className="text-[10px] text-muted-foreground">
+                  {t('models.temperature')}
+                </Label>
+                <input
+                  id="temperature"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={temperature}
+                  onChange={(event) => setTemperature(Math.max(0, Math.min(1, Number(event.target.value) || 0)))}
+                  className="h-7 rounded-md border border-border bg-transparent px-2 text-[11px] tabular-nums"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] leading-tight text-muted-foreground">
+              {t('models.persistence')}
+            </p>
+          </div>
+
+          {providersError ? (
+            <p className="text-[10px] text-destructive md:col-span-2">{t('models.apiError', { error: providersError })}</p>
+          ) : null}
+        </SectionCard>
+
+        {runId && view === 'pipeline' ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center justify-between gap-1 px-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.title')}</span>
+              <span className="text-[10px] text-muted-foreground">{t('pipeline.hint')}</span>
+            </div>
+            <PipelineGraph
+              status={status}
+              evaluations={live.evaluations}
+              revisions={live.revisions}
+              verifications={live.verifications}
+              agents={agents}
+              evaluatorModels={evaluatorModels}
+              verifierModels={verifierModels}
+              criteria={criteria}
+              projects={projects}
+              selectedProjectId={selectedId}
+              hasReport={Boolean(live.report)}
+              failed={status === 'failed'}
+            />
+          </div>
+        ) : null}
+
+        {hasResults && view === 'results' ? (
+          <div className="h-[min(72vh,780px)] min-h-[540px]">
             <ResultsPanel
               report={live.report}
               rubric={preview?.rubric}
@@ -804,10 +750,65 @@ export function VerdictWorkspace() {
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
-            <EventLog events={events} />
           </div>
-        </section>
+        ) : null}
+
+        <div className="sticky bottom-0 z-20 -mx-2 mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
+          {running ? (
+            <Button type="button" variant="destructive" onClick={() => void stopRun()}>
+              <Square className="h-4 w-4" /> {t('run.cancel')}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={!manifestText.trim() || evaluatorModels.length === 0 || verifierModels.length === 0 || starting}
+              onClick={() => void startRun()}
+            >
+              <Play className="h-4 w-4" /> {starting ? t('run.starting') : t('run.evaluate')}
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="icon" aria-label={t('run.refresh')} disabled={!runId} onClick={() => runId && void refreshRun(runId)}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="outline" size="icon" aria-label={t('run.export')} disabled={!live.report} onClick={exportReport}>
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant={logOpen ? 'secondary' : 'outline'}
+            size="icon"
+            aria-label={t('run.log')}
+            aria-pressed={logOpen}
+            onClick={() => setLogOpen((value) => !value)}
+          >
+            <Terminal className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant={view === 'results' ? 'secondary' : 'outline'}
+            size="icon"
+            aria-label={view === 'pipeline' ? t('run.showResults') : t('run.showPipeline')}
+            title={view === 'pipeline' ? t('run.showResults') : t('run.showPipeline')}
+            disabled={!canToggleView}
+            onClick={() => setView((current) => (current === 'pipeline' ? 'results' : 'pipeline'))}
+          >
+            {view === 'pipeline' ? <BarChart3 className="h-4 w-4" /> : <Network className="h-4 w-4" />}
+          </Button>
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
+            <StatusPill status={status} />
+            {runError ? <span className="min-w-0 truncate text-[10px] text-destructive">{runError}</span> : null}
+            {!runError && live.report ? (
+              <span className="text-[10px] text-muted-foreground">{t('run.reportReady', { date: formatDate(live.report.createdAt) })}</span>
+            ) : null}
+          </div>
+        </div>
       </main>
+
+      {logOpen ? (
+        <div className="fixed bottom-16 right-3 z-40 h-[min(45vh,420px)] w-[min(92vw,440px)] shadow-2xl">
+          <EventLog events={events} onClose={() => setLogOpen(false)} />
+        </div>
+      ) : null}
 
       {historyOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setHistoryOpen(false)}>
@@ -817,28 +818,31 @@ export function VerdictWorkspace() {
           >
             <div className="flex items-center gap-2">
               <History className="h-4 w-4" />
-              <h2 className="text-sm font-semibold">Saved runs</h2>
-              <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" aria-label="Close history" onClick={() => setHistoryOpen(false)}>
+              <h2 className="text-sm font-semibold">{t('history.title')}</h2>
+              <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" aria-label={t('history.close')} onClick={() => setHistoryOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground">Stored in this browser's IndexedDB only.</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">{t('history.stored')}</p>
             <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
               {history.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">No run saved yet.</p>
+                <p className="text-[11px] text-muted-foreground">{t('history.empty')}</p>
               ) : (
                 history.map((entry) => (
                   <div key={entry.id} className="rounded-md border border-border p-2">
                     <button type="button" className="w-full text-left" onClick={() => restoreSnapshot(entry)}>
                       <p className="truncate text-[11px] font-medium">{entry.summary.rubric}</p>
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {formatDate(entry.createdAt)} · {entry.summary.projects} projects · {entry.summary.tracks} track(s)
+                        {formatDate(entry.createdAt)} · {t('history.projects', { count: entry.summary.projects })} ·{' '}
+                        {t('history.tracks', { count: entry.summary.tracks })}
                       </p>
-                      <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">{entry.status}</p>
+                      <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">
+                        {t(`status.${entry.status}`, { defaultValue: entry.status })}
+                      </p>
                     </button>
                     <div className="mt-1 flex justify-end">
                       <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-destructive" onClick={() => void removeSaved(entry.id)}>
-                        <Trash2 className="h-3 w-3" /> Delete
+                        <Trash2 className="h-3 w-3" /> {t('history.delete')}
                       </Button>
                     </div>
                   </div>

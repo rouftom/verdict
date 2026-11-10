@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { ServiceWorkerRegister } from '@/components/service-worker-register'
+import { I18nProvider } from '@/components/i18n-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import {
   DEFAULT_CORNER_STYLE,
@@ -24,9 +26,25 @@ const themeBootstrap = buildChromeBootstrapScript({
 const themeCss = buildThemePackCss(THEME_PACKS)
 
 export const metadata: Metadata = {
-  title: 'Verdict — multi-agent project evaluation',
+  title: 'Verdict · multi-agent project evaluation',
   description:
     'Evidence-grounded scoring of hackathon projects: six evaluators, one cross-review round, two verifiers, per-track ranking.',
+  applicationName: 'Verdict',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: ['/favicon.ico'],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'verdict',
+  },
 }
 
 export const viewport: Viewport = {
@@ -44,7 +62,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style id="verdict-theme-packs" dangerouslySetInnerHTML={{ __html: themeCss }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            {children}
+            <ServiceWorkerRegister />
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

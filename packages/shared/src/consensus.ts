@@ -7,6 +7,7 @@ import type {
   Rubric,
   TrackRanking,
 } from './types'
+import { primaryTrack, projectTracks } from './tracks'
 
 export function mean(values: number[]): number {
   if (values.length === 0) return 0
@@ -108,10 +109,12 @@ export function rankProjects(
   const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
   const groups = new Map<string, ProjectInput[]>()
   for (const project of projects) {
-    const key = scope === 'global' ? 'all' : project.track?.trim() || 'default'
-    const bucket = groups.get(key) ?? []
-    bucket.push(project)
-    groups.set(key, bucket)
+    const keys = scope === 'global' ? ['all'] : projectTracks(project)
+    for (const key of keys) {
+      const bucket = groups.get(key) ?? []
+      bucket.push(project)
+      groups.set(key, bucket)
+    }
   }
 
   return [...groups.entries()].map(([track, entries]) => {
@@ -125,14 +128,17 @@ export function rankProjects(
     const ranked: RankedProject[] = sorted.map((project, index) => {
       const projectConsensus = byId.get(project.id)
       const rank = index + 1
+      // A supplied rank belongs to the primary track only; award and secondary
+      // tracks are ranked from the scores alone.
+      const hasProvidedRank = project.rank !== undefined && primaryTrack(project) === track
       return {
         projectId: project.id,
         name: project.name,
-        track: project.track ?? track,
+        track,
         rank,
         overall: projectConsensus?.overall ?? 0,
-        ...(project.rank !== undefined ? { providedRank: project.rank } : {}),
-        ...(project.rank !== undefined ? { rankDelta: project.rank - rank } : {}),
+        ...(hasProvidedRank ? { providedRank: project.rank } : {}),
+        ...(hasProvidedRank ? { rankDelta: (project.rank as number) - rank } : {}),
         confidence: projectConsensus?.confidence ?? 0,
         status: projectConsensus?.status ?? 'escalated',
       }

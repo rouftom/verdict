@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline · verdict</title>
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: #f7f9fe;
+        --foreground: #0b1526;
+        --muted: #5b6b85;
+        --card: #ffffff;
+        --border: #dfe7f5;
+        --primary: #0866ff;
+        --primary-foreground: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #050b18;
+          --foreground: #eef4ff;
+          --muted: #9aabc4;
+          --card: #0b1526;
+          --border: #1f2d45;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--background);
+        color: var(--foreground);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(420px, 100%);
+        border: 1px solid var(--border);
+        background: var(--card);
+        padding: 28px;
+      }
+      img {
+        width: 44px;
+        height: 44px;
+        display: block;
+        margin-bottom: 18px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0 0 8px;
+        color: var(--muted);
+      }
+      button {
+        margin-top: 16px;
+        border: 0;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        padding: 8px 14px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        filter: brightness(1.08);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo.svg" alt="" />
+      <h1>You are offline</h1>
+      <p>verdict needs a connection to harvest evidence and run the evaluation agents.</p>
+      <p>Reconnect, then reload this page. Saved reports stay available in this browser.</p>
+      <button type="button" onclick="window.location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

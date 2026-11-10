@@ -1,18 +1,17 @@
 /**
- * @sps/theme · the SarkiAI admin charter (apps/organization) replicated for the
- * Policy Sandbox. Theme packs: meta (default, Meta blue), fada, green, ocean,
- * sunset, mono.
+ * @verdict/theme · theme packs for the verdict console.
+ * Packs: default (blue), forest, green, ocean, sunset, mono.
  */
 
 import meta from './packs/meta.json'
-import fada from './packs/fada.json'
+import forest from './packs/forest.json'
 import green from './packs/green.json'
 import ocean from './packs/ocean.json'
 import sunset from './packs/sunset.json'
 import mono from './packs/mono.json'
 import type { ThemePack } from './types'
 
-const rawPacks: ThemePack[] = [meta, fada, green, ocean, sunset, mono] as ThemePack[]
+const rawPacks: ThemePack[] = [meta, forest, green, ocean, sunset, mono] as ThemePack[]
 
 export const THEME_PACKS: ThemePack[] = rawPacks
 
@@ -31,7 +30,7 @@ export function isThemePackId(id?: string | null): boolean {
 export const THEME_PACK_STORAGE_KEY = 'sps-theme-pack'
 export const MODE_STORAGE_KEY = 'sps-theme-mode'
 
-/** Corner treatment of the console chrome: square by default, or the FSM radii. */
+/** Corner treatment of the whole console: square by default, or rounded. */
 export type CornerStyle = 'square' | 'rounded'
 export const DEFAULT_CORNER_STYLE: CornerStyle = 'square'
 export const RADIUS_STORAGE_KEY = 'sps.radius'

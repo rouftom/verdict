@@ -1,9 +1,9 @@
 {
-  "id": "fada",
-  "name": { "fr": "Fada", "en": "Fada" },
+  "id": "forest",
+  "name": { "fr": "Forêt", "en": "Forest" },
   "description": {
-    "fr": "Charte officielle SarkiAI : vert profond, or et encre. Celle de sarkiai-enterprise / FSM.",
-    "en": "Official SarkiAI chart: deep green, gold and ink. The one used by sarkiai-enterprise / FSM."
+    "fr": "Vert profond, or et encre.",
+    "en": "Deep green, gold and ink."
   },
   "isDefault": false,
   "preview": {

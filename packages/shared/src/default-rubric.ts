@@ -7,7 +7,7 @@ import type { Rubric } from './types'
  */
 export const DEFAULT_RUBRIC: Rubric = {
   version: 1,
-  name: 'Project evaluation — generic rubric',
+  name: 'Project evaluation (generic rubric)',
   description:
     'Four weighted criteria: impact, use of AI tooling, technical depth and demo. Upload another rubric to replace it.',
   scale: {
@@ -111,7 +111,7 @@ export const DEFAULT_RUBRIC: Rubric = {
     { id: 'new_work', label: 'Built during the event', severity: 'disqualify', check: 'Commit history and demo show work produced during the event window.' },
     { id: 'public_repo', label: 'Public repository', severity: 'disqualify', check: 'The repository is publicly accessible.' },
     { id: 'demo_video', label: 'Required demo video', severity: 'disqualify', check: 'A demo video of about three minutes is present.' },
-    { id: 'one_track', label: 'Single track', severity: 'disqualify', check: 'The project is entered in exactly one track.' },
+    { id: 'one_track', label: 'Single participant track', severity: 'disqualify', check: 'The project is entered in exactly one participant track. Opt-in award tracks do not count as extra entries.' },
     { id: 'rights', label: 'Rights to code, data and assets', severity: 'disqualify', check: 'No unlicensed code, data or assets.' },
   ],
 }

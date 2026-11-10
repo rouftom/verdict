@@ -1,20 +1,35 @@
-# verdict
+<p align="center">
+  <img src="./apps/web/public/logo.svg" width="88" height="88" alt="verdict logo" />
+</p>
 
-Evidence-grounded, multi-agent evaluation of hackathon-style projects.
+<h1 align="center">verdict</h1>
+
+<p align="center">
+  Evidence-grounded, multi-agent evaluation of hackathon-style projects.
+</p>
+
+<p align="center">
+  <a href="https://bun.sh"><img alt="Bun 1.4.2" src="https://img.shields.io/badge/Bun-1.4.2-000000?logo=bun&logoColor=white" /></a>
+  <a href="https://nextjs.org"><img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" /></a>
+  <a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React-19-087EA4?logo=react&logoColor=white" /></a>
+  <a href="https://www.typescriptlang.org"><img alt="TypeScript 5.6" src="https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white" /></a>
+  <a href="https://turbo.build"><img alt="Turbo 2.3" src="https://img.shields.io/badge/Turbo-2.3-EF4444?logo=turborepo&logoColor=white" /></a>
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-3DA639" />
+</p>
 
 Upload a manifest of projects, the rules, and a rubric. `verdict` harvests each
 project's GitHub repository and demo video, then runs:
 
-1. **6 evaluator agents** — each scores the *same* weighted criteria
+1. **6 evaluator agents**: each scores the *same* weighted criteria
    independently.
-2. **1 cross-review round** — every agent sees the other five, anonymised, and
+2. **1 cross-review round**: every agent sees the other five, anonymised, and
    may revise with a written justification.
-3. **Consensus** — trimmed mean per criterion, spread, and MAD dispersion.
-4. **Comparative ranking** — one ordinal pass per track, aggregated by Borda
+3. **Consensus**: trimmed mean per criterion, spread, and MAD dispersion.
+4. **Comparative ranking**: one ordinal pass per track, aggregated by Borda
    count. Ranking is always produced, even with a single project.
-5. **2 verifier agents** — audit the six evaluations, then reconcile final
+5. **2 verifier agents**: audit the six evaluations, then reconcile final
    criterion scores and the per-track ranking.
-6. **Report** — final scores, ranking, supplied-rank delta, evidence errors,
+6. **Report**: final scores, ranking, supplied-rank delta, evidence errors,
    token usage.
 
 No authentication, no database. Run snapshots and the last workspace
@@ -43,8 +58,8 @@ The Python zipapp (the file named `yt-dlp` in the release assets) imports
 python3 -c "import zlib; print(zlib.ZLIB_VERSION)"
 ```
 
-If that fails while the system interpreter has it — for example `python3` is a
-`/usr/local/bin/python3` built without zlib, but `/usr/bin/python3` works — run
+If that fails while the system interpreter has it (for example `python3` is a
+`/usr/local/bin/python3` built without zlib, but `/usr/bin/python3` works), run
 the zipapp with the working interpreter, install zlib for the former, or use the
 self-contained Linux build, which embeds its own runtime:
 
@@ -104,6 +119,18 @@ bun run build
 cd apps/web && bun run start
 ```
 
+### PWA and offline
+
+`bun run build` runs `apps/web/scripts/build-sw.ts` first. It copies
+`apps/web/sw/sw.template.js` to the gitignored `apps/web/public/sw.js` and stamps
+it with the commit id, so every deploy registers a new worker. Navigations are
+network-first, images and fonts cache-first, styles and scripts
+stale-while-revalidate, and API or SSE requests are network-only. `next dev`
+unregisters any worker and clears its caches, so HMR never serves a stale bundle.
+
+The web app manifest is `apps/web/src/app/manifest.ts`. The logo, icons and the
+offline page live under `apps/web/public/`.
+
 ## Environment
 
 Everything is environment-driven. The full template is
@@ -120,7 +147,7 @@ LOG_LEVEL=info
 MAX_RUNS_IN_MEMORY=20
 MAX_EVENTS_PER_RUN=2000
 
-# providers — set the key(s) you have
+# providers: set the key(s) you have
 MODEL_API_KEY=            # Meta Model API (OpenAI-compatible), META_BASE_URL
 OPENAI_API_KEY=           # OPENAI_BASE_URL
 ANTHROPIC_API_KEY=        # ANTHROPIC_BASE_URL
@@ -182,7 +209,7 @@ UI always offers six evaluator slots and two verifier slots; the same model can
 fill several slots (useful for a single-provider demo), but diversity is
 recommended.
 
-Each slot has a searchable model select — models are grouped by provider — and
+Each slot has a searchable model select (models are grouped by provider) and
 its own reasoning selector (`Auto`, `None`, `Minimal`, `Low`, `Medium`, `High`,
 `Extra high`, `Max`). `Auto` keeps the environment default; any other value is
 stored on that agent's `ModelRef` and overrides the env for that call only. The
@@ -216,20 +243,30 @@ forwarded to an API that would reject it.
 
 | Input | Formats | Notes |
 | --- | --- | --- |
-| Manifest | JSON, YAML | Array, `{ projects: [] }`, or a single object. Fields: `name`, `track`, `github`/`repo`, `youtube`/`video`, `rank`, `description`, `team`. |
+| Manifest | JSON, YAML | Array, `{ projects: [] }`, or a single object. Fields: `name`, `track` (single), `tracks` (array), `github`/`repo`, `youtube`/`video`, `rank`, `description`, `team`. |
 | Evaluation rules | Markdown, TXT | Passed verbatim to every agent as untrusted context. Optional. |
 | Rubric | YAML, JSON, Markdown table | Optional; the built-in neutral rubric is used when empty. |
 
-Example inputs ship inside the repository, so the preset buttons work out of
-the box:
+Example inputs ship inside the repository:
 
-- `apps/web/public/rules/judging-rubric.generic.yaml` / `.md` — neutral rubric,
+- `apps/web/public/rules/judging-rubric.generic.yaml` / `.md`: neutral rubric,
   same weights as the organiser rubric (Impact 30%, Use of AI Tooling 25%,
   Technical Depth & Execution 20%, Demo 25%).
-- `apps/web/public/rules/meta-ai-developer-hackathon.md` — example rules
-  upload.
-- `apps/web/public/samples/winners.json` — example manifest with per-track
-  ranks.
+- `apps/web/public/rules/hackathon-rules.example.md`: generic example rules
+  upload, with no organiser or provider branding. It defines two participant
+  tracks (Indie Developer, Startup) and three award tracks (Best agentic use
+  case, Best creative build, Best build on Open Weight).
+
+Track values are free-form: whatever string a project carries in `track` or
+`tracks` becomes a ranking group. `tracks` is the multi-track field, so a
+project can be ranked in a participant track and several award tracks at the
+same time; the first entry is the primary track. Every track, participant or
+award, gets its own ranking, and a supplied `rank` applies to the primary track
+of that project only. Other tracks are ranked from the scores alone.
+
+The example manifest (`winners.json`) is deliberately kept **outside** this
+repository, next to the organiser rubric, so frequent edits to it never cause a
+merge conflict. Load it with *Choose file* when you need it.
 
 The built-in default is the generic neutral rubric. The organiser's exact
 rubric wording is deliberately **not** part of this repository: pass it as a
@@ -243,24 +280,51 @@ original text.
   comparative ranking pass, **after** every criterion score is fixed, as
   context that must not change a score.
 - The report always shows a supplied-rank delta, compared **per track**. Ranks
-  in `winners.json` restart at 1 in each track.
+  supplied in a manifest restart at 1 in each track.
 - Up to three projects can be selected as calibration anchors. Anchors are
   ranked normally, get no bonus, and may come from another track (their
   dossier is passed to the ranking pass as calibration only).
 
 ## Workspace
 
-The single screen has:
+The workspace has:
 
-- an inputs column (manifest, rules, rubric, presets);
-- a live preview (project count, criteria and weights, warnings, anchors);
-- six evaluator slots and two verifier slots;
-- options (ranks, video cap, temperature);
-- a React Flow pipeline graph (harvest → evaluate → review → consensus → rank
-  → verify → report);
-- a per-track ranking with a project detail table (consensus, spread, final
+- inputs in **three responsive columns** (project manifest, evaluation rules
+  and rubric), each a file picker, with a live validation strip underneath
+  (project count, criteria and weights, warnings, anchors). The rubric row also
+  carries the **Built-in** and **Generic YAML** shortcuts, aligned to the end
+  of the picker row;
+- one **Models** block in two columns: **six evaluators** on the left, the
+  **two verifiers** and the run **options** on the right, each agent slot
+  carrying its own model and reasoning select;
+- collapsible **Inputs** and **Models** sections, so a long run does not push
+  the controls around;
+- a React Flow pipeline, shown once a run starts, where harvest fans out to **one node per evaluator**
+  (six in parallel), converges on cross-review, consensus and ranking, then fans
+  out to **one node per verifier** before the report. Click any agent node for a
+  live synthesis popover: model, effort, project, per-criterion scores,
+  confidence, summary, red flags, revisions and verifier adjustments;
+- a per-track ranking and a project detail table, shown as soon as results
+  start arriving (consensus, spread, final
   scores, evaluator matrix, verifier adjustments, harvest errors);
-- a streaming run log, history drawer, JSON report export.
+- one bottom-bar toggle that switches between the pipeline view and the results
+  view, so only one of them is on screen at a time;
+- a streaming run log in a floating panel opened from the bottom bar, a
+  history drawer and a JSON report export;
+- a single appearance menu in the header: theme pack, light, dark or **system**
+  mode (automatic, follows the OS) and **rounded or square corners** applied to
+  the whole interface, pills included;
+- a globe **language selector** in the header with English, French, Mandarin
+  Chinese and Hindi. The choice persists in `localStorage` and the
+  `verdict-language` cookie, updates `<html lang>`, and defaults to English for
+  the first server render so hydration stays stable;
+- a run bar pinned to the bottom of the viewport, which stays there even when
+  every section is collapsed;
+- an installable PWA: a Workbox service worker caches the shell and an offline
+  fallback page, and never caches API or SSE traffic.
+
+The Meta fallback catalog always includes `muse-spark-1.3` and
+`muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.
 
 Runs stream over SSE; reloading the page re-subscribes and replays every event.
 A completed report is saved to IndexedDB automatically.
@@ -270,7 +334,7 @@ A completed report is saved to IndexedDB automatically.
 | Route | Purpose |
 | --- | --- |
 | `GET /health` | liveness |
-| `GET /providers` | configured providers, models and the env default evaluator/verifier pool (never a key) |
+| `GET /providers` | configured providers, models, the env default evaluator/verifier pool and the agent personas (never a key) |
 | `POST /parse/manifest` | parse and validate a manifest |
 | `POST /parse/rubric` | parse a rubric |
 | `POST /runs/preview` | dry parse for the upload preview |
@@ -286,17 +350,25 @@ reports it has seen.
 
 ## Repository layout
 
-```
-verdict
-├── apps/api        Fastify + SSE, in-memory run store
-├── apps/web        Next.js 16 single-screen workspace
-├── packages/shared types, zod schemas, manifest + rubric parsers, consensus
-├── packages/providers provider registry + AI SDK model factory
-├── packages/harvest   GitHub tarball/indexing, yt-dlp, frames, transcription
-├── packages/eval      agents, dossiers, prompts, consensus, ranking, verifiers
-├── packages/ui        shared UI kit
-└── packages/theme     theme packs and chrome
-```
+| Path | Role |
+| --- | --- |
+| `apps/api` | Fastify + SSE, in-memory run store |
+| `apps/web` | Next.js 16 single-screen workspace, PWA shell |
+| `apps/web/sw` | Workbox template stamped into `public/sw.js` at build time |
+| `apps/web/scripts/build-sw.ts` | Stamps the worker with the commit id |
+| `packages/shared` | types, zod schemas, manifest and rubric parsers, consensus |
+| `packages/providers` | provider registry and AI SDK model factory |
+| `packages/harvest` | GitHub tarball and indexing, yt-dlp, frames, transcription |
+| `packages/eval` | agents, dossiers, prompts, consensus, ranking, verifiers |
+| `packages/ui` | shared UI kit |
+| `packages/theme` | theme packs and chrome |
+
+Every app and package is a Bun workspace driven by Turbo. Root commands fan out
+through `turbo run`; run a single workspace from its directory with
+`cd apps/web && bun run build`.
+
+`AGENTS.md` at the repository root explains the architecture, the conventions
+and the verification checklist for anyone, human or agent, taking over the code.
 
 ## Guarantees and limits
 

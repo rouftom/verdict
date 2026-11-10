@@ -1,4 +1,5 @@
 import type {
+  AgentPool,
   ManifestParseResult,
   ModelRef,
   ProjectInput,
@@ -64,6 +65,7 @@ export interface ProviderResponse {
     evaluators: ModelRef[]
     verifiers: ModelRef[]
   }
+  agents: AgentPool
 }
 
 export function fetchProviders(): Promise<ProviderResponse> {

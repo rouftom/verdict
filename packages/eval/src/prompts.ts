@@ -12,7 +12,7 @@ export function rubricBlock(rubric: Rubric): string {
     `SCALE: ${rubric.scale.min}–${rubric.scale.max} (step ${rubric.scale.step})`,
     ...rubric.scale.anchors.map((anchor) => `- ${anchor.range[0]}–${anchor.range[1]} ${anchor.label}${anchor.hint ? `: ${anchor.hint}` : ''}`),
     '',
-    'CRITERIA — score every one exactly once:',
+    'CRITERIA: score every one exactly once:',
     ...rubric.criteria.map((criterion) =>
       [
         `- id: ${criterion.id} · ${criterion.label} · weight ${Math.round(criterion.weight * 100)}%`,
@@ -89,7 +89,7 @@ export function revisionPrompt(project: ProjectInput, dossier: string, own: Proj
 
 YOUR PREVIOUS EVALUATION
 overall: ${own.overall}
-${own.scores.map((score) => `- ${score.criterionId}: ${score.score} — ${score.rationale} | evidence: ${score.evidence.join('; ') || 'none'}`).join('\n')}
+${own.scores.map((score) => `- ${score.criterionId}: ${score.score}: ${score.rationale} | evidence: ${score.evidence.join('; ') || 'none'}`).join('\n')}
 summary: ${own.summary}
 
 PEER EVALUATIONS (anonymous)
@@ -118,7 +118,7 @@ export function rankingPrompt(
   calibrationPackets: string[] = [],
 ): string {
   const supplied = providedRanks.length > 0
-    ? `\n\nSUPPLIED RANKS (context only — never alter a criterion score)\n${providedRanks
+    ? `\n\nSUPPLIED RANKS (context only; never alter a criterion score)\n${providedRanks
         .map((entry) => `- ${entry.id} (${entry.name}): supplied rank ${entry.rank}`)
         .join('\n')}`
     : ''

@@ -1,6 +1,8 @@
 import { modelRefKey, type ModelRef } from '@verdict/providers'
 import {
   buildConsensus,
+  primaryTrack,
+  projectTracks,
   rankProjects,
   verifierFinalScores,
   weightedOverall,
@@ -119,7 +121,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   const evaluators = EVALUATORS.slice(0, Math.max(1, rubric.consensus.evaluators))
   const verifiers = VERIFIERS.slice(0, Math.max(1, rubric.consensus.verifiers))
 
-  // 1. Harvest ---------------------------------------------------------------
+  // 1. Harvest
   throwIfAborted(signal)
   emit('stage', { message: 'harvesting' })
   const evidenceList = await mapLimit(manifest, options.concurrency, async (project) => {
@@ -146,7 +148,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
   const evidenceMap = new Map(evidenceList.map((evidence) => [evidence.projectId, evidence]))
 
-  // 2. Independent evaluation -------------------------------------------------
+  // 2. Independent evaluation
   throwIfAborted(signal)
   emit('stage', { message: 'evaluating' })
   const evaluations: ProjectEvaluation[] = []
@@ -185,7 +187,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     evaluations.push(...projectEvaluations)
   })
 
-  // 3. Cross-review -----------------------------------------------------------
+  // 3. Cross-review
   throwIfAborted(signal)
   emit('stage', { message: 'reviewing' })
   const revisions: ProjectRevision[] = []
@@ -229,7 +231,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     revisions.push(...projectRevisions)
   })
 
-  // 4. Consensus --------------------------------------------------------------
+  // 4. Consensus
   throwIfAborted(signal)
   emit('stage', { message: 'consensus' })
   const consensus = manifest.map((project) => {
@@ -240,7 +242,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     return result
   })
 
-  // 5. Comparative ranking pass ----------------------------------------------
+  // 5. Comparative ranking pass
   throwIfAborted(signal)
   const tracks = groupByTrack(manifest)
   const comparativeOrders = new Map<string, string[]>()
@@ -268,7 +270,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     comparativeOrders.set(track, result.order)
   }
 
-  // 6. Verification -----------------------------------------------------------
+  // 6. Verification
   throwIfAborted(signal)
   emit('stage', { message: 'verifying' })
   const verifications: ProjectVerification[] = []
@@ -321,7 +323,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     verifications.push(...projectVerifications)
   })
 
-  // 7. Final ranking and report ----------------------------------------------
+  // 7. Final ranking and report
   const finalByTrack = new Map<string, RankedProject[]>()
   for (const [track, projects] of tracks) {
     const projectVerifications = verifications.filter((verification) => projects.some((project) => project.id === verification.projectId))
@@ -358,14 +360,15 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       ordered.map((project, index) => {
         const projectConsensus = consensus.find((entry) => entry.projectId === project.id)
         const rank = index + 1
+        const hasProvidedRank = project.rank !== undefined && primaryTrack(project) === track
         return {
           projectId: project.id,
           name: project.name,
-          track: project.track ?? track,
+          track,
           rank,
           overall: finalScores.get(project.id) ?? 0,
-          ...(project.rank !== undefined ? { providedRank: project.rank } : {}),
-          ...(project.rank !== undefined ? { rankDelta: project.rank - rank } : {}),
+          ...(hasProvidedRank ? { providedRank: project.rank } : {}),
+          ...(hasProvidedRank ? { rankDelta: (project.rank as number) - rank } : {}),
           confidence: projectConsensus?.confidence ?? 0,
           status: projectConsensus?.status ?? 'escalated',
         } satisfies RankedProject
@@ -400,7 +403,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       return {
         projectId: project.id,
         name: project.name,
-        track: project.track ?? 'default',
+        track: primaryTrack(project),
         consensus: projectConsensus,
         verifications: projectVerifications,
         finalScores: final.scores,
@@ -423,10 +426,11 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
 function groupByTrack(manifest: ProjectInput[]): Map<string, ProjectInput[]> {
   const groups = new Map<string, ProjectInput[]>()
   for (const project of manifest) {
-    const track = project.track?.trim() || 'default'
-    const bucket = groups.get(track) ?? []
-    bucket.push(project)
-    groups.set(track, bucket)
+    for (const track of projectTracks(project)) {
+      const bucket = groups.get(track) ?? []
+      bucket.push(project)
+      groups.set(track, bucket)
+    }
   }
   return groups
 }

@@ -167,7 +167,8 @@
   }
   /*
    * The pack tokens mix the primary at 30% "transparent". That reads as a pale
-   * grey with a near-black pack, but as a saturated blue with Meta blue, and the
+   * grey with a near-black pack, but as a saturated blue with the default
+   * blue pack, and the
    * secondary text stops being legible. Mixing against the page background at a
    * lower ratio keeps the same tinted-panel idea in every pack.
    */
@@ -218,15 +219,14 @@ html[data-density='dense'] {
  * Corner treatment: square is the console default, and the appearance menu
  * writes `data-radius` on <html>. Tailwind emits the radius utilities as
  * `calc(var(--radius) + Npx)`, so zeroing `--radius` alone would still leave
- * 4–12px corners: the utilities have to be flattened explicitly.
- * `rounded-full` deliberately stays round (avatars, pills, spinners).
+ * 4–12px corners: every rounded utility is flattened explicitly.
+ * Pills, badges and spinners follow the same rule.
  */
 html[data-radius='square'] {
   --radius: 0px;
 }
 
-html[data-radius='square']
-  :where(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
+html[data-radius='square'] :where([class*='rounded']) {
   border-radius: 0;
 }
 

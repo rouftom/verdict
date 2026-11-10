@@ -32,7 +32,7 @@ export function MultiSelect({
   className?: string
 }) {
   const selected = options.filter((option) => values.includes(option.value))
-  const summary = selected.length === 0 ? '—' : selected.length === 1 ? selected[0]!.label : `${selected[0]!.label} +${selected.length - 1}`
+  const summary = selected.length === 0 ? '-' : selected.length === 1 ? selected[0]!.label : `${selected[0]!.label} +${selected.length - 1}`
 
   const toggle = (value: string) => {
     const isOn = values.includes(value)

@@ -54,6 +54,7 @@ export const rawProjectSchema = z
     project: z.string().optional(),
     rank: z.union([z.number(), z.string()]).optional(),
     track: z.string().optional(),
+    tracks: z.union([z.array(z.string()), z.string()]).optional(),
     github: z.string().optional(),
     repo: z.string().optional(),
     repository: z.string().optional(),

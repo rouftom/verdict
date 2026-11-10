@@ -1,4 +1,4 @@
-# Judging rubric — generic (human-readable)
+# Judging rubric: generic (human-readable)
 
 > Neutral counterpart of [`judging-rubric.generic.yaml`](./judging-rubric.generic.yaml).
 > Same four weighted criteria and the same 0–100 scale, with no organiser or

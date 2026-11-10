@@ -107,6 +107,12 @@ function withV1(baseURL: string): string {
   return base.endsWith('/v1') ? base : `${base}/v1`
 }
 
+/** Always offer a model, even when the operator's `<PROVIDER>_MODELS` list omits it. */
+function withModel(models: ModelOption[], provider: ProviderId, id: string): ModelOption[] {
+  if (models.some((model) => model.id === id)) return models
+  return [...models, { id, label: id, provider, capabilities: { ...CAPABILITIES[provider] } }]
+}
+
 /** Describe every provider, including the ones that are not configured. Never returns a key. */
 export function listProviders(): ProviderInfo[] {
   const metaKey = env('MODEL_API_KEY')
@@ -127,7 +133,14 @@ export function listProviders(): ProviderInfo[] {
       label: DESCRIPTIONS.meta,
       configured: Boolean(metaKey),
       baseURL: withV1(env('META_BASE_URL') || 'https://api.meta.ai/v1'),
-      models: parseModels(env('META_MODELS'), 'meta', [env('META_REASONING_MODEL') || 'muse-spark-1.3', env('META_VISION_MODEL')].filter(Boolean)),
+      models: withModel(
+        parseModels(env('META_MODELS'), 'meta', [
+          env('META_REASONING_MODEL') || 'muse-spark-1.3',
+          env('META_VISION_MODEL'),
+        ].filter(Boolean)),
+        'meta',
+        'muse-wonder-1.0',
+      ),
     },
     {
       id: 'openai',
@@ -179,7 +192,7 @@ export function listProviders(): ProviderInfo[] {
       configured: Boolean(groqKey),
       baseURL: withV1(env('GROQ_BASE_URL') || 'https://api.groq.com/openai/v1'),
       models: parseModels(env('GROQ_MODELS'), 'groq', [
-        'openai/gpt-oss-20b',
+        'openai/gpt-oss-120b',
         'qwen/qwen3.8-27b',
         'qwen/qwen3.6-27b',
       ]),

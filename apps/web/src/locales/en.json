@@ -1,0 +1,243 @@
+{
+  "app": {
+    "tagline": "6 evaluators · 2 verifiers · per-track ranking",
+    "history": "History",
+    "language": "Language",
+    "appearance": "Appearance"
+  },
+  "appearance": {
+    "theme": "Theme",
+    "mode": "Mode",
+    "corners": "Corners",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "square": "Square",
+    "rounded": "Rounded"
+  },
+  "inputs": {
+    "title": "Inputs",
+    "projectCount_one": "{{count}} project",
+    "projectCount_other": "{{count}} projects",
+    "ruleChars": "{{count}} rule chars",
+    "manifestLabel": "Project manifest",
+    "manifestHint": "JSON or YAML. Accepts an array or { projects: [] }. Ranks optional and per track. Use tracks: [] to rank a project in several tracks at once.",
+    "rulesLabel": "Evaluation rules",
+    "rulesHint": "Markdown or TXT. Passed to every agent verbatim, as untrusted context.",
+    "rubricLabel": "Rubric",
+    "rubricHint": "YAML, JSON or the markdown criteria table. No file means the built-in neutral rubric.",
+    "builtIn": "Built-in",
+    "genericYaml": "Generic YAML",
+    "rubricBadge": "Rubric · {{name}}",
+    "anchors": "Calibration anchors (max 3)",
+    "chooseManifest": "Choose a manifest file to validate it.",
+    "presetError": "Preset {{label}} returned {{status}}."
+  },
+  "upload": {
+    "tooLarge": "File is larger than 8 MB.",
+    "unreadable": "Could not read the file.",
+    "chooseFile": "Choose file",
+    "reading": "Reading…",
+    "dropOrChoose": "drop or choose a file",
+    "linesChars": "{{lines}} lines · {{chars}} chars",
+    "clear": "Clear {{label}}"
+  },
+  "models": {
+    "title": "Models",
+    "aside": "per-agent model and reasoning effort, then run options",
+    "evaluators": "6 evaluators",
+    "allCriteria": "all 4 criteria",
+    "verifiers": "2 verifiers",
+    "auditFinal": "audit + final ranking",
+    "options": "Options",
+    "rankingHarvest": "ranking and harvest",
+    "showRanks": "Show supplied ranks to the ranking pass",
+    "showRanksHint": "Audit only. Criterion scores are fixed before ranking and are never changed by a supplied rank.",
+    "maxVideo": "Max video (min)",
+    "temperature": "Temperature",
+    "persistence": "Runs stream over SSE. Snapshots are kept in this browser's IndexedDB, no account and no server database.",
+    "apiError": "Could not reach the API: {{error}}"
+  },
+  "modelSlots": {
+    "reasoning": "Reasoning effort",
+    "auto": "Auto",
+    "envDefault": "env default",
+    "modelCount_one": "{{count}} model",
+    "modelCount_other": "{{count}} models",
+    "providerCount_one": "{{count}} provider",
+    "providerCount_other": "{{count}} providers",
+    "diversify": "Diversify",
+    "searchModel": "Search a model",
+    "noMatch": "No configured model matches.",
+    "noProvider": "No provider is configured. Add a key to .env (for example MODEL_API_KEY or OPENAI_API_KEY), then reload.",
+    "hidden_one": "{{count}} provider without a key is hidden.",
+    "hidden_other": "{{count}} providers without a key are hidden.",
+    "modelAria": "{{slot}} model {{index}}",
+    "reasoningAria": "{{slot}} reasoning effort {{index}}"
+  },
+  "reasoning": {
+    "none": "None",
+    "minimal": "Minimal",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "xhigh": "Extra high",
+    "max": "Max"
+  },
+  "pipeline": {
+    "title": "Pipeline",
+    "hint": "click an evaluator or verifier node for its live synthesis",
+    "harvest": "Harvest",
+    "harvestDetail": "GitHub tarball + video",
+    "review": "Cross-review",
+    "reviewDetail": "anonymised revision",
+    "consensus": "Consensus",
+    "consensusDetail": "trimmed mean + spread",
+    "rank": "Comparative rank",
+    "rankDetail": "ordinal, per track",
+    "report": "Report",
+    "reportDetail": "ranking + rank delta",
+    "revisionCount_one": "{{count}} revision",
+    "revisionCount_other": "{{count}} revisions",
+    "modelNotSet": "model not set",
+    "effort": "effort {{effort}}",
+    "revised": "revised · round {{round}}",
+    "approved": "approved",
+    "flagged": "flagged",
+    "resultCount_one": "{{count}} result across project · live",
+    "resultCount_other": "{{count}} results across projects · live",
+    "latestProject": "latest project",
+    "verifierFinalScore": "verifier final score",
+    "confidence": "confidence {{value}}%",
+    "evaluatorScore": "evaluator score",
+    "synthesis": "Synthesis",
+    "redFlags": "Red flags",
+    "adjustments": "Adjustments",
+    "waiting": "Waiting for this agent's first result. The card updates as the run streams."
+  },
+  "role": {
+    "evaluator": "evaluator",
+    "verifier": "verifier"
+  },
+  "status": {
+    "idle": "idle",
+    "queued": "queued",
+    "parsing": "parsing",
+    "harvesting": "harvesting",
+    "evaluating": "evaluating",
+    "reviewing": "reviewing",
+    "consensus": "consensus",
+    "verifying": "verifying",
+    "done": "done",
+    "failed": "failed",
+    "cancelled": "cancelled",
+    "escalated": "escalated"
+  },
+  "run": {
+    "evaluate": "Evaluate",
+    "starting": "Starting…",
+    "cancel": "Cancel run",
+    "refresh": "Refresh run",
+    "export": "Export report",
+    "log": "Run log",
+    "showPipeline": "Show pipeline",
+    "showResults": "Show results",
+    "reportReady": "report ready · {{date}}",
+    "failed": "Run failed."
+  },
+  "history": {
+    "title": "Saved runs",
+    "stored": "Stored in this browser's IndexedDB only.",
+    "empty": "No run saved yet.",
+    "projects": "{{count}} projects",
+    "tracks_one": "{{count}} track",
+    "tracks_other": "{{count}} tracks",
+    "delete": "Delete",
+    "close": "Close history"
+  },
+  "results": {
+    "ranking": "Ranking",
+    "final": "final",
+    "provisional": "provisional",
+    "uploadManifest": "Upload a manifest to see projects here.",
+    "projectDetail": "Project detail",
+    "selectProject": "Select a project to inspect its evidence and scores.",
+    "finalOverall": "Final overall",
+    "consensus": "Consensus",
+    "dispersion": "Dispersion",
+    "files_one": "{{count}} file",
+    "files_other": "{{count}} files",
+    "segments_one": "{{count}} segment",
+    "segments_other": "{{count}} segments",
+    "criterion": "Criterion",
+    "weight": "Weight",
+    "spread": "Spread",
+    "finalColumn": "Final",
+    "evaluator": "Evaluator",
+    "verifierAudit": "Verifier audit",
+    "approved": "approved",
+    "flagged": "flagged",
+    "noAdjustment": "No adjustment.",
+    "disagreement": "Disagreement above tolerance",
+    "harvestErrors": "Harvest errors",
+    "reportGenerated": "Report generated {{date}} · {{evaluators}} evaluator models · {{verifiers}} verifier models",
+    "trackProjects_one": "{{count}} project",
+    "trackProjects_other": "{{count}} projects",
+    "conf": "conf {{value}}",
+    "wasRank": "was #{{rank}}"
+  },
+  "log": {
+    "title": "Run log",
+    "events_one": "{{count}} event",
+    "events_other": "{{count}} events",
+    "empty": "Nothing yet. Start a run to stream stages and model verdicts.",
+    "close": "Close run log"
+  },
+  "sw": {
+    "ready": "A new version is ready.",
+    "refresh": "Refresh",
+    "dismiss": "Dismiss update notice"
+  },
+  "agents": {
+    "e1": {
+      "name": "Impact & problem fit",
+      "lens": "Impact",
+      "focus": "Who benefits, how much it matters, and whether the project fits a published problem statement."
+    },
+    "e2": {
+      "name": "AI tooling",
+      "lens": "Use of AI tooling",
+      "focus": "Which models are actually used at runtime, how deliberately they are chosen, and whether the integration goes beyond a thin wrapper."
+    },
+    "e3": {
+      "name": "Technical depth",
+      "lens": "Technical Depth & Execution",
+      "focus": "Architecture, code quality, error handling, tests, build story and evidence of real craft."
+    },
+    "e4": {
+      "name": "Demo & video",
+      "lens": "Demo",
+      "focus": "Whether the demo shows the product working end to end, whether the video is credible and well paced, and whether it matches the repository."
+    },
+    "e5": {
+      "name": "Evidence & rules",
+      "lens": "Cross-cutting integrity",
+      "focus": "Whether claims are supported by artefacts, whether the work is new, and whether hard rules are met."
+    },
+    "e6": {
+      "name": "Cross-cutting chair",
+      "lens": "Whole-project coherence",
+      "focus": "Whole-project coherence, contradictions between sources, and gaps the specialist lenses may miss."
+    },
+    "v1": {
+      "name": "Rubric & scoring verifier",
+      "lens": "Rubric compliance",
+      "focus": "Weights, scale, evidence per criterion, arithmetic, and consistency between criterion scores and the overall."
+    },
+    "v2": {
+      "name": "Evidence & integrity verifier",
+      "lens": "Evidence integrity",
+      "focus": "Unsupported claims, fabricated citations, anchoring to supplied ranks, disqualifiers and missing evidence."
+    }
+  }
+}

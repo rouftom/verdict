@@ -40,10 +40,10 @@ describe('reasoning mapping', () => {
   })
 
   test('unsupported levels clamp to the nearest accepted one', () => {
-    expect(reasoningProviderOptions('groq', 'none', 'openai/gpt-oss-20b')).toEqual({
+    expect(reasoningProviderOptions('groq', 'none', 'openai/gpt-oss-120b')).toEqual({
       groq: { reasoningEffort: 'low' },
     })
-    expect(reasoningProviderOptions('groq', 'xhigh', 'openai/gpt-oss-20b')).toEqual({
+    expect(reasoningProviderOptions('groq', 'xhigh', 'openai/gpt-oss-120b')).toEqual({
       groq: { reasoningEffort: 'high' },
     })
     expect(reasoningProviderOptions('xai', 'max')).toEqual({ xai: { reasoningEffort: 'xhigh' } })
