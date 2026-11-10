@@ -34,6 +34,10 @@ export interface ProviderInfo {
   configured: boolean
   baseURL?: string
   models: ModelOption[]
+  /** Where the list came from: the provider model endpoint, or its env fallback. */
+  modelsSource?: 'api' | 'fallback'
+  /** Set when discovery failed; the UI can surface it instead of a silent gap. */
+  modelsError?: string
 }
 
 /**

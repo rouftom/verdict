@@ -53,7 +53,10 @@ const RUNWARE_BY_FAMILY: Record<string, readonly ReasoningEffort[]> = {
 /** Effort levels the UI may offer for a given provider (and Runware model). */
 export function reasoningEffortsFor(provider: ProviderId, model?: string): readonly ReasoningEffort[] {
   if (provider === 'runware' && model) {
-    const family = model.split(':')[0]?.trim().toLowerCase() ?? ''
+    // Model ids arrive either as native AIR (`anthropic:claude@...`) or as the
+    // OpenAI-compatible names returned by `/v1/models`
+    // (`anthropic-claude-...`); both start with the family.
+    const family = model.match(/^([a-z0-9]+)[:\-]/i)?.[1]?.toLowerCase() ?? ''
     return RUNWARE_BY_FAMILY[family] ?? LOW_TO_HIGH
   }
   return BY_PROVIDER[provider]

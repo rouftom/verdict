@@ -150,6 +150,8 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
   }
 
   const hidden = providers.filter((provider) => !provider.configured).length
+  const failed = providers.filter((provider) => provider.configured && provider.modelsError)
+  const failedNames = failed.map((provider) => provider.label).join(', ')
 
   return (
     <div className={cn('flex flex-col gap-1.5', compact && 'gap-1')}>
@@ -204,6 +206,11 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
       {hidden > 0 ? (
         <p className="text-[10px] text-muted-foreground">
           {t('modelSlots.hidden', { count: hidden })}
+        </p>
+      ) : null}
+      {failed.length > 0 ? (
+        <p className="text-[10px] text-amber-600">
+          {t('modelSlots.catalogError', { providers: failedNames })}
         </p>
       ) : null}
     </div>

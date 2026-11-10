@@ -184,20 +184,29 @@ NEBIUS_API_KEY=           # NEBIUS_BASE_URL
 NVIDIA_API_KEY=           # NVIDIA_API_URL
 OLLAMA_BASE_URL=          # local, OpenAI-compatible
 
-# models shown in the UI (comma list or JSON array); empty = sensible defaults
+# model catalogs come from each provider's own model endpoint.
+# <PROVIDER>_MODELS is a fallback used only when that endpoint fails
+# (comma list or JSON array); empty = no fallback.
 META_MODELS=
 OPENAI_MODELS=
 ANTHROPIC_MODELS=
 GOOGLE_MODELS=
 XAI_MODELS=
-RUNWARE_MODELS=           # AIR ids, e.g. google:gemini@4-argon,deepseek:v4.1@flash-1017
+RUNWARE_MODELS=
 GROQ_MODELS=
 DEEPSEEK_MODELS=
 NEBIUS_MODELS=
 NVIDIA_MODELS=
 OLLAMA_MODELS=
 
-# agent defaults (comma list of provider:model); empty = cycle every configured model
+# model discovery cache and limits
+PROVIDER_MODELS_TTL_SECONDS=600        # successful list cache
+PROVIDER_MODELS_ERROR_TTL_SECONDS=60   # failed list cache
+PROVIDER_MODELS_TIMEOUT_MS=6000        # per-provider request timeout
+
+# agent defaults (comma list of provider:model); entries missing from the
+# discovered catalog are dropped, and an empty or fully stale pool cycles the
+# discovered models.
 EVAL_MODELS=
 VERIFIER_MODELS=
 
@@ -366,8 +375,15 @@ The workspace has:
   icons restored once the run settles, so a long pipeline stays visible from
   another tab.
 
-The Meta fallback catalog always includes `muse-spark-1.3` and
-`muse-wonder-1.0`, even when `META_MODELS` is set to a shorter list.
+Model lists are not hardcoded. For every configured provider the API calls that
+provider's model endpoint (`GET /v1/models`, Anthropic's `/v1/models`, Google's
+`/v1beta/models` or Ollama's `/api/tags`), filters out non-chat models and caches
+the result in memory. A model released after this code was written therefore
+appears without a code change; `claude-haiku-5-5` is a current example. When an
+endpoint fails, `<PROVIDER>_MODELS` is used as the fallback for that provider and
+the Models section names the affected providers. Set `PROVIDER_MODELS_TTL_SECONDS`,
+`PROVIDER_MODELS_ERROR_TTL_SECONDS` and `PROVIDER_MODELS_TIMEOUT_MS` to tune the
+cache and the request timeout. `GET /providers?refresh=1` bypasses the cache.
 
 Runs stream over SSE; reloading the page re-subscribes and replays every event.
 A completed report is saved to IndexedDB automatically.
@@ -377,7 +393,7 @@ A completed report is saved to IndexedDB automatically.
 | Route | Purpose |
 | --- | --- |
 | `GET /health` | liveness |
-| `GET /providers` | configured providers, models, the env default evaluator/verifier pool and the agent personas (never a key) |
+| `GET /providers` | configured providers, their discovered models (`?refresh=1` bypasses the cache), the env default evaluator/verifier pool and the agent personas (never a key) |
 | `POST /parse/manifest` | parse and validate a manifest |
 | `POST /parse/rubric` | parse a rubric |
 | `POST /runs/preview` | dry parse for the upload preview |

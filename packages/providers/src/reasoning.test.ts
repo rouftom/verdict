@@ -70,6 +70,8 @@ describe('reasoning mapping', () => {
     expect(reasoningEffortsFor('google')).toEqual(['none', 'minimal', 'low', 'medium', 'high'])
     expect(reasoningEffortsFor('runware', 'xai:grok@4.7')).toEqual(['low', 'medium', 'high', 'xhigh'])
     expect(reasoningEffortsFor('runware', 'anthropic:claude@opus-5.5')).toContain('max')
+    expect(reasoningEffortsFor('runware', 'anthropic-claude-haiku-5-5')).toContain('max')
+    expect(reasoningEffortsFor('runware', 'google-gemini-3-flash')).toEqual(['none', 'low', 'medium', 'high'])
   })
 
   test('an unknown env value is ignored', () => {
