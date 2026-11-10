@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3010",
-    "build": "next build",
+    "build": "bun scripts/build-sw.ts && next build",
     "start": "next start -p 3010",
     "typecheck": "tsc --noEmit",
+    "sw": "bun scripts/build-sw.ts",
     "clean": "rm -rf .next dist .turbo"
   },
   "dependencies": {

@@ -166,7 +166,7 @@ export function VerdictWorkspace() {
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const running = status !== undefined && RUNNING.includes(status)
 
-  // Providers ---------------------------------------------------------------
+  // Providers
   React.useEffect(() => {
     let cancelled = false
     fetchProviders()
@@ -467,9 +467,7 @@ export function VerdictWorkspace() {
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-primary text-[13px] font-black text-primary-foreground">
-            V
-          </span>
+          <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
           <div className="leading-none">
             <p className="text-[13px] font-bold tracking-tight">verdict</p>
             <p className="mt-0.5 text-[10px] text-muted-foreground">6 evaluators · 2 verifiers · per-track ranking</p>

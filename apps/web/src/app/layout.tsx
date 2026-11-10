@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { ServiceWorkerRegister } from '@/components/service-worker-register'
 import { ThemeProvider } from '@/components/theme-provider'
 import {
   DEFAULT_CORNER_STYLE,
@@ -27,6 +28,22 @@ export const metadata: Metadata = {
   title: 'Verdict · multi-agent project evaluation',
   description:
     'Evidence-grounded scoring of hackathon projects: six evaluators, one cross-review round, two verifiers, per-track ranking.',
+  applicationName: 'verdict',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/logo.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: ['/favicon.ico'],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'verdict',
+  },
 }
 
 export const viewport: Viewport = {
@@ -45,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   )
