@@ -393,6 +393,11 @@ html[data-radius='square'] :where([class*='rounded']) {
   background-size: 200% 100%;
   animation: verdict-shimmer 1.4s ease-in-out infinite;
 }
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
+}
 
 /* Active edges of the process graph: a moving dash while the step runs. */
 @keyframes dash {

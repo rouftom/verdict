@@ -25,6 +25,7 @@ import {
   Button,
   Checkbox,
   Label,
+  Skeleton,
   cn,
 } from '@verdict/ui'
 import {
@@ -159,6 +160,7 @@ export function VerdictWorkspace() {
 
   const [preview, setPreview] = React.useState<PreviewResponse | null>(null)
   const [previewError, setPreviewError] = React.useState<string | null>(null)
+  const [previewing, setPreviewing] = React.useState(false)
 
   const [evaluatorModels, setEvaluatorModels] = React.useState<ModelRef[]>([])
   const [verifierModels, setVerifierModels] = React.useState<ModelRef[]>([])
@@ -181,6 +183,7 @@ export function VerdictWorkspace() {
   const [selectedId, setSelectedId] = React.useState<string | undefined>()
 
   const [history, setHistory] = React.useState<StoredRun[]>([])
+  const [historyLoading, setHistoryLoading] = React.useState(true)
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [inputsOpen, setInputsOpen] = React.useState(true)
   const [modelsOpen, setModelsOpen] = React.useState(true)
@@ -193,6 +196,17 @@ export function VerdictWorkspace() {
   const unsubscribe = React.useRef<(() => void) | null>(null)
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const running = status !== undefined && RUNNING.includes(status)
+
+  const refreshHistory = React.useCallback(async () => {
+    setHistoryLoading(true)
+    try {
+      setHistory(await listRuns())
+    } catch {
+      // IndexedDB can be unavailable (private window, quota): keep the last list.
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
 
   // A pulsing dot on the tab favicon while the pipeline is active, so a long
   // run stays visible from another tab.
@@ -239,12 +253,17 @@ export function VerdictWorkspace() {
         setVerifierModels(fillModels(verifierPool, 2))
       }
       setRestored(true)
-      setHistory(await listRuns())
     })()
     return () => {
       cancelled = true
     }
   }, [providers, defaults, restored])
+
+  // Load saved runs on mount, independently of the provider fetch: a provider
+  // outage must not leave the history drawer stuck on its skeleton.
+  React.useEffect(() => {
+    void refreshHistory()
+  }, [refreshHistory])
 
   // Persist configuration (best effort, localStorage-free).
   React.useEffect(() => {
@@ -257,24 +276,35 @@ export function VerdictWorkspace() {
     if (!manifestText.trim()) {
       setPreview(null)
       setPreviewError(null)
+      setPreviewing(false)
       return
     }
+    let cancelled = false
     const timer = setTimeout(() => {
+      setPreviewing(true)
       void previewInputs({
         manifestText,
         ...(rubricText.trim() ? { rubricText, rubricFilename: rubricName } : {}),
         rulesText,
       })
         .then((result) => {
+          if (cancelled) return
           setPreview(result)
           setPreviewError(null)
         })
         .catch((error) => {
+          if (cancelled) return
           setPreview(null)
           setPreviewError(messageOf(error))
         })
+        .finally(() => {
+          if (!cancelled) setPreviewing(false)
+        })
     }, 450)
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [manifestText, rubricText, rubricName, rulesText])
 
   React.useEffect(() => () => unsubscribe.current?.(), [])
@@ -388,7 +418,7 @@ export function VerdictWorkspace() {
             },
             snapshot,
           })
-          setHistory(await listRuns())
+          await refreshHistory()
         }
       } catch (error) {
         const message = messageOf(error)
@@ -406,7 +436,7 @@ export function VerdictWorkspace() {
         if (manual) setRefreshing(false)
       }
     },
-    [t],
+    [refreshHistory, t],
   )
 
   // If the SSE stream drops (a restart, a proxy, a laptop waking up), the run
@@ -557,7 +587,7 @@ export function VerdictWorkspace() {
 
   const removeSaved = async (id: string) => {
     await deleteRun(id)
-    setHistory(await listRuns())
+    await refreshHistory()
   }
 
   const projects = preview?.projects ?? []
@@ -716,7 +746,22 @@ export function VerdictWorkspace() {
                   <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {previewError}
                 </p>
               ) : null}
-              {preview ? (
+              {previewing && !preview ? (
+                <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Skeleton className="h-5 w-28 rounded-full" />
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-3 w-40" />
+                  <div className="flex flex-wrap gap-1.5">
+                    <Skeleton className="h-5 w-28 rounded-full" />
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                    <Skeleton className="h-5 w-32 rounded-full" />
+                  </div>
+                </div>
+              ) : preview ? (
                 <>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tone="success">{t('inputs.rubricBadge', { name: preview.rubric.name })}</Badge>
@@ -799,7 +844,15 @@ export function VerdictWorkspace() {
               <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('models.evaluators')}</Label>
               <span className="text-[10px] text-muted-foreground">{t('models.allCriteria')}</span>
             </div>
-            <ModelSlots providers={providers} value={evaluatorModels} slots={6} onChange={setEvaluatorModels} idPrefix="eval" compact />
+            <ModelSlots
+              providers={providers}
+              value={evaluatorModels}
+              slots={6}
+              onChange={setEvaluatorModels}
+              idPrefix="eval"
+              compact
+              loading={providers.length === 0 && !providersError}
+            />
           </div>
 
           <div className="flex min-w-0 flex-col gap-2 md:border-l md:border-border md:pl-4">
@@ -807,7 +860,15 @@ export function VerdictWorkspace() {
               <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('models.verifiers')}</Label>
               <span className="text-[10px] text-muted-foreground">{t('models.auditFinal')}</span>
             </div>
-            <ModelSlots providers={providers} value={verifierModels} slots={2} onChange={setVerifierModels} idPrefix="verify" compact />
+            <ModelSlots
+              providers={providers}
+              value={verifierModels}
+              slots={2}
+              onChange={setVerifierModels}
+              idPrefix="verify"
+              compact
+              loading={providers.length === 0 && !providersError}
+            />
 
             <div className="mt-1 h-px bg-border" />
 
@@ -884,6 +945,7 @@ export function VerdictWorkspace() {
               selectedProjectId={selectedId}
               hasReport={Boolean(live.report)}
               failed={status === 'failed'}
+              loading={agents === undefined && !providersError}
             />
           </div>
         ) : null}
@@ -1030,7 +1092,17 @@ export function VerdictWorkspace() {
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground">{t('history.stored')}</p>
             <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
-              {history.length === 0 ? (
+              {historyLoading && history.length === 0 ? (
+                <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+                  {Array.from({ length: 3 }, (_, index) => (
+                    <div key={`history-skeleton-${index}`} className="rounded-md border border-border p-2">
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="mt-1.5 h-2.5 w-44" />
+                      <Skeleton className="mt-1.5 h-2.5 w-20" />
+                    </div>
+                  ))}
+                </div>
+              ) : history.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground">{t('history.empty')}</p>
               ) : (
                 history.map((entry) => (
