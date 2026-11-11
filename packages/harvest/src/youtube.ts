@@ -71,6 +71,14 @@ const isMuxed = (format: YtdlpFormat): boolean => hasVideo(format) && hasAudio(f
 /** Storyboard and other non-media entries also carry a format_id. */
 const isMedia = (format: YtdlpFormat): boolean =>
   Boolean(format.format_id) && !/mhtml/i.test(format.protocol ?? '') && (hasVideo(format) || hasAudio(format))
+/** `-drc` entries are alternate loudness variants of an audio stream, not new media. */
+const isDrc = (format: YtdlpFormat): boolean => /-drc$/i.test(format.format_id ?? '')
+/**
+ * A direct HTTPS stream downloads as one file, while an HLS (`m3u8_native`)
+ * stream is fetched and merged fragment by fragment: slower and more brittle.
+ * Prefer the direct rendition when both reach the same height.
+ */
+const isDirect = (format: YtdlpFormat): boolean => !/m3u8|dash/i.test(format.protocol ?? '')
 
 /** Decoding h264 is cheaper and more portable than vp9 or av1. */
 function codecPreference(format: YtdlpFormat): number {
@@ -81,19 +89,24 @@ function codecPreference(format: YtdlpFormat): number {
   return 0
 }
 
-/** Prefer a portable codec, then mp4, then the lightest stream at the same height. */
+/** Prefer a portable codec, then a direct stream, then mp4, then the lightest. */
 function byVideoPreference(a: YtdlpFormat, b: YtdlpFormat): number {
   return (
     heightOf(b) - heightOf(a) ||
     codecPreference(b) - codecPreference(a) ||
+    Number(isDirect(b)) - Number(isDirect(a)) ||
     Number(b.ext === 'mp4') - Number(a.ext === 'mp4') ||
     (a.tbr ?? 0) - (b.tbr ?? 0)
   )
 }
 
-/** Audio feeds the transcript, so prefer m4a then the highest bitrate. */
+/** Audio feeds the transcript, so prefer m4a, then a direct stream, then the highest bitrate. */
 function byAudioPreference(a: YtdlpFormat, b: YtdlpFormat): number {
-  return Number(b.ext === 'm4a') - Number(a.ext === 'm4a') || (b.abr ?? b.tbr ?? 0) - (a.abr ?? a.tbr ?? 0)
+  return (
+    Number(b.ext === 'm4a') - Number(a.ext === 'm4a') ||
+    Number(isDirect(b)) - Number(isDirect(a)) ||
+    (b.abr ?? b.tbr ?? 0) - (a.abr ?? a.tbr ?? 0)
+  )
 }
 
 /**
@@ -103,7 +116,7 @@ function byAudioPreference(a: YtdlpFormat, b: YtdlpFormat): number {
  * plus audio as separate streams, which is what `best[height<=360]` failed on.
  */
 export function chooseDownloadFormat(formats: YtdlpFormat[] | undefined, maxHeight: number): DownloadFormat {
-  const usable = (formats ?? []).filter(isMedia)
+  const usable = (formats ?? []).filter((format) => isMedia(format) && !isDrc(format))
   if (usable.length === 0) {
     return { selector: FALLBACK_FORMAT(maxHeight), merge: true, reason: 'no format list' }
   }
@@ -130,13 +143,23 @@ export function chooseDownloadFormat(formats: YtdlpFormat[] | undefined, maxHeig
   // fail, and only split streams when nothing is muxed.
   const muxedAbove = usable
     .filter((format) => isMuxed(format) && heightOf(format) > 0)
-    .sort((a, b) => heightOf(a) - heightOf(b) || Number(b.ext === 'mp4') - Number(a.ext === 'mp4'))
+    .sort(
+      (a, b) =>
+        heightOf(a) - heightOf(b) ||
+        Number(isDirect(b)) - Number(isDirect(a)) ||
+        Number(b.ext === 'mp4') - Number(a.ext === 'mp4'),
+    )
   const muxedSmallest = muxedAbove[0]
   if (muxedSmallest) {
     return { selector: muxedSmallest.format_id as string, merge: false, reason: `muxed ${heightOf(muxedSmallest)}p` }
   }
 
-  const video = videos.sort((a, b) => heightOf(a) - heightOf(b) || Number(b.ext === 'mp4') - Number(a.ext === 'mp4'))[0]
+  const video = videos.sort(
+    (a, b) =>
+      heightOf(a) - heightOf(b) ||
+      Number(isDirect(b)) - Number(isDirect(a)) ||
+      Number(b.ext === 'mp4') - Number(a.ext === 'mp4'),
+  )[0]
   if (!video) {
     return { selector: FALLBACK_FORMAT(maxHeight), merge: true, reason: 'no video stream' }
   }
@@ -209,25 +232,35 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
     // `best[height<=360][ext=mp4]` chain fails when a video has no muxed
     // rendition at that height.
     const downloadFormat = chooseDownloadFormat(meta?.formats, maxHeight)
-    const downloaded = await run(
-      ytdlpPath(),
-      [
-        '--no-warnings',
-        '--no-playlist',
-        '--retries', '2',
-        '--fragment-retries', '2',
-        ...(impersonate ? ['--impersonate', impersonate] : []),
-        ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
-        '-f', downloadFormat.selector,
-        ...(downloadFormat.merge ? ['--merge-output-format', 'mkv'] : []),
-        '-o', template,
-        ...(cookies ? ['--cookies', cookies] : []),
-        ref.url,
-      ],
-      { timeoutMs: 15 * 60_000, maxBuffer: 2 * 1024 * 1024, ...(options.signal ? { signal: options.signal } : {}) },
-    )
+    const fallback: DownloadFormat = { selector: FALLBACK_FORMAT(maxHeight), merge: true, reason: 'fallback selector' }
+    const downloadWith = (format: DownloadFormat) =>
+      run(
+        ytdlpPath(),
+        [
+          '--no-warnings',
+          '--no-playlist',
+          '--retries', '2',
+          '--fragment-retries', '2',
+          ...(impersonate ? ['--impersonate', impersonate] : []),
+          ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
+          '-f', format.selector,
+          ...(format.merge ? ['--merge-output-format', 'mkv'] : []),
+          '-o', template,
+          ...(cookies ? ['--cookies', cookies] : []),
+          ref.url,
+        ],
+        { timeoutMs: 15 * 60_000, maxBuffer: 2 * 1024 * 1024, ...(options.signal ? { signal: options.signal } : {}) },
+      )
+    let used = downloadFormat
+    let downloaded = await downloadWith(downloadFormat)
+    // The catalogue can change between the probe and the download. Retry once
+    // with the generic selector instead of failing the whole project.
+    if (downloaded.code !== 0 && downloadFormat.selector !== fallback.selector) {
+      used = fallback
+      downloaded = await downloadWith(fallback)
+    }
     if (downloaded.code !== 0) {
-      throw new Error(`yt-dlp download failed (${downloadFormat.reason}): ${downloaded.stderr.slice(-400)}`)
+      throw new Error(`yt-dlp download failed (${used.reason}): ${downloaded.stderr.slice(-400)}`)
     }
 
     const files = await readdir(workspace)

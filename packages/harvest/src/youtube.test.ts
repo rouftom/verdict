@@ -56,6 +56,20 @@ describe('chooseDownloadFormat', () => {
     expect(chooseDownloadFormat(high, 360)).toEqual({ selector: '137+140', merge: true, reason: '1080p video plus audio' })
   })
 
+  test('prefers a direct stream over HLS and skips loudness variants', () => {
+    const formats = [
+      format({ format_id: '160', ext: 'mp4', height: 360, vcodec: 'avc1.4D401E', acodec: 'none', tbr: 56, protocol: 'm3u8_native' }),
+      format({ format_id: '134', ext: 'mp4', height: 360, vcodec: 'avc1.4D401E', acodec: 'none', tbr: 207, protocol: 'https' }),
+      format({ format_id: '140-drc', ext: 'm4a', height: 0, vcodec: 'none', acodec: 'mp4a.40.2', abr: 129, protocol: 'https' }),
+      format({ format_id: '140', ext: 'm4a', height: 0, vcodec: 'none', acodec: 'mp4a.40.2', abr: 129, protocol: 'https' }),
+    ]
+    expect(chooseDownloadFormat(formats, 360)).toEqual({
+      selector: '134+140',
+      merge: true,
+      reason: '360p video plus audio',
+    })
+  })
+
   test('ignores storyboards and falls back without a media list', () => {
     const storyboard = [format({ format_id: 'sb0', ext: 'mhtml', protocol: 'mhtml', vcodec: 'none', acodec: 'none' })]
     expect(chooseDownloadFormat(storyboard, 360)).toEqual({
