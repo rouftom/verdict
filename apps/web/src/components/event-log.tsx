@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
-import { ArrowDownToLine, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, Check, Copy, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, Trash2, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
 import { formatElapsed } from '@/lib/run-timeline'
 
@@ -112,6 +112,54 @@ function elapsedOf(event: RunEvent, origin?: string): string | undefined {
   return `+${formatElapsed(at - start)}`
 }
 
+/** One event as plain text, exactly as the console reads, for the copy button. */
+function plainLine(event: RunEvent, origin?: string): string {
+  const agent = agentOf(event)
+  const elapsed = elapsedOf(event, origin)
+  const parts = [timeOf(event)]
+  if (elapsed) parts.push(elapsed)
+  parts.push(event.type.toUpperCase())
+  if (agent) parts.push(`[${agent.name ?? agent.id}]`)
+  const message = event.projectId ? `${event.projectId}: ${event.message ?? ''}` : (event.message ?? '')
+  parts.push(message)
+  return parts.join(' ')
+}
+
+/**
+ * Copy the whole log as text. Falls back to a hidden textarea when the
+ * clipboard API is unavailable or the page is not a secure context.
+ */
+function useCopyLog(events: RunEvent[], origin?: string) {
+  const [copied, setCopied] = React.useState(false)
+  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+
+  const copy = React.useCallback(async () => {
+    const text = events.map((event) => plainLine(event, origin)).join('\n')
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const area = document.createElement('textarea')
+      area.value = text
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.select()
+      document.execCommand('copy')
+      document.body.removeChild(area)
+    }
+    setCopied(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setCopied(false), 1600)
+  }, [events, origin])
+
+  return { copied, copy }
+}
+
 function EventLine({ event, origin }: { event: RunEvent; origin?: string }) {
   const { t } = useTranslation()
   const tone = toneOf(event)
@@ -159,6 +207,7 @@ export function EventLog({
   const scroller = React.useRef<HTMLElement | null>(null)
   const stick = React.useRef(true)
   const [stuck, setStuck] = React.useState(true)
+  const { copied, copy } = useCopyLog(events, origin)
   const listMounted = events.length > 0
 
   // Real-time autoscroll: follow new events while the reader is at the bottom.
@@ -218,6 +267,18 @@ export function EventLog({
             <ArrowDownToLine className="h-3.5 w-3.5" />
           </Button>
         ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="h-6 w-6"
+          aria-label={t('log.copy')}
+          title={copied ? t('log.copied') : t('log.copy')}
+          onClick={copy}
+          disabled={events.length === 0}
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
         {onClear && events.length > 0 ? (
           <Button
             type="button"
@@ -312,12 +373,25 @@ export function LogPeek({
 }) {
   const { t } = useTranslation()
   const latest = events.slice(-3)
+  const { copied, copy } = useCopyLog(events, origin)
   return (
     <Card className="w-[min(92vw,380px)] overflow-hidden shadow-2xl">
       <CardHeader className="min-h-0 gap-1.5 border-b border-border px-2 py-1.5">
         <Terminal className="h-3 w-3 text-muted-foreground" />
         <CardTitle className="text-[11px]">{t('log.title')}</CardTitle>
         <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{t('log.events', { count: events.length })}</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="h-5 w-5"
+          aria-label={t('log.copy')}
+          title={copied ? t('log.copied') : t('log.copy')}
+          onClick={copy}
+          disabled={events.length === 0}
+        >
+          {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+        </Button>
         {onClear && events.length > 0 ? (
           <Button
             type="button"

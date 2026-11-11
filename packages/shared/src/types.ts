@@ -315,6 +315,25 @@ export interface TrackRanking {
   entries: RankedProject[]
 }
 
+export type UsageStage = 'evaluation' | 'revision' | 'ranking' | 'verification' | 'verifier_ranking'
+
+export interface UsageByAgent extends UsageTotals {
+  agentId: string
+  agentName: string
+  role: 'evaluator' | 'verifier'
+}
+
+export interface UsageByStage extends UsageTotals {
+  stage: UsageStage
+}
+
+/** Token and call totals for the run, broken down by agent and by stage. */
+export interface RunUsage {
+  total: UsageTotals
+  byAgent: UsageByAgent[]
+  byStage: UsageByStage[]
+}
+
 export interface Report {
   runId: string
   createdAt: string
@@ -340,6 +359,8 @@ export interface Report {
       errors: string[]
     }
   }>
+  /** Optional: runs stored before usage tracking existed have no entry. */
+  usage?: RunUsage
   warnings: string[]
 }
 
