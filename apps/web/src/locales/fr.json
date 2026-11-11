@@ -113,7 +113,8 @@
     "synthesis": "Synthèse",
     "redFlags": "Signaux d'alerte",
     "adjustments": "Ajustements",
-    "waiting": "En attente du premier résultat de cet agent. La carte se met à jour pendant l'exécution."
+    "waiting": "En attente du premier résultat de cet agent. La carte se met à jour pendant l'exécution.",
+    "loading": "Chargement des agents..."
   },
   "role": {
     "evaluator": "évaluateur",
@@ -201,6 +202,7 @@
     "reduce": "Réduire le journal",
     "expand": "Développer le journal",
     "jump": "Aller au dernier événement",
+    "clear": "Effacer le journal",
     "dockBottom": "Ancrer le journal en bas",
     "dockTop": "Ancrer le journal en haut",
     "dockLeft": "Ancrer le journal à gauche",

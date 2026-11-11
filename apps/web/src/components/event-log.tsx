@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
-import { ArrowDownToLine, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, X } from 'lucide-react'
+import { ArrowDownToLine, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, Trash2, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
 
 export type LogDock = 'bottom' | 'top' | 'left' | 'right'
@@ -47,6 +47,7 @@ export function EventLog({
   events,
   onClose,
   onReduce,
+  onClear,
   dock = 'bottom',
   onDockChange,
   className,
@@ -54,6 +55,7 @@ export function EventLog({
   events: RunEvent[]
   onClose?: () => void
   onReduce?: () => void
+  onClear?: () => void
   dock?: LogDock
   onDockChange?: (dock: LogDock) => void
   className?: string
@@ -120,6 +122,19 @@ export function EventLog({
             onClick={jumpToLatest}
           >
             <ArrowDownToLine className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+        {onClear && events.length > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-6 w-6"
+            aria-label={t('log.clear')}
+            title={t('log.clear')}
+            onClick={onClear}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         ) : null}
         {onDockChange ? (
@@ -192,10 +207,12 @@ export function LogPeek({
   events,
   onExpand,
   onClose,
+  onClear,
 }: {
   events: RunEvent[]
   onExpand: () => void
   onClose: () => void
+  onClear?: () => void
 }) {
   const { t } = useTranslation()
   const latest = events.slice(-3)
@@ -205,6 +222,19 @@ export function LogPeek({
         <Terminal className="h-3 w-3 text-muted-foreground" />
         <CardTitle className="text-[11px]">{t('log.title')}</CardTitle>
         <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{t('log.events', { count: events.length })}</span>
+        {onClear && events.length > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-5 w-5"
+            aria-label={t('log.clear')}
+            title={t('log.clear')}
+            onClick={onClear}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="ghost"

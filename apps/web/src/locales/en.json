@@ -113,7 +113,8 @@
     "synthesis": "Synthesis",
     "redFlags": "Red flags",
     "adjustments": "Adjustments",
-    "waiting": "Waiting for this agent's first result. The card updates as the run streams."
+    "waiting": "Waiting for this agent's first result. The card updates as the run streams.",
+    "loading": "Loading the agent pool..."
   },
   "role": {
     "evaluator": "evaluator",
@@ -201,6 +202,7 @@
     "reduce": "Reduce run log",
     "expand": "Expand run log",
     "jump": "Jump to the latest event",
+    "clear": "Clear run log",
     "dockBottom": "Dock run log at the bottom",
     "dockTop": "Dock run log at the top",
     "dockLeft": "Dock run log on the left",
