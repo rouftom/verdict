@@ -6,6 +6,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
 import { ArrowDownToLine, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, Trash2, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
+import { formatElapsed } from '@/lib/run-timeline'
 
 export type LogDock = 'bottom' | 'top' | 'left' | 'right'
 
@@ -18,23 +19,113 @@ const DOCK_ICONS = {
 
 const DOCKS: LogDock[] = ['bottom', 'top', 'left', 'right']
 
-function toneOf(event: RunEvent): string {
-  if (event.type === 'error') return 'text-destructive'
-  if (event.type === 'stage') return 'text-brand-primary font-medium'
-  if (event.type === 'report') return 'text-emerald-600'
-  if (event.type === 'log') return 'text-muted-foreground'
-  return 'text-foreground'
+interface EventTone {
+  text: string
+  chip: string
+  row: string
+}
+
+/** One colour per event kind, so the stream reads like a real console. */
+const TONES: Record<RunEvent['type'], EventTone> = {
+  stage: {
+    text: 'text-sky-700 dark:text-sky-300',
+    chip: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+    row: 'bg-sky-500/5',
+  },
+  log: { text: 'text-muted-foreground', chip: 'bg-muted text-muted-foreground', row: '' },
+  project: {
+    text: 'text-indigo-600 dark:text-indigo-300',
+    chip: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300',
+    row: '',
+  },
+  evidence: {
+    text: 'text-cyan-700 dark:text-cyan-300',
+    chip: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
+    row: '',
+  },
+  evaluation: {
+    text: 'text-violet-700 dark:text-violet-300',
+    chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+    row: '',
+  },
+  revision: {
+    text: 'text-amber-700 dark:text-amber-300',
+    chip: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+    row: '',
+  },
+  consensus: {
+    text: 'text-teal-700 dark:text-teal-300',
+    chip: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
+    row: '',
+  },
+  verification: {
+    text: 'text-emerald-700 dark:text-emerald-300',
+    chip: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    row: '',
+  },
+  report: {
+    text: 'text-emerald-600 dark:text-emerald-300 font-semibold',
+    chip: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    row: 'bg-emerald-500/5',
+  },
+  error: {
+    text: 'text-destructive',
+    chip: 'bg-destructive/15 text-destructive',
+    row: 'bg-destructive/5',
+  },
+}
+
+const AGENT_TONES: Record<string, string> = {
+  e1: 'text-sky-600 dark:text-sky-400',
+  e2: 'text-fuchsia-600 dark:text-fuchsia-400',
+  e3: 'text-amber-600 dark:text-amber-400',
+  e4: 'text-rose-600 dark:text-rose-400',
+  e5: 'text-emerald-600 dark:text-emerald-400',
+  e6: 'text-indigo-600 dark:text-indigo-400',
+  v1: 'text-violet-600 dark:text-violet-400',
+  v2: 'text-teal-600 dark:text-teal-400',
+}
+
+/** The agent that produced an evaluation, revision or verification event. */
+function agentOf(event: RunEvent): { id: string; name?: string } | undefined {
+  if (!event.data || typeof event.data !== 'object') return undefined
+  const data = event.data as Record<string, unknown>
+  const id = typeof data.agentId === 'string' ? data.agentId : typeof data.verifierId === 'string' ? data.verifierId : undefined
+  if (!id) return undefined
+  const name = typeof data.agentName === 'string' ? data.agentName : typeof data.verifierName === 'string' ? data.verifierName : undefined
+  return { id, ...(name ? { name } : {}) }
+}
+
+function toneOf(event: RunEvent): EventTone {
+  return TONES[event.type] ?? TONES.log
 }
 
 function timeOf(event: RunEvent): string {
   return new Date(event.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-function EventLine({ event }: { event: RunEvent }) {
+function elapsedOf(event: RunEvent, origin?: string): string | undefined {
+  if (!origin) return undefined
+  const start = Date.parse(origin)
+  const at = Date.parse(event.at)
+  if (Number.isNaN(start) || Number.isNaN(at) || at < start) return undefined
+  return `+${formatElapsed(at - start)}`
+}
+
+function EventLine({ event, origin }: { event: RunEvent; origin?: string }) {
+  const { t } = useTranslation()
+  const tone = toneOf(event)
+  const agent = agentOf(event)
+  const agentLabel = agent ? t(`agents.${agent.id}.name`, { defaultValue: agent.name ?? agent.id }) : undefined
+  const elapsed = elapsedOf(event, origin)
   return (
-    <div className={cn('flex gap-2 px-2 py-0.5 font-mono text-[10px] leading-relaxed', toneOf(event))}>
+    <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-2 border-transparent px-2 py-0.5 font-mono text-[10px] leading-relaxed', tone.text, tone.row)}>
       <span className="shrink-0 tabular-nums text-muted-foreground/70">{timeOf(event)}</span>
-      <span className="shrink-0 text-muted-foreground/70">[{event.type}]</span>
+      {elapsed ? <span className="shrink-0 tabular-nums text-muted-foreground/50">{elapsed}</span> : null}
+      <span className={cn('shrink-0 rounded px-1 text-[9px] font-semibold uppercase tracking-wide', tone.chip)}>{event.type}</span>
+      {agent && agentLabel ? (
+        <span className={cn('shrink-0 font-semibold', AGENT_TONES[agent.id] ?? 'text-foreground')}>[{agentLabel}]</span>
+      ) : null}
       <span className="min-w-0 break-words">
         {event.projectId ? <span className="text-muted-foreground">{event.projectId}: </span> : null}
         {event.message}
@@ -51,6 +142,7 @@ export function EventLog({
   dock = 'bottom',
   onDockChange,
   className,
+  origin,
 }: {
   events: RunEvent[]
   onClose?: () => void
@@ -59,6 +151,8 @@ export function EventLog({
   dock?: LogDock
   onDockChange?: (dock: LogDock) => void
   className?: string
+  /** Timestamp of the run's first event, used for the elapsed column. */
+  origin?: string
 }) {
   const { t } = useTranslation()
   const listRef = React.useRef<VirtuosoHandle | null>(null)
@@ -191,7 +285,7 @@ export function EventLog({
             className="h-full"
             followOutput="auto"
             initialTopMostItemIndex={{ index: Math.max(0, events.length - 1), align: 'end' }}
-            itemContent={(_index, event) => <EventLine event={event} />}
+            itemContent={(_index, event) => <EventLine event={event} origin={origin} />}
           />
         )}
       </CardContent>
@@ -208,11 +302,13 @@ export function LogPeek({
   onExpand,
   onClose,
   onClear,
+  origin,
 }: {
   events: RunEvent[]
   onExpand: () => void
   onClose: () => void
   onClear?: () => void
+  origin?: string
 }) {
   const { t } = useTranslation()
   const latest = events.slice(-3)
@@ -261,11 +357,17 @@ export function LogPeek({
         {latest.length === 0 ? (
           <p className="p-2 text-[10px] text-muted-foreground">{t('log.empty')}</p>
         ) : (
-          latest.map((event, index) => (
-            <div key={`${event.at}-${index}`} className={cn('truncate px-2 py-0.5 font-mono text-[10px] leading-snug', toneOf(event))}>
-              {timeOf(event)} <span className="text-muted-foreground/70">[{event.type}]</span> {event.message}
-            </div>
-          ))
+          latest.map((event, index) => {
+            const tone = toneOf(event)
+            const elapsed = elapsedOf(event, origin)
+            return (
+              <div key={`${event.at}-${index}`} className={cn('truncate px-2 py-0.5 font-mono text-[10px] leading-snug', tone.text, tone.row)}>
+                {timeOf(event)}
+                {elapsed ? <span className="text-muted-foreground/50"> {elapsed}</span> : null}{' '}
+                <span className={cn('rounded px-1 text-[9px] font-semibold uppercase', tone.chip)}>{event.type}</span> {event.message}
+              </div>
+            )
+          })
         )}
       </CardContent>
     </Card>

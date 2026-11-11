@@ -12,7 +12,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import { Badge, Popover, PopoverContent, PopoverTrigger, cn } from '@verdict/ui'
+import { Badge, Popover, PopoverAnchor, PopoverContent, cn } from '@verdict/ui'
 import {
   Activity,
   CheckCircle2,
@@ -30,8 +30,10 @@ import type {
   ProjectEvaluation,
   ProjectRevision,
   ProjectVerification,
+  RunEvent,
   RunStatus,
 } from '@verdict/shared'
+import { agentTimings, durationOf, stageTimings, type Timing } from '@/lib/run-timeline'
 
 type StageStatus = 'idle' | 'active' | 'done' | 'error'
 
@@ -39,6 +41,7 @@ interface StageData extends Record<string, unknown> {
   title: string
   detail: string
   status: StageStatus
+  duration?: string
 }
 
 export interface CriterionMeta {
@@ -61,7 +64,20 @@ type AgentData = AgentSummary &
   Record<string, unknown> & {
     criteria: CriterionMeta[]
     projectName?: string
+    duration?: string
   }
+
+/** Tick once a second only while the run is live, so a finished graph stays still. */
+function useNow(active: boolean): number {
+  const [now, setNow] = React.useState(() => Date.now())
+  React.useEffect(() => {
+    setNow(Date.now())
+    if (!active) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [active])
+  return now
+}
 
 function StatusIcon({ status, className }: { status: StageStatus; className?: string }) {
   if (status === 'done') return <CheckCircle2 className={cn('h-3.5 w-3.5 text-emerald-500', className)} />
@@ -85,7 +101,10 @@ function StageNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
       <div className="flex items-center gap-1.5">
         <StatusIcon status={stage.status} />
-        <span className="truncate text-[12px] font-semibold">{stage.title}</span>
+        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{stage.title}</span>
+        {stage.duration ? (
+          <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground">{stage.duration}</span>
+        ) : null}
       </div>
       <p className="mt-0.5 truncate pl-5 text-[10px] leading-tight text-muted-foreground">{stage.detail}</p>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
@@ -156,6 +175,11 @@ function AgentCard({ data }: { data: AgentData }) {
         {data.model?.reasoningEffort ? (
           <Badge tone="brand" className="text-[10px]">
             {t('pipeline.effort', { effort: data.model.reasoningEffort })}
+          </Badge>
+        ) : null}
+        {data.duration ? (
+          <Badge tone="neutral" className="font-mono text-[10px] tabular-nums">
+            {data.duration}
           </Badge>
         ) : null}
         {data.revision ? (
@@ -265,18 +289,25 @@ function AgentNode({ data }: NodeProps) {
   const popover = React.useContext(AgentPopoverContext)
   const open = popover.openId === agent.agent.id
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => popover.setOpenId(next ? agent.agent.id : null)}
-    >
-      <PopoverTrigger asChild>
+    <Popover open={open} onOpenChange={(next) => popover.setOpenId(next ? agent.agent.id : null)}>
+      {/*
+        An anchor instead of a trigger: React Flow swallows the click on a node
+        before Radix's toggle sees it, so the popover opened and closed in the
+        same gesture. The popover stays controlled and opens after the click.
+      */}
+      <PopoverAnchor asChild>
         <button
           type="button"
           title={t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
-          // React Flow captures pointer events on the pane. Stop them on the
-          // trigger or the popover opens and closes in the same gesture.
+          aria-expanded={open}
           onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            // Open after the gesture: mounting the dismissable layer during the
+            // same click makes Radix treat that click as an outside press and
+            // close the card immediately.
+            window.setTimeout(() => popover.setOpenId(open ? null : agent.agent.id), 0)
+          }}
           className={cn(
             'nodrag nopan cursor-pointer w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
             'hover:border-brand-primary/60 hover:bg-brand-primary/5',
@@ -300,11 +331,14 @@ function AgentNode({ data }: NodeProps) {
             <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
               {modelName(agent.model, t('pipeline.modelNotSet'))}
             </span>
+            {agent.duration ? (
+              <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground">{agent.duration}</span>
+            ) : null}
             {agent.count > 1 ? <span className="text-[9px] tabular-nums text-muted-foreground">×{agent.count}</span> : null}
           </div>
           <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
         </button>
-      </PopoverTrigger>
+      </PopoverAnchor>
       <PopoverContent
         side="right"
         align="start"
@@ -378,7 +412,7 @@ function summariseAgents(
   evaluations: ProjectEvaluation[],
   revisions: ProjectRevision[],
   verifications: ProjectVerification[],
-  phase: Phase,
+  current: RunStatus | undefined,
   failed: boolean,
   selectedProjectId?: string,
 ): AgentSummary[] {
@@ -392,13 +426,16 @@ function summariseAgents(
     const revision = latestFor(ownRevisions, selectedProjectId)
     const verification = latestFor(ownVerifications, selectedProjectId)
     const hasResult = role === 'evaluator' ? Boolean(evaluation) : Boolean(verification)
-    const status: StageStatus = hasResult
-      ? 'done'
-      : failed
-        ? 'error'
-        : phase === 'active'
-          ? 'active'
-          : 'idle'
+    // An agent is busy until its own result for the *current* pass arrives, so
+    // the spinner keeps turning during the revision round instead of freezing
+    // on the first evaluation.
+    let status: StageStatus = 'idle'
+    if (failed) status = hasResult ? 'done' : 'error'
+    else if (current === 'done') status = hasResult ? 'done' : 'idle'
+    else if (current === 'evaluating') status = role === 'evaluator' ? (evaluation ? 'done' : 'active') : 'idle'
+    else if (current === 'reviewing') status = role === 'evaluator' ? (revision ? 'done' : 'active') : 'done'
+    else if (current === 'verifying') status = role === 'verifier' ? (verification ? 'done' : 'active') : 'done'
+    else if (current === 'consensus') status = hasResult ? 'done' : 'idle'
     return {
       agent,
       role,
@@ -425,6 +462,8 @@ export interface PipelineGraphProps {
   selectedProjectId?: string
   hasReport: boolean
   failed?: boolean
+  /** The streamed events, used for live stage and agent durations. */
+  events?: RunEvent[]
   /** The agent pool is still loading: show shimmer placeholders instead of an empty graph. */
   loading?: boolean
 }
@@ -442,6 +481,7 @@ export function PipelineGraph({
   selectedProjectId,
   hasReport,
   failed = false,
+  events = [],
   loading = false,
 }: PipelineGraphProps) {
   const { t } = useTranslation()
@@ -451,6 +491,10 @@ export function PipelineGraph({
   const [openAgentId, setOpenAgentId] = React.useState<string | null>(null)
   const popoverState = React.useMemo(() => ({ openId: openAgentId, setOpenId: setOpenAgentId }), [openAgentId])
   const projectNames = React.useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects])
+  const live = Boolean(status && !['done', 'failed', 'cancelled'].includes(status))
+  const now = useNow(live)
+  const stages = React.useMemo(() => stageTimings(events), [events])
+  const agentsTimings = React.useMemo(() => agentTimings(events, stages), [events, stages])
 
   const evaluatorSummaries = React.useMemo(
     () =>
@@ -461,7 +505,7 @@ export function PipelineGraph({
         evaluations,
         revisions,
         verifications,
-        phaseOf('evaluate', status),
+        status,
         failed,
         selectedProjectId,
       ),
@@ -477,7 +521,7 @@ export function PipelineGraph({
         evaluations,
         revisions,
         verifications,
-        phaseOf('verify', status),
+        status,
         failed,
         selectedProjectId,
       ),
@@ -485,6 +529,31 @@ export function PipelineGraph({
   )
 
   const nodes = React.useMemo<Node[]>(() => {
+    const stageTimingFor = (id: string): Timing | undefined => {
+      if (id === 'harvest' || id === 'review' || id === 'consensus') return stages.get(id)
+      if (id === 'rank') {
+        const start = stages.get('consensus')?.end
+        if (start === undefined) return undefined
+        const end = stages.get('verify')?.start
+        return { start, ...(end !== undefined ? { end } : {}) }
+      }
+      const start = stages.get('harvest')?.start
+      const end = stages.get('verify')?.end
+      return start === undefined ? undefined : { start, ...(end !== undefined ? { end } : {}) }
+    }
+
+    const agentDurationOf = (summary: AgentSummary): string | undefined => {
+      const stage = stages.get(summary.role === 'verifier' ? 'verify' : summary.revision ? 'review' : 'evaluate')
+      const timing = agentsTimings.get(summary.agent.id)
+      const start = timing?.start ?? stage?.start
+      if (start === undefined) return undefined
+      // An agent without its own result still stops counting when its stage
+      // closes, so a failed agent does not show a duration that never ends.
+      const candidate = timing?.end ?? stage?.end
+      const end = candidate !== undefined && candidate >= start ? candidate : undefined
+      return durationOf({ start, ...(end !== undefined ? { end } : {}) }, now)
+    }
+
     const stageNodes = STAGES.map((stage) => {
       let stageStatus: StageStatus = 'idle'
       const index = stage.id === 'harvest' ? 0 : stage.id === 'review' ? 2 : stage.id === 'consensus' ? 3 : stage.id === 'rank' ? 4 : 5
@@ -499,6 +568,7 @@ export function PipelineGraph({
           : stage.id === 'report' && hasReport
             ? t('pipeline.reportDetail')
             : t(stage.detailKey)
+      const duration = durationOf(stageTimingFor(stage.id), now)
 
       return {
         id: stage.id,
@@ -513,7 +583,7 @@ export function PipelineGraph({
                 : stage.id === 'rank'
                   ? { x: 976, y: 96 }
                   : { x: 1356, y: 96 },
-        data: { title: t(stage.titleKey), detail, status: stageStatus } satisfies StageData,
+        data: { title: t(stage.titleKey), detail, status: stageStatus, ...(duration ? { duration } : {}) } satisfies StageData,
       }
     })
 
@@ -521,40 +591,53 @@ export function PipelineGraph({
       const column = index % 2
       const row = Math.floor(index / 2)
       const evaluation = summary.revision ?? summary.evaluation
+      const duration = agentDurationOf(summary)
       return {
         id: `agent-${summary.agent.id}`,
         type: 'agent',
         position: { x: 200 + column * 188, y: row * 74 },
+        // React Flow disables pointer events on nodes when the canvas is not
+        // selectable or draggable. The agent cards must stay clickable.
+        style: { pointerEvents: 'all' as const },
         data: {
           ...summary,
           criteria,
+          ...(duration ? { duration } : {}),
           ...(evaluation ? { projectName: projectNames.get(evaluation.projectId) ?? evaluation.projectId } : {}),
         } satisfies AgentData,
       }
     })
 
-    const verifierNodes = verifierSummaries.map((summary, index) => ({
-      id: `agent-${summary.agent.id}`,
-      type: 'agent',
-      position: { x: 200 + index * 188, y: 232 },
-      data: {
-        ...summary,
-        criteria,
-        ...(summary.verification
-          ? { projectName: projectNames.get(summary.verification.projectId) ?? summary.verification.projectId }
-          : {}),
-      } satisfies AgentData,
-    }))
+    const verifierNodes = verifierSummaries.map((summary, index) => {
+      const duration = agentDurationOf(summary)
+      return {
+        id: `agent-${summary.agent.id}`,
+        type: 'agent',
+        position: { x: 200 + index * 188, y: 232 },
+        style: { pointerEvents: 'all' as const },
+        data: {
+          ...summary,
+          criteria,
+          ...(duration ? { duration } : {}),
+          ...(summary.verification
+            ? { projectName: projectNames.get(summary.verification.projectId) ?? summary.verification.projectId }
+            : {}),
+        } satisfies AgentData,
+      }
+    })
 
     return [...stageNodes, ...evaluatorNodes, ...verifierNodes]
   }, [
     activeIndex,
+    agentsTimings,
     criteria,
     evaluatorSummaries,
     failed,
     hasReport,
+    now,
     projectNames,
     revisions.length,
+    stages,
     status,
     t,
     verifierSummaries,

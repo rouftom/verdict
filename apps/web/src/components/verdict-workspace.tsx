@@ -615,10 +615,12 @@ export function VerdictWorkspace() {
     [clearedEvents, events],
   )
   const clearEvents = () => setClearedEvents(events.length)
+  const runOrigin = events[0]?.at
   const logPanel = (
     <div className={cn('flex min-h-0 min-w-0 shrink-0 flex-col border-border bg-card', DOCK_PANEL_CLASS[logDock])}>
       <EventLog
         events={visibleEvents}
+        origin={runOrigin}
         onClear={clearEvents}
         onClose={() => setLogOpen(false)}
         onReduce={() => setLogReduced(true)}
@@ -956,6 +958,7 @@ export function VerdictWorkspace() {
               selectedProjectId={selectedId}
               hasReport={Boolean(live.report)}
               failed={status === 'failed'}
+              events={events}
               loading={agents === undefined && !providersError}
             />
           </div>
@@ -1084,7 +1087,7 @@ export function VerdictWorkspace() {
 
       {logOpen && logReduced ? (
         <div className="fixed right-3 bottom-14 z-40">
-          <LogPeek events={visibleEvents} onClear={clearEvents} onExpand={() => setLogReduced(false)} onClose={() => setLogOpen(false)} />
+          <LogPeek events={visibleEvents} origin={runOrigin} onClear={clearEvents} onExpand={() => setLogReduced(false)} onClose={() => setLogOpen(false)} />
         </div>
       ) : null}
 
