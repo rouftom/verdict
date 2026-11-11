@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { chooseDownloadFormat, cookieAttempts, parseYouTubeUrl, type YtdlpFormat } from './youtube'
+import {
+  chooseDownloadFormat,
+  cookieAttempts,
+  parseYouTubeUrl,
+  youtubeAccessHint,
+  ytdlpFailure,
+  type YtdlpFormat,
+} from './youtube'
 
 describe('parseYouTubeUrl', () => {
   test('accepts watch, youtu.be, shorts, embed and live URLs', () => {
@@ -93,5 +100,31 @@ describe('cookieAttempts', () => {
   test('has nothing to fall back to without a jar', () => {
     expect(cookieAttempts(undefined, false)).toEqual([undefined])
     expect(cookieAttempts(undefined, true)).toEqual([undefined])
+  })
+})
+
+describe('yt-dlp failures', () => {
+  test('keeps the last actionable ERROR line without the prefix', () => {
+    const stderr = [
+      'WARNING: something harmless',
+      'ERROR: [youtube] abc: Sign in to confirm your age. This video may be inappropriate for some users.',
+      'ERROR: [youtube] abc: Use --cookies for the authentication.',
+    ].join('\n')
+    expect(ytdlpFailure(stderr)).toBe('[youtube] abc: Use --cookies for the authentication.')
+    expect(ytdlpFailure('plain text')).toBe('plain text')
+  })
+
+  test('names the age wall and the fix', () => {
+    expect(youtubeAccessHint('ERROR: [youtube] x: Sign in to confirm your age.')).toContain('age-restricted')
+    expect(youtubeAccessHint('Sign in to confirm your age.')).toContain('YTDLP_COOKIES_BASE64')
+  })
+
+  test('names private and removed videos', () => {
+    expect(youtubeAccessHint('This video is private')).toContain('private or members-only')
+    expect(youtubeAccessHint('Video unavailable. This video has been removed by the uploader')).toContain('unavailable')
+  })
+
+  test('stays quiet for a genuine format problem', () => {
+    expect(youtubeAccessHint('Requested format is not available. Use --list-formats')).toBeNull()
   })
 })
