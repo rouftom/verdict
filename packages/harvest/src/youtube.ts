@@ -78,6 +78,10 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
   const maxMinutes = options.maxMinutes ?? Number(env('MAX_VIDEO_MINUTES') || 20)
   const frameInterval = Math.max(2, options.frameIntervalSeconds ?? 20)
   const maxFrames = Math.max(1, options.maxFrames ?? Number(env('FRAME_MAX') || 24))
+  // Frames are the only thing the evaluators look at, so a 360p download is
+  // enough. `YTDLP_MAX_HEIGHT` raises it when a closer read is needed.
+  const requestedHeight = Number(env('YTDLP_MAX_HEIGHT') || 360)
+  const maxHeight = Number.isFinite(requestedHeight) && requestedHeight >= 144 ? Math.round(requestedHeight) : 360
   const workspace = await temporaryDirectory('verdict-video')
 
   try {
@@ -99,7 +103,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
         '--fragment-retries', '2',
         ...(impersonate ? ['--impersonate', impersonate] : []),
         ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
-        '-f', 'best[height<=480][ext=mp4]/best[height<=480]/best',
+        '-f', `best[height<=${maxHeight}][ext=mp4]/best[height<=${maxHeight}]/best`,
         '-o', template,
         ...(cookies ? ['--cookies', cookies] : []),
         ref.url,
