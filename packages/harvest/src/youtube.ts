@@ -36,10 +36,119 @@ interface Probe {
   duration?: number
   uploader?: string
   thumbnail?: string
+  formats?: YtdlpFormat[]
 }
+
+/** One entry of the `formats` array that `yt-dlp -J` reports. */
+export interface YtdlpFormat {
+  format_id?: string
+  ext?: string
+  height?: number | null
+  vcodec?: string | null
+  acodec?: string | null
+  tbr?: number | null
+  abr?: number | null
+  protocol?: string | null
+}
+
+export interface DownloadFormat {
+  /** Expression passed to `yt-dlp -f`. */
+  selector: string
+  /** The selector merges separate streams, so ffmpeg is required. */
+  merge: boolean
+  /** Why this format won, kept for tests and error messages. */
+  reason: string
+}
+
+const FALLBACK_FORMAT = (maxHeight: number) =>
+  `bv*[height<=${maxHeight}]+ba/b[height<=${maxHeight}]/bv*+ba/b`
+
+const heightOf = (format: YtdlpFormat): number =>
+  typeof format.height === 'number' && Number.isFinite(format.height) && format.height > 0 ? format.height : 0
+const hasVideo = (format: YtdlpFormat): boolean => Boolean(format.vcodec) && format.vcodec !== 'none'
+const hasAudio = (format: YtdlpFormat): boolean => Boolean(format.acodec) && format.acodec !== 'none'
+const isMuxed = (format: YtdlpFormat): boolean => hasVideo(format) && hasAudio(format)
+/** Storyboard and other non-media entries also carry a format_id. */
+const isMedia = (format: YtdlpFormat): boolean =>
+  Boolean(format.format_id) && !/mhtml/i.test(format.protocol ?? '') && (hasVideo(format) || hasAudio(format))
+
+/** Decoding h264 is cheaper and more portable than vp9 or av1. */
+function codecPreference(format: YtdlpFormat): number {
+  const codec = format.vcodec ?? ''
+  if (codec.startsWith('avc1')) return 3
+  if (codec.startsWith('vp9') || codec.startsWith('vp09')) return 2
+  if (codec.startsWith('av01')) return 1
+  return 0
+}
+
+/** Prefer a portable codec, then mp4, then the lightest stream at the same height. */
+function byVideoPreference(a: YtdlpFormat, b: YtdlpFormat): number {
+  return (
+    heightOf(b) - heightOf(a) ||
+    codecPreference(b) - codecPreference(a) ||
+    Number(b.ext === 'mp4') - Number(a.ext === 'mp4') ||
+    (a.tbr ?? 0) - (b.tbr ?? 0)
+  )
+}
+
+/** Audio feeds the transcript, so prefer m4a then the highest bitrate. */
+function byAudioPreference(a: YtdlpFormat, b: YtdlpFormat): number {
+  return Number(b.ext === 'm4a') - Number(a.ext === 'm4a') || (b.abr ?? b.tbr ?? 0) - (a.abr ?? a.tbr ?? 0)
+}
+
+/**
+ * Pick the download format from the list `yt-dlp` reported instead of asking
+ * for a hard-coded selector. YouTube does not serve every rendition for every
+ * video: a video may have no muxed 360p mp4 at all and still offer 360p video
+ * plus audio as separate streams, which is what `best[height<=360]` failed on.
+ */
+export function chooseDownloadFormat(formats: YtdlpFormat[] | undefined, maxHeight: number): DownloadFormat {
+  const usable = (formats ?? []).filter(isMedia)
+  if (usable.length === 0) {
+    return { selector: FALLBACK_FORMAT(maxHeight), merge: true, reason: 'no format list' }
+  }
+
+  const muxed = usable
+    .filter((format) => isMuxed(format) && heightOf(format) > 0 && heightOf(format) <= maxHeight)
+    .sort(byVideoPreference)
+  const muxedBest = muxed[0]
+  if (muxedBest) {
+    return { selector: muxedBest.format_id as string, merge: false, reason: `muxed ${heightOf(muxedBest)}p` }
+  }
+
+  // No muxed rendition at the cap: take a video-only stream at the cap plus
+  // the best audio, which is how YouTube serves most renditions today.
+  const videos = usable.filter((format) => hasVideo(format) && !hasAudio(format) && heightOf(format) > 0)
+  const atCap = videos.filter((format) => heightOf(format) <= maxHeight).sort(byVideoPreference)
+  const audio = usable.filter((format) => hasAudio(format) && !hasVideo(format)).sort(byAudioPreference)[0]
+  if (atCap[0]) {
+    const selector = audio ? `${atCap[0].format_id}+${audio.format_id}` : `${atCap[0].format_id}+bestaudio`
+    return { selector, merge: true, reason: `${heightOf(atCap[0])}p video plus audio` }
+  }
+
+  // Everything is above the cap: take the smallest muxed stream rather than
+  // fail, and only split streams when nothing is muxed.
+  const muxedAbove = usable
+    .filter((format) => isMuxed(format) && heightOf(format) > 0)
+    .sort((a, b) => heightOf(a) - heightOf(b) || Number(b.ext === 'mp4') - Number(a.ext === 'mp4'))
+  const muxedSmallest = muxedAbove[0]
+  if (muxedSmallest) {
+    return { selector: muxedSmallest.format_id as string, merge: false, reason: `muxed ${heightOf(muxedSmallest)}p` }
+  }
+
+  const video = videos.sort((a, b) => heightOf(a) - heightOf(b) || Number(b.ext === 'mp4') - Number(a.ext === 'mp4'))[0]
+  if (!video) {
+    return { selector: FALLBACK_FORMAT(maxHeight), merge: true, reason: 'no video stream' }
+  }
+  const selector = audio ? `${video.format_id}+${audio.format_id}` : `${video.format_id}+bestaudio`
+  return { selector, merge: true, reason: `${heightOf(video)}p video plus audio` }
+}
+
 
 async function probe(ref: YouTubeRef, workDirectory: string, signal?: AbortSignal): Promise<Probe | null> {
   const cookies = await cookiesFile(workDirectory)
+  const impersonate = env('YTDLP_IMPERSONATE')
+  const extractorArgs = env('YTDLP_EXTRACTOR_ARGS')
   const result = await run(
     ytdlpPath(),
     [
@@ -47,6 +156,8 @@ async function probe(ref: YouTubeRef, workDirectory: string, signal?: AbortSigna
       '--no-warnings',
       '--no-playlist',
       '--skip-download',
+      ...(impersonate ? ['--impersonate', impersonate] : []),
+      ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
       ...(cookies ? ['--cookies', cookies] : []),
       ref.url,
     ],
@@ -94,6 +205,10 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
     const template = join(workspace, 'video.%(ext)s')
     const impersonate = env('YTDLP_IMPERSONATE')
     const extractorArgs = env('YTDLP_EXTRACTOR_ARGS')
+    // Choose from the formats the probe actually saw: the hard-coded
+    // `best[height<=360][ext=mp4]` chain fails when a video has no muxed
+    // rendition at that height.
+    const downloadFormat = chooseDownloadFormat(meta?.formats, maxHeight)
     const downloaded = await run(
       ytdlpPath(),
       [
@@ -103,14 +218,17 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
         '--fragment-retries', '2',
         ...(impersonate ? ['--impersonate', impersonate] : []),
         ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
-        '-f', `best[height<=${maxHeight}][ext=mp4]/best[height<=${maxHeight}]/best`,
+        '-f', downloadFormat.selector,
+        ...(downloadFormat.merge ? ['--merge-output-format', 'mkv'] : []),
         '-o', template,
         ...(cookies ? ['--cookies', cookies] : []),
         ref.url,
       ],
       { timeoutMs: 15 * 60_000, maxBuffer: 2 * 1024 * 1024, ...(options.signal ? { signal: options.signal } : {}) },
     )
-    if (downloaded.code !== 0) throw new Error(`yt-dlp download failed: ${downloaded.stderr.slice(-400)}`)
+    if (downloaded.code !== 0) {
+      throw new Error(`yt-dlp download failed (${downloadFormat.reason}): ${downloaded.stderr.slice(-400)}`)
+    }
 
     const files = await readdir(workspace)
     const videoFile = files.find((name) => name.startsWith('video.') && /\.(mp4|mkv|webm|mov)$/i.test(name))
