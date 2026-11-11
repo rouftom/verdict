@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { RunEvent } from '@verdict/shared'
-import { agentTimings, durationOf, formatElapsed, stageTimings } from './run-timeline'
+import { agentTimings, durationOf, formatElapsed, reportTiming, stageTimings, statusFromEvents } from './run-timeline'
 
 function event(at: string, type: RunEvent['type'], message?: string, data?: unknown): RunEvent {
   return { runId: 'run', at, type, ...(message ? { message } : {}), ...(data ? { data } : {}) }
@@ -43,6 +43,45 @@ describe('stageTimings', () => {
   test('ignores duplicate stage events from a replayed snapshot', () => {
     const stages = stageTimings([...events, event(at(100), 'stage', 'verifying')])
     expect(stages.get('verify')?.start).toBe(Date.parse(at(60)))
+  })
+})
+
+describe('reportTiming', () => {
+  const events = [
+    event(at(0), 'stage', 'harvesting'),
+    event(at(10), 'stage', 'evaluating'),
+    event(at(40), 'stage', 'reviewing'),
+    event(at(50), 'stage', 'consensus'),
+    event(at(60), 'stage', 'verifying'),
+    event(at(85), 'stage', 'reporting'),
+    event(at(90), 'report', 'report'),
+  ]
+
+  test('runs from its own reporting stage to the report event', () => {
+    expect(reportTiming(events)).toEqual({ start: Date.parse(at(85)), end: Date.parse(at(90)) })
+  })
+
+  test('has no timing while the report does not exist', () => {
+    expect(reportTiming(events.slice(0, 6))).toBeUndefined()
+  })
+
+  test('has no timing for an older snapshot without a reporting stage', () => {
+    const legacy = [...events.slice(0, 5), event(at(90), 'report', 'report')]
+    expect(reportTiming(legacy)).toBeUndefined()
+  })
+})
+
+describe('statusFromEvents', () => {
+  test('uses the last stage event as the current step', () => {
+    expect(statusFromEvents([event(at(0), 'stage', 'harvesting'), event(at(10), 'stage', 'evaluating')])).toBe('evaluating')
+  })
+
+  test('is done once the report exists', () => {
+    expect(statusFromEvents([event(at(0), 'stage', 'harvesting'), event(at(10), 'report', 'report')])).toBe('done')
+  })
+
+  test('is undefined without stage events', () => {
+    expect(statusFromEvents([event(at(0), 'log', 'started')])).toBeUndefined()
   })
 })
 

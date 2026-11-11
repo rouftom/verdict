@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Background,
@@ -12,7 +13,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import { Badge, Popover, PopoverAnchor, PopoverContent, cn } from '@verdict/ui'
+import { Badge, cn } from '@verdict/ui'
 import {
   Activity,
   CheckCircle2,
@@ -33,7 +34,7 @@ import type {
   RunEvent,
   RunStatus,
 } from '@verdict/shared'
-import { agentTimings, durationOf, stageTimings, type Timing } from '@/lib/run-timeline'
+import { agentTimings, durationOf, reportTiming, stageTimings, statusFromEvents, type Timing } from '@/lib/run-timeline'
 
 type StageStatus = 'idle' | 'active' | 'done' | 'error'
 
@@ -275,11 +276,37 @@ function AgentCard({ data }: { data: AgentData }) {
   )
 }
 
-/** Only one agent card may stay open at a time, so a second click swaps it. */
+/**
+ * Agent cards are opened from a fixed-position panel rendered in a portal. A
+ * Radix popover inside a React Flow node fought the canvas for the click and
+ * the dismissable layer, which is why a node could look inert. The panel is
+ * independent of the canvas transform, of its overflow and of its pointer
+ * event rules, so a click always opens exactly one card.
+ */
+interface AgentPanel {
+  id: string
+  x: number
+  y: number
+}
+
 const AgentPopoverContext = React.createContext<{
   openId: string | null
-  setOpenId: (id: string | null) => void
-}>({ openId: null, setOpenId: () => {} })
+  open: (id: string, anchor: DOMRect) => void
+  close: () => void
+}>({ openId: null, open: () => {}, close: () => {} })
+
+const PANEL_WIDTH = 320
+const PANEL_MARGIN = 8
+
+/** Place the panel beside the node, switching sides when the viewport is tight. */
+function panelPosition(anchor: DOMRect): { x: number; y: number } {
+  const width = typeof window === 'undefined' ? PANEL_WIDTH : window.innerWidth
+  const height = typeof window === 'undefined' ? 800 : window.innerHeight
+  const maxX = width - PANEL_WIDTH - PANEL_MARGIN
+  const x = anchor.right + PANEL_MARGIN <= maxX ? anchor.right + PANEL_MARGIN : Math.max(PANEL_MARGIN, anchor.left - PANEL_WIDTH - PANEL_MARGIN)
+  const y = Math.min(Math.max(PANEL_MARGIN, anchor.top), Math.max(PANEL_MARGIN, height - 120))
+  return { x, y }
+}
 
 function AgentNode({ data }: NodeProps) {
   const { t } = useTranslation()
@@ -289,67 +316,45 @@ function AgentNode({ data }: NodeProps) {
   const popover = React.useContext(AgentPopoverContext)
   const open = popover.openId === agent.agent.id
   return (
-    <Popover open={open} onOpenChange={(next) => popover.setOpenId(next ? agent.agent.id : null)}>
-      {/*
-        An anchor instead of a trigger: React Flow swallows the click on a node
-        before Radix's toggle sees it, so the popover opened and closed in the
-        same gesture. The popover stays controlled and opens after the click.
-      */}
-      <PopoverAnchor asChild>
-        <button
-          type="button"
-          title={t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
-          aria-expanded={open}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation()
-            // Open after the gesture: mounting the dismissable layer during the
-            // same click makes Radix treat that click as an outside press and
-            // close the card immediately.
-            window.setTimeout(() => popover.setOpenId(open ? null : agent.agent.id), 0)
-          }}
-          className={cn(
-            'nodrag nopan cursor-pointer w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
-            'hover:border-brand-primary/60 hover:bg-brand-primary/5',
-            agent.status === 'active' && 'border-brand-primary ring-2 ring-brand-primary/20',
-            agent.status === 'done' && 'border-emerald-500/40',
-            agent.status === 'error' && 'border-destructive/50',
-            agent.status === 'idle' && 'border-border opacity-80',
-          )}
-        >
-          <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
-          <div className="flex items-center gap-1.5">
-            <StatusIcon status={agent.status} className="h-3 w-3" />
-            <span className="truncate text-[11px] font-semibold">
-              {t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
-            </span>
-            {overall !== undefined ? (
-              <span className={cn('ml-auto text-[10px] font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
-            ) : null}
-          </div>
-          <div className="mt-0.5 flex items-center gap-1 pl-[18px]">
-            <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
-              {modelName(agent.model, t('pipeline.modelNotSet'))}
-            </span>
-            {agent.duration ? (
-              <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground">{agent.duration}</span>
-            ) : null}
-            {agent.count > 1 ? <span className="text-[9px] tabular-nums text-muted-foreground">×{agent.count}</span> : null}
-          </div>
-          <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
-        </button>
-      </PopoverAnchor>
-      <PopoverContent
-        side="right"
-        align="start"
-        sideOffset={8}
-        collisionPadding={12}
-        onOpenAutoFocus={(event) => event.preventDefault()}
-        className="z-[1000] w-[320px] p-2.5"
-      >
-        <AgentCard data={agent} />
-      </PopoverContent>
-    </Popover>
+    <button
+      type="button"
+      title={t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
+      aria-expanded={open}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation()
+        popover.open(agent.agent.id, event.currentTarget.getBoundingClientRect())
+      }}
+      className={cn(
+        'nodrag nopan cursor-pointer w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
+        'hover:border-brand-primary/60 hover:bg-brand-primary/5',
+        agent.status === 'active' && 'border-brand-primary ring-2 ring-brand-primary/20',
+        agent.status === 'done' && 'border-emerald-500/40',
+        agent.status === 'error' && 'border-destructive/50',
+        agent.status === 'idle' && 'border-border opacity-80',
+      )}
+    >
+      <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
+      <div className="flex items-center gap-1.5">
+        <StatusIcon status={agent.status} className="h-3 w-3" />
+        <span className="truncate text-[11px] font-semibold">
+          {t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
+        </span>
+        {overall !== undefined ? (
+          <span className={cn('ml-auto text-[10px] font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
+        ) : null}
+      </div>
+      <div className="mt-0.5 flex items-center gap-1 pl-[18px]">
+        <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
+          {modelName(agent.model, t('pipeline.modelNotSet'))}
+        </span>
+        {agent.duration ? (
+          <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground">{agent.duration}</span>
+        ) : null}
+        {agent.count > 1 ? <span className="text-[9px] tabular-nums text-muted-foreground">×{agent.count}</span> : null}
+      </div>
+      <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
+    </button>
   )
 }
 
@@ -485,13 +490,40 @@ export function PipelineGraph({
   loading = false,
 }: PipelineGraphProps) {
   const { t } = useTranslation()
-  const activeIndex = statusIndex(status)
+  // A restored snapshot can lose its status while keeping the events. Rebuild
+  // it from the stream so the nodes show a spinner instead of an idle ring.
+  const current = status ?? statusFromEvents(events)
+  const activeIndex = statusIndex(current)
   const evaluatorPool = agents?.evaluators ?? []
   const verifierPool = agents?.verifiers ?? []
-  const [openAgentId, setOpenAgentId] = React.useState<string | null>(null)
-  const popoverState = React.useMemo(() => ({ openId: openAgentId, setOpenId: setOpenAgentId }), [openAgentId])
+  const [panel, setPanel] = React.useState<AgentPanel | null>(null)
+  const openAgent = React.useCallback((id: string, anchor: DOMRect) => {
+    setPanel({ id, ...panelPosition(anchor) })
+  }, [])
+  const closeAgent = React.useCallback(() => setPanel(null), [])
+  const popoverState = React.useMemo(
+    () => ({ openId: panel?.id ?? null, open: openAgent, close: closeAgent }),
+    [closeAgent, openAgent, panel?.id],
+  )
+  // Close on Escape, resize or scroll: a fixed panel must not drift away from
+  // the node it describes.
+  React.useEffect(() => {
+    if (!panel) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPanel(null)
+    }
+    const close = () => setPanel(null)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+    }
+  }, [panel])
   const projectNames = React.useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects])
-  const live = Boolean(status && !['done', 'failed', 'cancelled'].includes(status))
+  const live = Boolean(current && !['done', 'failed', 'cancelled'].includes(current))
   const now = useNow(live)
   const stages = React.useMemo(() => stageTimings(events), [events])
   const agentsTimings = React.useMemo(() => agentTimings(events, stages), [events, stages])
@@ -505,11 +537,11 @@ export function PipelineGraph({
         evaluations,
         revisions,
         verifications,
-        status,
+        current,
         failed,
         selectedProjectId,
       ),
-    [evaluations, evaluatorModels, evaluatorPool, failed, revisions, selectedProjectId, status, verifications],
+    [current, evaluations, evaluatorModels, evaluatorPool, failed, revisions, selectedProjectId, verifications],
   )
 
   const verifierSummaries = React.useMemo(
@@ -521,15 +553,18 @@ export function PipelineGraph({
         evaluations,
         revisions,
         verifications,
-        status,
+        current,
         failed,
         selectedProjectId,
       ),
-    [evaluations, failed, revisions, selectedProjectId, status, verifications, verifierModels, verifierPool],
+    [current, evaluations, failed, revisions, selectedProjectId, verifications, verifierModels, verifierPool],
   )
 
   const nodes = React.useMemo<Node[]>(() => {
     const stageTimingFor = (id: string): Timing | undefined => {
+      // The report is not a stage event: it runs from the end of the last
+      // stage to its own event, never from the harvest start.
+      if (id === 'report') return reportTiming(events)
       if (id === 'harvest' || id === 'review' || id === 'consensus') return stages.get(id)
       if (id === 'rank') {
         const start = stages.get('consensus')?.end
@@ -537,9 +572,7 @@ export function PipelineGraph({
         const end = stages.get('verify')?.start
         return { start, ...(end !== undefined ? { end } : {}) }
       }
-      const start = stages.get('harvest')?.start
-      const end = stages.get('verify')?.end
-      return start === undefined ? undefined : { start, ...(end !== undefined ? { end } : {}) }
+      return undefined
     }
 
     const agentDurationOf = (summary: AgentSummary): string | undefined => {
@@ -558,7 +591,7 @@ export function PipelineGraph({
       let stageStatus: StageStatus = 'idle'
       const index = stage.id === 'harvest' ? 0 : stage.id === 'review' ? 2 : stage.id === 'consensus' ? 3 : stage.id === 'rank' ? 4 : 5
       if (failed && index === Math.max(0, activeIndex)) stageStatus = 'error'
-      else if (status === 'done' || hasReport) stageStatus = 'done'
+      else if (current === 'done' || hasReport) stageStatus = 'done'
       else if (index < activeIndex) stageStatus = 'done'
       else if (index === activeIndex) stageStatus = 'active'
 
@@ -631,22 +664,23 @@ export function PipelineGraph({
     activeIndex,
     agentsTimings,
     criteria,
+    current,
     evaluatorSummaries,
+    events,
     failed,
     hasReport,
     now,
     projectNames,
     revisions.length,
     stages,
-    status,
     t,
     verifierSummaries,
   ])
 
   const edges = React.useMemo<Edge[]>(() => {
     const list: Edge[] = []
-    const evalPhase = phaseOf('evaluate', status)
-    const verifyPhase = phaseOf('verify', status)
+    const evalPhase = phaseOf('evaluate', current)
+    const verifyPhase = phaseOf('verify', current)
 
     for (const summary of evaluatorSummaries) {
       const target = `agent-${summary.agent.id}`
@@ -673,7 +707,7 @@ export function PipelineGraph({
       source: 'review',
       target: 'consensus',
       type: 'smoothstep',
-      animated: phaseOf('review', status) === 'active',
+      animated: phaseOf('review', current) === 'active',
       style: { strokeWidth: 1.5 },
     })
     list.push({
@@ -681,7 +715,7 @@ export function PipelineGraph({
       source: 'consensus',
       target: 'rank',
       type: 'smoothstep',
-      animated: status === 'consensus',
+      animated: current === 'consensus',
       style: { strokeWidth: 1.5 },
     })
 
@@ -706,7 +740,13 @@ export function PipelineGraph({
     }
 
     return list
-  }, [evaluatorSummaries, status, verifierSummaries])
+  }, [current, evaluatorSummaries, verifierSummaries])
+
+  const panelAgent = React.useMemo(() => {
+    if (!panel) return undefined
+    const node = nodes.find((entry) => entry.id === `agent-${panel.id}`)
+    return node ? (node.data as AgentData) : undefined
+  }, [nodes, panel])
 
   return (
     <div className="verdict-flow h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
@@ -738,6 +778,31 @@ export function PipelineGraph({
             <Controls showInteractive={false} className="!bottom-1.5 !left-1.5" />
           </ReactFlow>
         )}
+        {panel && panelAgent && typeof document !== 'undefined'
+          ? createPortal(
+              <div
+                className="fixed inset-0 z-[999]"
+                aria-hidden
+                onPointerDown={(event) => {
+                  event.stopPropagation()
+                  closeAgent()
+                }}
+                onWheel={(event) => event.stopPropagation()}
+              >
+                <div
+                  role="dialog"
+                  aria-label={t(`agents.${panelAgent.agent.id}.name`, { defaultValue: panelAgent.agent.name })}
+                  className="fixed w-[320px] rounded-2xl border border-border bg-popover p-2.5 text-popover-foreground shadow-xl"
+                  style={{ left: panel.x, top: panel.y }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <AgentCard data={panelAgent} />
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
       </AgentPopoverContext.Provider>
     </div>
   )

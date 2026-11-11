@@ -1,4 +1,4 @@
-import type { RunEvent } from '@verdict/shared'
+import type { RunEvent, RunStatus } from '@verdict/shared'
 
 /**
  * Timing derived from the event stream, so the graph can show a live duration
@@ -16,6 +16,7 @@ const STAGE_OF: Record<string, string> = {
   reviewing: 'review',
   consensus: 'consensus',
   verifying: 'verify',
+  reporting: 'report',
 }
 
 /** Compact duration, the same grammar the reference project uses. */
@@ -58,6 +59,42 @@ export function stageTimings(events: RunEvent[]): Map<string, Timing> {
     }
   }
   return stages
+}
+
+/**
+ * The report has its own stage event (`reporting`), emitted when the final
+ * ranking starts, and it closes at the report event. Without that stage the
+ * report node used to inherit the harvest range and displayed the duration of
+ * the whole run, so it now shows nothing rather than a wrong number.
+ */
+export function reportTiming(events: RunEvent[]): Timing | undefined {
+  const stages = stageTimings(events)
+  const timing = stages.get('report')
+  if (!timing || timing.end === undefined) return undefined
+  return { start: timing.start, end: timing.end }
+}
+
+const STATUS_OF_STAGE: Record<string, RunStatus> = {
+  harvesting: 'harvesting',
+  evaluating: 'evaluating',
+  reviewing: 'reviewing',
+  consensus: 'consensus',
+  verifying: 'verifying',
+}
+
+/**
+ * Status rebuilt from the event stream, used when the snapshot lost it. The
+ * last stage event is the current step; a report event already closed the run.
+ */
+export function statusFromEvents(events: RunEvent[]): RunStatus | undefined {
+  if (events.some((event) => event.type === 'report')) return 'done'
+  let status: RunStatus | undefined
+  for (const event of events) {
+    if (event.type !== 'stage' || !event.message) continue
+    const mapped = STATUS_OF_STAGE[event.message]
+    if (mapped) status = mapped
+  }
+  return status
 }
 
 function agentOf(event: RunEvent): string | undefined {
