@@ -4,7 +4,7 @@ import * as React from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { Shuffle } from 'lucide-react'
-import { Button, SearchSelect, cn, type SearchSelectGroup } from '@verdict/ui'
+import { Button, SearchSelect, Skeleton, cn, type SearchSelectGroup } from '@verdict/ui'
 import {
   REASONING_EFFORTS,
   reasoningEffortsFor,
@@ -20,6 +20,8 @@ export interface ModelSlotsProps {
   onChange: (value: ModelRef[]) => void
   idPrefix: string
   compact?: boolean
+  /** Providers are still being fetched: show shimmer rows instead of the empty state. */
+  loading?: boolean
 }
 
 interface FlatModel {
@@ -95,7 +97,7 @@ function assignmentKey(models: ModelRef[]): string {
   return models.map((model) => `${model.provider}:${model.model}:${model.reasoningEffort ?? ''}`).join('|')
 }
 
-export function ModelSlots({ providers, value, slots, onChange, idPrefix, compact = false }: ModelSlotsProps) {
+export function ModelSlots({ providers, value, slots, onChange, idPrefix, compact = false, loading = false }: ModelSlotsProps) {
   const { t } = useTranslation()
   const flat = React.useMemo(() => flatten(providers), [providers])
   const groups = React.useMemo(() => modelGroups(providers), [providers])
@@ -139,6 +141,26 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
       if (assignmentKey(next) !== previous) break
     }
     onChange(next)
+  }
+
+  if (loading && flat.length === 0) {
+    return (
+      <div className={cn('flex flex-col gap-1.5', compact && 'gap-1')} aria-busy="true" aria-live="polite">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+        <div className="flex flex-col gap-1">
+          {Array.from({ length: slots }, (_, index) => (
+            <div key={`${idPrefix}-loading-${index}`} className="flex min-w-0 items-center gap-1.5">
+              <Skeleton className="h-3 w-6" />
+              <Skeleton className="h-7 min-w-0 flex-1" />
+              <Skeleton className="h-7 w-[84px] shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   if (flat.length === 0) {

@@ -12,7 +12,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import { Badge, Popover, PopoverContent, PopoverTrigger, cn } from '@verdict/ui'
+import { Badge, Popover, PopoverContent, PopoverTrigger, Skeleton, cn } from '@verdict/ui'
 import {
   Activity,
   CheckCircle2,
@@ -425,6 +425,8 @@ export interface PipelineGraphProps {
   selectedProjectId?: string
   hasReport: boolean
   failed?: boolean
+  /** The agent pool is still loading: show shimmer placeholders instead of an empty graph. */
+  loading?: boolean
 }
 
 export function PipelineGraph({
@@ -440,6 +442,7 @@ export function PipelineGraph({
   selectedProjectId,
   hasReport,
   failed = false,
+  loading = false,
 }: PipelineGraphProps) {
   const { t } = useTranslation()
   const activeIndex = statusIndex(status)
@@ -625,26 +628,41 @@ export function PipelineGraph({
   return (
     <div className="h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
       <AgentPopoverContext.Provider value={popoverState}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.16 }}
-          minZoom={0.35}
-          onlyRenderVisibleElements
-          panOnDrag
-          zoomOnScroll={false}
-          zoomOnPinch={false}
-          zoomOnDoubleClick={false}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background gap={18} size={1} />
-          <Controls showInteractive={false} className="!bottom-1.5 !left-1.5" />
-        </ReactFlow>
+        {loading ? (
+          <div className="flex h-full flex-col gap-6 p-4" aria-busy="true" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:flex-nowrap">
+              {STAGES.map((stage) => (
+                <Skeleton key={`${stage.id}-skeleton`} className="h-[46px] w-[132px] shrink-0" />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 content-start gap-2.5 sm:grid-cols-3">
+              {Array.from({ length: 6 }, (_, index) => (
+                <Skeleton key={`agent-skeleton-${index}`} className="h-[58px]" />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.16 }}
+            minZoom={0.35}
+            onlyRenderVisibleElements
+            panOnDrag
+            zoomOnScroll={false}
+            zoomOnPinch={false}
+            zoomOnDoubleClick={false}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background gap={18} size={1} />
+            <Controls showInteractive={false} className="!bottom-1.5 !left-1.5" />
+          </ReactFlow>
+        )}
       </AgentPopoverContext.Provider>
     </div>
   )
