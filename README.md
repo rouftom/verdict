@@ -229,6 +229,7 @@ TRANSCRIPTION_SEGMENT_SECONDS=30
 YTDLP_COOKIES_BASE64=     # base64 of a Netscape cookies.txt, written mode 600 at runtime
 YTDLP_IMPERSONATE=        # optional, e.g. chrome
 YTDLP_EXTRACTOR_ARGS=     # optional, e.g. youtube:player_client=web
+YTDLP_MAX_HEIGHT=360       # highest downloaded video height, in pixels
 YTDLP_PATH=yt-dlp
 FFMPEG_PATH=ffmpeg
 FFPROBE_PATH=ffprobe
