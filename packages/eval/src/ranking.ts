@@ -90,26 +90,38 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
   const orders: string[][] = []
   let failures = 0
 
-  for (const modelRef of modelRefs) {
-    try {
-      const result = await generateStructured({
-        model: createLanguageModel(modelRef),
-        modelRef,
-        schema: rankingOutputSchema,
-        system: rankingSystem(rubric),
-        prompt: rankingPrompt(track, packets, trackAnchors, suppliedRanks, calibrationPackets),
-        temperature,
-        jsonContract: `{ "order": ["project-id", "..."], "rationale": "one sentence" }`,
-        ...(signal ? { signal } : {}),
-      })
-      usage.inputTokens += result.usage.inputTokens
-      usage.outputTokens += result.usage.outputTokens
-      usage.calls += 1
-      orders.push(normaliseOrder(result.object.order, ids, fallback))
-    } catch (error) {
+  // Every model orders the track independently. Running them together turns
+  // the comparative pass from a serial chain into one round of calls; a slow
+  // or failing model no longer delays the others.
+  const outcomes = await Promise.all(
+    modelRefs.map(async (modelRef) => {
+      try {
+        const result = await generateStructured({
+          model: createLanguageModel(modelRef),
+          modelRef,
+          schema: rankingOutputSchema,
+          system: rankingSystem(rubric),
+          prompt: rankingPrompt(track, packets, trackAnchors, suppliedRanks, calibrationPackets),
+          temperature,
+          jsonContract: `{ "order": ["project-id", "..."], "rationale": "one sentence" }`,
+          ...(signal ? { signal } : {}),
+        })
+        return { order: normaliseOrder(result.object.order, ids, fallback), usage: result.usage }
+      } catch (error) {
+        onLog?.(`[${track}] ranking model ${modelRefKey(modelRef)} failed: ${error instanceof Error ? error.message : String(error)}`)
+        return null
+      }
+    }),
+  )
+  for (const outcome of outcomes) {
+    if (!outcome) {
       failures += 1
-      onLog?.(`[${track}] ranking model ${modelRefKey(modelRef)} failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
     }
+    usage.inputTokens += outcome.usage.inputTokens
+    usage.outputTokens += outcome.usage.outputTokens
+    usage.calls += outcome.usage.calls
+    orders.push(outcome.order)
   }
 
   if (orders.length === 0) return { track, order: fallback, borda: {}, usage, failures }

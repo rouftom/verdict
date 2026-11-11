@@ -191,7 +191,22 @@
     "trackProjects_one": "{{count}} projet",
     "trackProjects_other": "{{count}} projets",
     "conf": "conf. {{value}}",
-    "wasRank": "était n°{{rank}}"
+    "wasRank": "était n°{{rank}}",
+    "pipelineUsage": "Consommation du pipeline",
+    "calls_one": "{{count}} appel",
+    "calls_other": "{{count}} appels",
+    "tokensIn": "{{value}} entrée",
+    "tokensOut": "{{value}} sortie",
+    "agentCount_one": "{{count}} agent",
+    "agentCount_other": "{{count}} agents",
+    "costPerAgent": "Par agent",
+    "costPerStage": "Par étape",
+    "costNote": "Jetons et appels déclarés par le fournisseur. Le prix par jeton dépend du fournisseur.",
+    "stageEvaluation": "Évaluation",
+    "stageRevision": "Contre-revue",
+    "stageRanking": "Classement comparatif",
+    "stageVerification": "Vérification",
+    "stageVerifierRanking": "Classement des vérificateurs"
   },
   "log": {
     "title": "Journal d'exécution",
@@ -206,7 +221,9 @@
     "dockBottom": "Ancrer le journal en bas",
     "dockTop": "Ancrer le journal en haut",
     "dockLeft": "Ancrer le journal à gauche",
-    "dockRight": "Ancrer le journal à droite"
+    "dockRight": "Ancrer le journal à droite",
+    "copy": "Copier tout le journal",
+    "copied": "Copié"
   },
   "sw": {
     "ready": "Une nouvelle version est prête.",
