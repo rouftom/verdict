@@ -643,7 +643,7 @@ export function VerdictWorkspace() {
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setHistoryOpen((value) => !value)}>
+          <Button type="button" variant="outline" size="sm" className="h-7" onClick={() => setHistoryOpen((value) => !value)}>
             <History className="h-3.5 w-3.5" /> {t('app.history')}
             {history.length > 0 ? <span className="tabular-nums text-muted-foreground">({history.length})</span> : null}
           </Button>
