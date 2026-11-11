@@ -12,6 +12,7 @@ export interface Timing {
 /** Stage events carry the pipeline step as their message. */
 const STAGE_OF: Record<string, string> = {
   harvesting: 'harvest',
+  screening: 'stageOne',
   evaluating: 'evaluate',
   reviewing: 'review',
   consensus: 'consensus',
@@ -76,6 +77,7 @@ export function reportTiming(events: RunEvent[]): Timing | undefined {
 
 const STATUS_OF_STAGE: Record<string, RunStatus> = {
   harvesting: 'harvesting',
+  screening: 'screening',
   evaluating: 'evaluating',
   reviewing: 'reviewing',
   consensus: 'consensus',

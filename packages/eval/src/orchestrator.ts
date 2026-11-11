@@ -19,6 +19,7 @@ import {
   type RunOptions,
   type RunUsage,
   type Rubric,
+  type StageOneResult,
   type TrackRanking,
   type UsageByAgent,
   type UsageByStage,
@@ -27,6 +28,7 @@ import {
 import { harvestProject } from '@verdict/harvest'
 import { EVALUATORS, VERIFIERS } from './agents'
 import { evaluateProject } from './evaluator'
+import { failOpenStageOne, screenProject } from './screening'
 import { rankTrack } from './ranking'
 import { reviseEvaluation } from './revision'
 import { verifyProject, verifyRanking } from './verifier'
@@ -185,11 +187,48 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
   const evidenceMap = new Map(evidenceList.map((evidence) => [evidence.projectId, evidence]))
 
-  // 2. Independent evaluation
+  // 2. Stage One pass/fail gate. Every project is screened, but only the ones
+  // that pass move on to scoring. A failed screening call opens the gate rather
+  // than silently dropping the project.
+  await checkpoint()
+  emit('stage', { message: 'screening' })
+  const screeningModel = pickModel(evaluatorModels, 0, 'evaluator')
+  const stageOne = await mapLimit(manifest, options.concurrency, async (project): Promise<StageOneResult> => {
+    await checkpoint()
+    const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
+    try {
+      const result = await screenProject({
+        project,
+        evidence,
+        rulesText,
+        modelRef: screeningModel,
+        temperature: options.temperature,
+        signal,
+      })
+      recordUsage('screening', result.usage)
+      emit('screening', {
+        projectId: project.id,
+        message: result.result.passed ? 'Stage One passed' : 'Stage One failed',
+        data: result.result,
+      })
+      return result.result
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const fallback = failOpenStageOne(project.id, message)
+      log(`[${project.name}] Stage One could not run: ${message}`)
+      emit('screening', { projectId: project.id, message: 'Stage One advanced for review', data: fallback })
+      return fallback
+    }
+  })
+  const passedIds = new Set(stageOne.filter((result) => result.passed).map((result) => result.projectId))
+  const eligible = manifest.filter((project) => passedIds.has(project.id))
+  log(`Stage One: ${eligible.length} of ${manifest.length} ${manifest.length === 1 ? 'project' : 'projects'} passed.`)
+
+  // 3. Independent evaluation
   await checkpoint()
   emit('stage', { message: 'evaluating' })
   const evaluations: ProjectEvaluation[] = []
-  await mapLimit(manifest, options.concurrency, async (project) => {
+  await mapLimit(eligible, options.concurrency, async (project) => {
     await checkpoint()
     const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
     const projectEvaluations = await Promise.all(
@@ -225,11 +264,11 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     evaluations.push(...projectEvaluations)
   })
 
-  // 3. Cross-review
+  // 4. Cross-review
   await checkpoint()
   emit('stage', { message: 'reviewing' })
   const revisions: ProjectRevision[] = []
-  await mapLimit(manifest, options.concurrency, async (project) => {
+  await mapLimit(eligible, options.concurrency, async (project) => {
     await checkpoint()
     const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
     const ownEvaluations = evaluations.filter((evaluation) => evaluation.projectId === project.id)
@@ -270,10 +309,10 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     revisions.push(...projectRevisions)
   })
 
-  // 4. Consensus
+  // 5. Consensus
   await checkpoint()
   emit('stage', { message: 'consensus' })
-  const consensus = manifest.map((project) => {
+  const consensus = eligible.map((project) => {
     const projectRevisions = revisions.filter((revision) => revision.projectId === project.id)
     const result = buildConsensus(project.id, projectRevisions.length > 0 ? projectRevisions : evaluations.filter((evaluation) => evaluation.projectId === project.id), rubric)
     emit('consensus', { projectId: project.id, message: `${project.name} → ${result.overall} (${result.status})`, data: result })
@@ -281,9 +320,14 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     return result
   })
 
-  // 5. Comparative ranking pass
+  // 6. Comparative ranking pass
   await checkpoint()
-  const tracks = groupByTrack(manifest)
+  const tracks = new Map(
+    [...groupByTrack(manifest)].map(([track, projects]) => [
+      track,
+      projects.filter((project) => passedIds.has(project.id)),
+    ]),
+  )
   const comparativeOrders = new Map<string, string[]>()
   // Two lanes handle the tracks at once. A track is independent of the others,
   // so waiting for a slow track no longer delays the rest of the ranking.
@@ -303,7 +347,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       rubric,
       modelRefs: evaluatorModels,
       temperature: options.temperature,
-      allProjects: manifest,
+      allProjects: eligible,
       allConsensus: consensus,
       showProvidedRanks: options.showRanksToAgents,
       onLog: log,
@@ -313,11 +357,11 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     comparativeOrders.set(track, result.order)
   })
 
-  // 6. Verification
+  // 7. Verification
   await checkpoint()
   emit('stage', { message: 'verifying' })
   const verifications: ProjectVerification[] = []
-  await mapLimit(manifest, options.concurrency, async (project) => {
+  await mapLimit(eligible, options.concurrency, async (project) => {
     await checkpoint()
     const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
     const projectConsensus = consensus.find((entry) => entry.projectId === project.id)
@@ -367,7 +411,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     verifications.push(...projectVerifications)
   })
 
-  // 7. Final ranking and report
+  // 8. Final ranking and report
   emit('stage', { message: 'reporting' })
   const finalByTrack = new Map<string, RankedProject[]>()
   await mapLimit([...tracks.entries()], 2, async ([track, projects]) => {
@@ -430,7 +474,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       .sort((left, right) =>
         left.role === right.role ? left.agentName.localeCompare(right.agentName) : left.role.localeCompare(right.role),
       ),
-    byStage: (['evaluation', 'revision', 'ranking', 'verification', 'verifier_ranking'] as const)
+    byStage: (['screening', 'evaluation', 'revision', 'ranking', 'verification', 'verifier_ranking'] as const)
       .map((stage) => {
         const totals = usageByStage.get(stage)
         return totals ? ({ stage, ...totals } as UsageByStage) : null
@@ -446,6 +490,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       verifiers: [...new Set(verifiers.map((_, index) => modelRefKey(pickModel(verifierModels, index, 'verifier'))))],
     },
     criteria: rubric.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.weight })),
+    stageOne,
     rankings,
     projects: manifest.map((project) => {
       const projectConsensus = consensus.find((entry) => entry.projectId === project.id) ?? {

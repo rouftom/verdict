@@ -234,6 +234,19 @@ export interface ProjectEvidence {
   errors: string[]
 }
 
+/**
+ * Stage One is a pass/fail gate that runs before any scoring: a project must
+ * reasonably fit a published track and actually use the event's AI tooling.
+ * A project that fails is listed in the results but never scored or ranked.
+ */
+export interface StageOneResult {
+  projectId: string
+  passed: boolean
+  themeFit: boolean
+  toolingUse: boolean
+  rationale: string
+}
+
 export interface CriterionScore {
   criterionId: string
   score: number
@@ -315,7 +328,7 @@ export interface TrackRanking {
   entries: RankedProject[]
 }
 
-export type UsageStage = 'evaluation' | 'revision' | 'ranking' | 'verification' | 'verifier_ranking'
+export type UsageStage = 'screening' | 'evaluation' | 'revision' | 'ranking' | 'verification' | 'verifier_ranking'
 
 export interface UsageByAgent extends UsageTotals {
   agentId: string
@@ -343,6 +356,8 @@ export interface Report {
     verifiers: string[]
   }
   criteria: Array<{ id: string; label: string; weight: number }>
+  /** Stage One results for every project, pass and fail. Absent on older runs. */
+  stageOne?: StageOneResult[]
   rankings: TrackRanking[]
   projects: Array<{
     projectId: string
@@ -368,6 +383,7 @@ export type RunStatus =
   | 'queued'
   | 'parsing'
   | 'harvesting'
+  | 'screening'
   | 'evaluating'
   | 'reviewing'
   | 'consensus'
@@ -395,6 +411,7 @@ export type RunEventType =
   | 'log'
   | 'project'
   | 'evidence'
+  | 'screening'
   | 'evaluation'
   | 'revision'
   | 'consensus'
@@ -421,6 +438,8 @@ export interface RunSnapshot {
   manifest: ProjectInput[]
   rubric: Rubric
   evidence: ProjectEvidence[]
+  /** Stage One gate results, filled as each project is screened. */
+  stageOne: StageOneResult[]
   evaluations: ProjectEvaluation[]
   revisions: ProjectRevision[]
   consensus: ProjectConsensus[]

@@ -84,6 +84,14 @@ export const criterionScoreSchema = z.object({
   redFlags: z.array(z.string()).catch([]),
 })
 
+export const stageOneOutputSchema = z.object({
+  /** Whether the project reasonably fits a published track it entered. */
+  themeFit: z.boolean(),
+  /** Whether the event's AI tooling is actually used at runtime. */
+  toolingUse: z.boolean(),
+  rationale: z.string().default(''),
+})
+
 export const evaluationOutputSchema = z.object({
   scores: z.array(criterionScoreSchema).default([]),
   summary: z.string().default(''),
@@ -124,6 +132,7 @@ export const verificationOutputSchema = z.object({
 })
 
 export type EvaluationOutput = z.infer<typeof evaluationOutputSchema>
+export type StageOneOutput = z.infer<typeof stageOneOutputSchema>
 export type RevisionOutput = z.infer<typeof revisionOutputSchema>
 export type RankingOutput = z.infer<typeof rankingOutputSchema>
 export type VerificationOutput = z.infer<typeof verificationOutputSchema>

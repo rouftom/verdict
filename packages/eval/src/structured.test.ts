@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { extractJson, repairJson } from './structured'
+import { callSignal, extractJson, repairJson } from './structured'
 
 describe('JSON extraction', () => {
   test('reads a plain object', () => {
@@ -49,5 +49,21 @@ describe('JSON extraction', () => {
         { criterionId: 'demo', score: null },
       ],
     })
+  })
+})
+
+describe('callSignal', () => {
+  test('fires on its own when a provider never answers', async () => {
+    const signal = callSignal(undefined, 5)
+    await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
+    expect(signal.aborted).toBe(true)
+  })
+
+  test('still aborts at once when the run is cancelled', () => {
+    const run = new AbortController()
+    const signal = callSignal(run.signal, 60_000)
+    expect(signal.aborted).toBe(false)
+    run.abort()
+    expect(signal.aborted).toBe(true)
   })
 })
