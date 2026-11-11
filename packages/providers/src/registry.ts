@@ -457,6 +457,61 @@ export async function modelPool(
   return Array.from({ length: size }, (_, index) => available[index % available.length]!)
 }
 
+/**
+ * Remove the vendor prefix Runware (and similar gateways) put in front of a
+ * model id, so `openai-gpt-6-luna` and `openai/gpt-6-luna` are recognised as
+ * the same OpenAI family.
+ */
+function bareModelId(model: string): string {
+  return model.trim().replace(/^(?:openai|azure|azure-openai)[-/:]/i, '')
+}
+
+/**
+ * OpenAI's reasoning families reject `max_tokens` and only accept
+ * `max_completion_tokens`. The AI SDK applies that conversion for its own
+ * OpenAI client, but only after matching the bare model id: a gateway id such
+ * as `openai-gpt-6-luna` slips through and the request fails with
+ * "Unsupported parameter: 'max_tokens' is not supported with this model".
+ */
+export function usesCompletionTokens(model: string): boolean {
+  return /^(?:o\d|gpt-[5-9])/i.test(bareModelId(model))
+}
+
+/** Rewrite one JSON request body when it targets a reasoning model. */
+export function rewriteCompletionTokens(body: string): string {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return body
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return body
+  const request = parsed as Record<string, unknown>
+  if (typeof request.model !== 'string' || !usesCompletionTokens(request.model)) return body
+  if (request.max_tokens == null) return body
+  if (request.max_completion_tokens == null) request.max_completion_tokens = request.max_tokens
+  delete request.max_tokens
+  return JSON.stringify(request)
+}
+
+type FetchFunction = typeof globalThis.fetch
+
+/**
+ * Wrap a fetch implementation so every OpenAI-compatible gateway request gets
+ * the parameter its model family actually accepts. Non-JSON and non-reasoning
+ * requests pass through untouched.
+ */
+export function withCompletionTokens(fetchImpl: FetchFunction = globalThis.fetch): FetchFunction {
+  return (async (input: Parameters<FetchFunction>[0], init?: Parameters<FetchFunction>[1]) => {
+    if (init && typeof init.body === 'string') {
+      init = { ...init, body: rewriteCompletionTokens(init.body) }
+    }
+    return fetchImpl(input, init)
+  }) as FetchFunction
+}
+
+const COMPATIBLE_FETCH = withCompletionTokens()
+
 export function createLanguageModel(ref: ModelRef): LanguageModel {
   const provider = definitions().find((entry) => entry.id === ref.provider)
   if (!provider) throw new Error(`Unknown provider "${ref.provider}".`)
@@ -468,6 +523,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'meta',
         baseURL: provider.baseURL ?? 'https://api.meta.ai/v1',
         apiKey: env('MODEL_API_KEY'),
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }
@@ -476,6 +532,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'runware',
         baseURL: provider.baseURL ?? 'https://api.runware.ai/v1',
         apiKey: env('RUNWARE_API_KEY'),
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }
@@ -484,6 +541,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'groq',
         baseURL: provider.baseURL ?? 'https://api.groq.com/openai/v1',
         apiKey: env('GROQ_API_KEY'),
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }
@@ -492,6 +550,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'deepseek',
         baseURL: provider.baseURL ?? 'https://api.deepseek.com/v1',
         apiKey: env('DEEPSEEK_API_KEY'),
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }
@@ -500,6 +559,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'nebius',
         baseURL: provider.baseURL ?? 'https://api.studio.nebius.ai/v1',
         apiKey: env('NEBIUS_API_KEY'),
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }
@@ -508,6 +568,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'nvidia',
         baseURL: provider.baseURL ?? 'https://integrate.api.nvidia.com/v1',
         apiKey: env('NVIDIA_API_KEY'),
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }
@@ -516,6 +577,7 @@ export function createLanguageModel(ref: ModelRef): LanguageModel {
         name: 'ollama',
         baseURL: withV1(provider.baseURL ?? 'http://localhost:11434'),
         apiKey: env('OLLAMA_API_KEY') || 'ollama',
+        fetch: COMPATIBLE_FETCH,
       })
       return client(ref.model)
     }

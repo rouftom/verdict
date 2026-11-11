@@ -74,15 +74,17 @@ export const rawManifestSchema = z.union([
 
 export const criterionScoreSchema = z.object({
   criterionId: z.string(),
-  score: z.number(),
-  confidence: z.number().min(0).max(1).default(0.6),
-  evidence: z.array(z.string()).default([]),
+  // Gateways sometimes quote a number or omit an optional field. Coercing and
+  // catching here is safer than rejecting an otherwise usable evaluation.
+  score: z.coerce.number(),
+  confidence: z.coerce.number().min(0).max(1).catch(0.6),
+  evidence: z.array(z.string()).catch([]),
   rationale: z.string().default(''),
-  redFlags: z.array(z.string()).default([]),
+  redFlags: z.array(z.string()).catch([]),
 })
 
 export const evaluationOutputSchema = z.object({
-  scores: z.array(criterionScoreSchema),
+  scores: z.array(criterionScoreSchema).default([]),
   summary: z.string().default(''),
   redFlags: z.array(z.string()).default([]),
   /** Optional relative order of the project ids seen in the dossier. */
@@ -100,19 +102,20 @@ export const rankingOutputSchema = z.object({
 })
 
 export const verificationOutputSchema = z.object({
-  projectId: z.string(),
-  finalScores: z.record(z.string(), z.number()),
+  /** Redundant with the run: default it instead of rejecting the whole audit. */
+  projectId: z.string().default(''),
+  finalScores: z.record(z.string(), z.coerce.number()),
   adjustments: z
     .array(
       z.object({
         criterionId: z.string(),
-        from: z.number(),
-        to: z.number(),
-        reason: z.string(),
+        from: z.coerce.number(),
+        to: z.coerce.number(),
+        reason: z.string().default(''),
       }),
     )
     .default([]),
-  approved: z.boolean().default(true),
+  approved: z.boolean().catch(true),
   notes: z.string().default(''),
   redFlags: z.array(z.string()).default([]),
   /** Final order of the project ids in this track, best first. */
