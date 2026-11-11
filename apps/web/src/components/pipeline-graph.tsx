@@ -626,7 +626,7 @@ export function PipelineGraph({
   }, [evaluatorSummaries, status, verifierSummaries])
 
   return (
-    <div className="h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
+    <div className="verdict-flow h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
       <AgentPopoverContext.Provider value={popoverState}>
         {loading ? (
           <div className="flex h-full flex-col gap-6 p-4" aria-busy="true" aria-live="polite">
