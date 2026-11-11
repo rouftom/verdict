@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises'
+import { mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { FrameEvidence, VideoArtifact } from '@verdict/shared'
 import { cookiesFile, env, ffmpegPath, hasYtdlp, temporaryDirectory, removeDirectory, ytdlpPath } from './env'
@@ -168,8 +168,13 @@ export function chooseDownloadFormat(formats: YtdlpFormat[] | undefined, maxHeig
 }
 
 
-async function probe(ref: YouTubeRef, workDirectory: string, signal?: AbortSignal): Promise<Probe | null> {
-  const cookies = await cookiesFile(workDirectory)
+interface ProbeResult {
+  meta: Probe | null
+  /** The format list came from a cookied request, so the download needs the jar too. */
+  authenticated: boolean
+}
+
+async function probeOnce(ref: YouTubeRef, cookies: string | undefined, signal?: AbortSignal): Promise<Probe | null> {
   const impersonate = env('YTDLP_IMPERSONATE')
   const extractorArgs = env('YTDLP_EXTRACTOR_ARGS')
   const result = await run(
@@ -192,6 +197,32 @@ async function probe(ref: YouTubeRef, workDirectory: string, signal?: AbortSigna
   } catch {
     return null
   }
+}
+
+/**
+ * A stale cookie jar does not merely fail: YouTube answers with a smaller
+ * catalogue and `-J` returns "Requested format is not available" before any
+ * list is printed. Public demo videos work anonymously, so probe without
+ * cookies first and only fall back to the jar when the video needs a session.
+ */
+async function probe(ref: YouTubeRef, workDirectory: string, signal?: AbortSignal): Promise<ProbeResult> {
+  const cookies = await cookiesFile(workDirectory)
+  const anonymous = await probeOnce(ref, undefined, signal)
+  if (anonymous?.formats?.length) return { meta: anonymous, authenticated: false }
+  if (!cookies) return { meta: anonymous, authenticated: false }
+  const authenticated = await probeOnce(ref, cookies, signal)
+  if (authenticated) return { meta: authenticated, authenticated: true }
+  return { meta: anonymous, authenticated: false }
+}
+
+/**
+ * Which cookie state to try first, then the other one. A cookied list implies
+ * a cookied download; otherwise try clean first so an expired jar cannot break
+ * a public video.
+ */
+export function cookieAttempts(cookies: string | undefined, authenticated: boolean): Array<string | undefined> {
+  if (!cookies) return [undefined]
+  return authenticated ? [cookies, undefined] : [undefined, cookies]
 }
 
 export interface HarvestVideoOptions {
@@ -219,7 +250,8 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
   const workspace = await temporaryDirectory('verdict-video')
 
   try {
-    const meta = await probe(ref, workspace, options.signal)
+    const probeResult = await probe(ref, workspace, options.signal)
+    const meta = probeResult.meta
     if (typeof meta?.duration === 'number' && meta.duration > maxMinutes * 60) {
       throw new Error(`Video is ${Math.round(meta.duration / 60)} min, above the ${maxMinutes} min cap.`)
     }
@@ -233,7 +265,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
     // rendition at that height.
     const downloadFormat = chooseDownloadFormat(meta?.formats, maxHeight)
     const fallback: DownloadFormat = { selector: FALLBACK_FORMAT(maxHeight), merge: true, reason: 'fallback selector' }
-    const downloadWith = (format: DownloadFormat) =>
+    const downloadWith = (format: DownloadFormat, cookieFile: string | undefined) =>
       run(
         ytdlpPath(),
         [
@@ -246,21 +278,32 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
           '-f', format.selector,
           ...(format.merge ? ['--merge-output-format', 'mkv'] : []),
           '-o', template,
-          ...(cookies ? ['--cookies', cookies] : []),
+          ...(cookieFile ? ['--cookies', cookieFile] : []),
           ref.url,
         ],
         { timeoutMs: 15 * 60_000, maxBuffer: 2 * 1024 * 1024, ...(options.signal ? { signal: options.signal } : {}) },
       )
+    const attempts = cookieAttempts(cookies, probeResult.authenticated)
+    const downloadFirstWorking = async (format: DownloadFormat) => {
+      let last: Awaited<ReturnType<typeof downloadWith>> | null = null
+      for (const cookieFile of attempts) {
+        if (options.signal?.aborted) break
+        last = await downloadWith(format, cookieFile)
+        if (last.code === 0) return last
+      }
+      return last
+    }
+
     let used = downloadFormat
-    let downloaded = await downloadWith(downloadFormat)
+    let downloaded = await downloadFirstWorking(downloadFormat)
     // The catalogue can change between the probe and the download. Retry once
     // with the generic selector instead of failing the whole project.
-    if (downloaded.code !== 0 && downloadFormat.selector !== fallback.selector) {
+    if ((!downloaded || downloaded.code !== 0) && downloadFormat.selector !== fallback.selector) {
       used = fallback
-      downloaded = await downloadWith(fallback)
+      downloaded = await downloadFirstWorking(fallback)
     }
-    if (downloaded.code !== 0) {
-      throw new Error(`yt-dlp download failed (${used.reason}): ${downloaded.stderr.slice(-400)}`)
+    if (!downloaded || downloaded.code !== 0) {
+      throw new Error(`yt-dlp download failed (${used.reason}): ${downloaded?.stderr.slice(-400) ?? 'Cancelled.'}`)
     }
 
     const files = await readdir(workspace)
@@ -269,6 +312,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
     const videoPath = join(workspace, videoFile)
 
     const framesDirectory = join(workspace, 'frames')
+    await mkdir(framesDirectory, { recursive: true })
     const framesResult = await run(
       ffmpegPath(),
       [

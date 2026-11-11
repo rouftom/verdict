@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { chooseDownloadFormat, parseYouTubeUrl, type YtdlpFormat } from './youtube'
+import { chooseDownloadFormat, cookieAttempts, parseYouTubeUrl, type YtdlpFormat } from './youtube'
 
 describe('parseYouTubeUrl', () => {
   test('accepts watch, youtu.be, shorts, embed and live URLs', () => {
@@ -78,5 +78,20 @@ describe('chooseDownloadFormat', () => {
       reason: 'no format list',
     })
     expect(chooseDownloadFormat(undefined, 360).selector).toBe('bv*[height<=360]+ba/b[height<=360]/bv*+ba/b')
+  })
+})
+
+describe('cookieAttempts', () => {
+  test('tries a cookied list with the jar first, then anonymously', () => {
+    expect(cookieAttempts('cookies.txt', true)).toEqual(['cookies.txt', undefined])
+  })
+
+  test('tries clean first so an expired jar cannot break a public video', () => {
+    expect(cookieAttempts('cookies.txt', false)).toEqual([undefined, 'cookies.txt'])
+  })
+
+  test('has nothing to fall back to without a jar', () => {
+    expect(cookieAttempts(undefined, false)).toEqual([undefined])
+    expect(cookieAttempts(undefined, true)).toEqual([undefined])
   })
 })
