@@ -12,7 +12,7 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react'
-import { Badge, Popover, PopoverContent, PopoverTrigger, Skeleton, cn } from '@verdict/ui'
+import { Badge, Popover, PopoverContent, PopoverTrigger, cn } from '@verdict/ui'
 import {
   Activity,
   CheckCircle2,
@@ -629,17 +629,9 @@ export function PipelineGraph({
     <div className="verdict-flow h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
       <AgentPopoverContext.Provider value={popoverState}>
         {loading ? (
-          <div className="flex h-full flex-col gap-6 p-4" aria-busy="true" aria-live="polite">
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:flex-nowrap">
-              {STAGES.map((stage) => (
-                <Skeleton key={`${stage.id}-skeleton`} className="h-[46px] w-[132px] shrink-0" />
-              ))}
-            </div>
-            <div className="grid grid-cols-2 content-start gap-2.5 sm:grid-cols-3">
-              {Array.from({ length: 6 }, (_, index) => (
-                <Skeleton key={`agent-skeleton-${index}`} className="h-[58px]" />
-              ))}
-            </div>
+          <div className="flex h-full flex-col items-center justify-center gap-2" aria-busy="true" aria-live="polite">
+            <Loader2 className="h-5 w-5 animate-spin text-brand-primary" />
+            <p className="text-[11px] text-muted-foreground">{t('pipeline.loading')}</p>
           </div>
         ) : (
           <ReactFlow

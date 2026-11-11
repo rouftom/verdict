@@ -173,6 +173,9 @@ export function VerdictWorkspace() {
   const [runId, setRunId] = React.useState<string | null>(null)
   const [status, setStatus] = React.useState<RunStatus | undefined>()
   const [events, setEvents] = React.useState<RunEvent[]>([])
+  // Clearing the log only hides the lines already shown: new events keep
+  // streaming, and a fresh run starts from zero again.
+  const [clearedEvents, setClearedEvents] = React.useState(0)
   const [live, setLive] = React.useState<LiveState>(EMPTY_LIVE)
   const [runError, setRunError] = React.useState<string | null>(null)
   const [starting, setStarting] = React.useState(false)
@@ -455,6 +458,7 @@ export function VerdictWorkspace() {
     setPaused(false)
     setRunError(null)
     setEvents([])
+    setClearedEvents(0)
     setLive(EMPTY_LIVE)
     setStatus('queued')
     setView('pipeline')
@@ -573,6 +577,7 @@ export function VerdictWorkspace() {
     setStatus(snapshot.status)
     setPaused(false)
     setEvents(snapshot.events)
+    setClearedEvents(0)
     setRunError(snapshot.error ?? null)
     setLive({
       evaluations: snapshot.evaluations,
@@ -605,10 +610,16 @@ export function VerdictWorkspace() {
 
   const sideDock = logDock === 'left' || logDock === 'right'
   const docked = logOpen && !logReduced
+  const visibleEvents = React.useMemo(
+    () => (clearedEvents > 0 ? events.slice(Math.min(clearedEvents, events.length)) : events),
+    [clearedEvents, events],
+  )
+  const clearEvents = () => setClearedEvents(events.length)
   const logPanel = (
     <div className={cn('flex min-h-0 min-w-0 shrink-0 flex-col border-border bg-card', DOCK_PANEL_CLASS[logDock])}>
       <EventLog
-        events={events}
+        events={visibleEvents}
+        onClear={clearEvents}
         onClose={() => setLogOpen(false)}
         onReduce={() => setLogReduced(true)}
         dock={logDock}
@@ -1073,7 +1084,7 @@ export function VerdictWorkspace() {
 
       {logOpen && logReduced ? (
         <div className="fixed right-3 bottom-14 z-40">
-          <LogPeek events={events} onExpand={() => setLogReduced(false)} onClose={() => setLogOpen(false)} />
+          <LogPeek events={visibleEvents} onClear={clearEvents} onExpand={() => setLogReduced(false)} onClose={() => setLogOpen(false)} />
         </div>
       ) : null}
 

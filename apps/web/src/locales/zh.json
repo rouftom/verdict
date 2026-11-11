@@ -108,7 +108,8 @@
     "synthesis": "综合",
     "redFlags": "风险信号",
     "adjustments": "调整",
-    "waiting": "等待此智能体的首个结果。卡片会随运行实时更新。"
+    "waiting": "等待此智能体的首个结果。卡片会随运行实时更新。",
+    "loading": "正在加载智能体..."
   },
   "role": {
     "evaluator": "评估员",
@@ -191,6 +192,7 @@
     "reduce": "缩小运行日志",
     "expand": "展开运行日志",
     "jump": "跳到最新事件",
+    "clear": "清空运行日志",
     "dockBottom": "将运行日志停靠到底部",
     "dockTop": "将运行日志停靠到顶部",
     "dockLeft": "将运行日志停靠到左侧",
