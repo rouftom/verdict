@@ -158,29 +158,39 @@ export function verifierPrompt(
   evaluations: ProjectEvaluation[],
   consensus: ProjectConsensus,
 ): string {
+  const disagreements = new Set(consensus.disagreements)
+  const consensusLines = consensus.criteria
+    .map((criterion) => {
+      const notes = criterion.notes.length > 0 ? ` | ${criterion.notes.join(' · ')}` : ''
+      const flag = disagreements.has(criterion.criterionId) ? ' <- arbitrate: spread above tolerance' : ''
+      return `- ${criterion.criterionId}: ${criterion.score} (spread ${criterion.spread})${flag}${notes}`
+    })
+    .join('\n')
+  const evaluationLines = evaluations
+    .map(
+      (evaluation) =>
+        `${evaluation.agentName} (overall ${evaluation.overall})\n${evaluation.scores
+          .map(
+            (score) =>
+              `  - ${score.criterionId}: ${score.score} (confidence ${score.confidence}) | ${score.rationale} | evidence: ${score.evidence.join('; ') || 'none'}`,
+          )
+          .join('\n')}`,
+    )
+    .join('\n\n')
+
   return `PROJECT ID: ${project.id}
 
 CONSENSUS
 overall: ${consensus.overall} · dispersion: ${consensus.dispersion} · status: ${consensus.status}
-${consensus.criteria.map((criterion) => `- ${criterion.criterionId}: ${criterion.score} (spread ${criterion.spread})`).join('\n')}
+${consensusLines}
 
 SIX EVALUATIONS
-${evaluations
-  .map((evaluation) => `${evaluation.agentName}: ${evaluation.scores.map((score) => `${score.criterionId}=${score.score}`).join(', ')} | ${scoreEvidence(scoreEvidenceList(evaluation))}`)
-  .join('\n')}
+${evaluationLines}
 
 EVIDENCE PACKET
 ${dossier}
 
-Return finalScores for every criterion id, the adjustments you made (with a reason), approved, notes and redFlags.`
-}
-
-function scoreEvidenceList(evaluation: ProjectEvaluation): string[] {
-  return evaluation.scores.flatMap((score) => score.evidence)
-}
-
-function scoreEvidence(list: string[]): string {
-  return list.slice(0, 6).join('; ') || 'no citations'
+Arbitrate every criterion flagged above, and correct a score only when the evidence supports it. An observation marked "score excluded, no citation" is not part of the consensus anymore. Return finalScores for every criterion id, the adjustments you made (with a reason), approved, notes and redFlags.`
 }
 
 export function verifierRankingPrompt(track: string, packets: string[], verifierScores: string): string {

@@ -68,11 +68,15 @@ export async function verifyProject(args: VerifyProjectArgs): Promise<{ verifica
     const bounded = Math.min(consensusScore + limit, Math.max(consensusScore - limit, proposed))
     finalScores[criterion.id] = Math.round(bounded * 100) / 100
     if (Math.abs(bounded - consensusScore) >= 0.5) {
+      const base = output.adjustments.find((entry) => entry.criterionId === criterion.id)?.reason ?? 'Verifier adjustment.'
+      // Say when the rubric limit, not the verifier, decided the final value:
+      // an audit that silently shrinks a proposal looks like no adjustment.
+      const reason = Math.abs(proposed - bounded) >= 0.5 ? `${base} (limited to ${limit} points from the consensus)` : base
       adjustments.push({
         criterionId: criterion.id,
         from: consensusScore,
         to: Math.round(bounded * 100) / 100,
-        reason: output.adjustments.find((entry) => entry.criterionId === criterion.id)?.reason ?? 'Verifier adjustment.',
+        reason,
       })
     }
   }
