@@ -72,6 +72,7 @@ interface WorkspaceSettings {
   evaluatorModels: ModelRef[]
   verifierModels: ModelRef[]
   showRanks: boolean
+  cacheResources: boolean
   maxVideoMinutes: number
   temperature: number
 }
@@ -165,6 +166,7 @@ export function VerdictWorkspace() {
   const [evaluatorModels, setEvaluatorModels] = React.useState<ModelRef[]>([])
   const [verifierModels, setVerifierModels] = React.useState<ModelRef[]>([])
   const [showRanks, setShowRanks] = React.useState(false)
+  const [cacheResources, setCacheResources] = React.useState(true)
   const [anchors, setAnchors] = React.useState<string[]>([])
   const [anchorQuery, setAnchorQuery] = React.useState('')
   const [maxVideoMinutes, setMaxVideoMinutes] = React.useState(20)
@@ -249,6 +251,7 @@ export function VerdictWorkspace() {
         setEvaluatorModels(savedEvaluators.length > 0 ? savedEvaluators : fillModels(evalPool, 6))
         setVerifierModels(savedVerifiers.length > 0 ? savedVerifiers : fillModels(verifierPool, 2))
         setShowRanks(saved.showRanks)
+        setCacheResources(saved.cacheResources ?? true)
         setMaxVideoMinutes(saved.maxVideoMinutes)
         setTemperature(saved.temperature)
       } else {
@@ -271,8 +274,8 @@ export function VerdictWorkspace() {
   // Persist configuration (best effort, localStorage-free).
   React.useEffect(() => {
     if (!restored) return
-    void saveSettings({ evaluatorModels, verifierModels, showRanks, maxVideoMinutes, temperature } satisfies WorkspaceSettings)
-  }, [evaluatorModels, verifierModels, showRanks, maxVideoMinutes, temperature, restored])
+    void saveSettings({ evaluatorModels, verifierModels, showRanks, cacheResources, maxVideoMinutes, temperature } satisfies WorkspaceSettings)
+  }, [evaluatorModels, verifierModels, showRanks, cacheResources, maxVideoMinutes, temperature, restored])
 
   // Debounced validation preview.
   React.useEffect(() => {
@@ -474,6 +477,7 @@ export function VerdictWorkspace() {
           evaluatorModels,
           verifierModels,
           showRanksToAgents: showRanks,
+          cacheResources,
           anchors,
           maxRounds: 2,
           temperature,
@@ -571,6 +575,7 @@ export function VerdictWorkspace() {
     setEvaluatorModels(snapshot.options.evaluatorModels)
     setVerifierModels(snapshot.options.verifierModels)
     setShowRanks(snapshot.options.showRanksToAgents)
+    setCacheResources(snapshot.options.cacheResources ?? true)
     setAnchors(snapshot.options.anchors)
     setMaxVideoMinutes(snapshot.options.maxVideoMinutes)
     setTemperature(snapshot.options.temperature)
@@ -621,6 +626,7 @@ export function VerdictWorkspace() {
       <EventLog
         events={visibleEvents}
         origin={runOrigin}
+        streaming={running && !paused}
         onClear={clearEvents}
         onClose={() => setLogOpen(false)}
         onReduce={() => setLogReduced(true)}
@@ -895,6 +901,15 @@ export function VerdictWorkspace() {
                 <span className="block text-[11px] font-medium">{t('models.showRanks')}</span>
                 <span className="block text-[10px] leading-tight text-muted-foreground">
                   {t('models.showRanksHint')}
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2">
+              <Checkbox id="cache-resources" checked={cacheResources} onCheckedChange={(value) => setCacheResources(value === true)} className="mt-0.5" />
+              <span>
+                <span className="block text-[11px] font-medium">{t('models.cacheResources')}</span>
+                <span className="block text-[10px] leading-tight text-muted-foreground">
+                  {t('models.cacheResourcesHint')}
                 </span>
               </span>
             </label>

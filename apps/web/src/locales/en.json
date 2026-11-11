@@ -55,6 +55,8 @@
     "rankingHarvest": "ranking and harvest",
     "showRanks": "Show supplied ranks to the ranking pass",
     "showRanksHint": "Audit only. Criterion scores are fixed before ranking and are never changed by a supplied rank.",
+    "cacheResources": "Cache downloaded resources",
+    "cacheResourcesHint": "Reuse a repository or video already harvested in this session instead of downloading it again. Clear it to force a fresh download.",
     "maxVideo": "Max video (min)",
     "temperature": "Temperature",
     "persistence": "Runs stream over SSE. Snapshots are kept in this browser's IndexedDB, no account and no server database.",
@@ -223,7 +225,8 @@
     "dockLeft": "Dock run log on the left",
     "dockRight": "Dock run log on the right",
     "copy": "Copy the whole run log",
-    "copied": "Copied"
+    "copied": "Copied",
+    "streaming": "Streaming"
   },
   "sw": {
     "ready": "A new version is ready.",

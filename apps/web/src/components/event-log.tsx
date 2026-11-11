@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/u
 import { ArrowDownToLine, Check, Copy, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Terminal, Trash2, X } from 'lucide-react'
 import type { RunEvent } from '@verdict/shared'
 import { formatElapsed } from '@/lib/run-timeline'
+import { SpiralStream } from './stream-indicator'
 
 export type LogDock = 'bottom' | 'top' | 'left' | 'right'
 
@@ -191,6 +192,7 @@ export function EventLog({
   onDockChange,
   className,
   origin,
+  streaming = false,
 }: {
   events: RunEvent[]
   onClose?: () => void
@@ -201,6 +203,8 @@ export function EventLog({
   className?: string
   /** Timestamp of the run's first event, used for the elapsed column. */
   origin?: string
+  /** Shows the spiral stream indicator at the foot of the log while a run streams. */
+  streaming?: boolean
 }) {
   const { t } = useTranslation()
   const listRef = React.useRef<VirtuosoHandle | null>(null)
@@ -350,6 +354,12 @@ export function EventLog({
           />
         )}
       </CardContent>
+      {streaming ? (
+        <div className="flex shrink-0 items-center gap-1.5 border-t border-border px-2 py-1" aria-live="polite" data-testid="stream-indicator">
+          <SpiralStream className="h-4 w-4 text-brand-primary" />
+          <span className="text-[10px] font-medium text-muted-foreground">{t('log.streaming')}</span>
+        </div>
+      ) : null}
     </Card>
   )
 }

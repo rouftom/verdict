@@ -166,6 +166,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     const evidence = await harvestProject(project, {
       maxVideoMinutes: options.maxVideoMinutes,
       frameIntervalSeconds: options.frameIntervalSeconds,
+      useCache: options.cacheResources,
       signal,
       onLog: (message) => log(message),
     })

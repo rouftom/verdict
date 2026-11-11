@@ -13,6 +13,8 @@ export interface HarvestOptions {
   maxVideoMinutes?: number
   frameIntervalSeconds?: number
   signal?: AbortSignal
+  /** When false, every source is fetched again and the session cache is bypassed. */
+  useCache?: boolean
   onLog?: (message: string) => void
 }
 
@@ -30,6 +32,7 @@ export async function harvestProject(project: ProjectInput, options: HarvestOpti
     try {
       evidence.repo = await harvestRepo(project.github, {
         signal: options.signal,
+        useCache: options.useCache,
         onSource: (source) =>
           options.onLog?.(
             source === 'cache'
@@ -52,6 +55,7 @@ export async function harvestProject(project: ProjectInput, options: HarvestOpti
         maxMinutes: options.maxVideoMinutes,
         frameIntervalSeconds: options.frameIntervalSeconds,
         signal: options.signal,
+        useCache: options.useCache,
         onSource: (source) =>
           options.onLog?.(
             source === 'cache'

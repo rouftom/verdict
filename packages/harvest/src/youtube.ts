@@ -269,6 +269,8 @@ export interface HarvestVideoOptions {
   frameIntervalSeconds?: number
   maxFrames?: number
   signal?: AbortSignal
+  /** When false, the video is downloaded and transcribed again instead of reusing the session cache. */
+  useCache?: boolean
   /** Tells the caller whether the artifact came from the session cache. */
   onSource?: (source: 'cache' | 'network') => void
 }
@@ -304,6 +306,11 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
   const requestedHeight = Number(env('YTDLP_MAX_HEIGHT') || 360)
   const maxHeight = Number.isFinite(requestedHeight) && requestedHeight >= 144 ? Math.round(requestedHeight) : 360
   const settings: VideoSettings = { maxMinutes, frameIntervalSeconds: frameInterval, maxFrames, maxHeight }
+
+  if (options.useCache === false) {
+    options.onSource?.('network')
+    return harvestVideoUncached(ref, settings, options)
+  }
 
   const { value: artifact, hit } = await videoCache.load(
     videoCacheKey(ref.id, settings),

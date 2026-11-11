@@ -167,6 +167,8 @@ interface LanguageMap {
 export interface HarvestRepoOptions {
   maxBytes?: number
   signal?: AbortSignal
+  /** When false, the tarball is downloaded again instead of reusing the session cache. */
+  useCache?: boolean
   /** Tells the caller whether the artifact came from the session cache. */
   onSource?: (source: 'cache' | 'network') => void
 }
@@ -189,6 +191,10 @@ export async function harvestRepo(value: string, options: HarvestRepoOptions = {
   if (!ref) throw new Error(`Unsupported repository URL: ${value}`)
 
   const maxBytes = options.maxBytes ?? Number(env('MAX_REPO_BYTES') || 60 * 1024 * 1024)
+  if (options.useCache === false) {
+    options.onSource?.('network')
+    return harvestRepoUncached(ref, maxBytes, options)
+  }
   const { value: artifact, hit } = await repoCache.load(
     repoCacheKey(ref.owner, ref.repo, maxBytes),
     () => harvestRepoUncached(ref, maxBytes, options),
