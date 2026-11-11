@@ -55,6 +55,8 @@
     "rankingHarvest": "classement et collecte",
     "showRanks": "Montrer les rangs fournis à la passe de classement",
     "showRanksHint": "Audit uniquement. Les scores des critères sont figés avant le classement et ne changent jamais à cause d'un rang fourni.",
+    "cacheResources": "Mettre en cache les ressources téléchargées",
+    "cacheResourcesHint": "Réutiliser un dépôt ou une vidéo déjà collectés pendant cette session au lieu de les retélécharger. Décochez pour forcer un nouveau téléchargement.",
     "maxVideo": "Vidéo max (min)",
     "temperature": "Température",
     "persistence": "Les exécutions arrivent en SSE. Les instantanés restent dans l'IndexedDB de ce navigateur, sans compte ni base de données serveur.",
@@ -223,7 +225,8 @@
     "dockLeft": "Ancrer le journal à gauche",
     "dockRight": "Ancrer le journal à droite",
     "copy": "Copier tout le journal",
-    "copied": "Copié"
+    "copied": "Copié",
+    "streaming": "Flux en direct"
   },
   "sw": {
     "ready": "Une nouvelle version est prête.",

@@ -54,6 +54,8 @@
     "rankingHarvest": "排名与采集",
     "showRanks": "向排名环节展示提供的名次",
     "showRanksHint": "仅用于审计。标准分数在排名前已固定，绝不会因提供的名次而改变。",
+    "cacheResources": "缓存已下载的资源",
+    "cacheResourcesHint": "复用本次会话中已采集的仓库或视频，避免再次下载。取消勾选可强制重新下载。",
     "maxVideo": "视频上限（分钟）",
     "temperature": "温度",
     "persistence": "运行通过 SSE 流式传输。快照仅保存在此浏览器的 IndexedDB 中，无需账号，也没有服务器数据库。",
@@ -211,7 +213,8 @@
     "dockLeft": "将运行日志停靠到左侧",
     "dockRight": "将运行日志停靠到右侧",
     "copy": "复制完整运行日志",
-    "copied": "已复制"
+    "copied": "已复制",
+    "streaming": "正在流式输出"
   },
   "sw": {
     "ready": "新版本已就绪。",

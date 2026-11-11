@@ -28,6 +28,7 @@ export const runOptionsSchema = z.object({
   verifierModels: z.array(modelRefSchema).default([]),
   /** Kept for the operator's audit trail. Ranks never enter scoring prompts. */
   showRanksToAgents: z.boolean().default(false),
+  cacheResources: z.boolean().default(true),
   anchors: z.array(z.string()).default([]),
   maxRounds: z.number().int().min(1).max(3).default(2),
   temperature: z.number().min(0).max(1).default(0.2),

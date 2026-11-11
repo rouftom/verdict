@@ -32,6 +32,7 @@ export interface RunRequest {
     evaluatorModels: ModelRef[]
     verifierModels: ModelRef[]
     showRanksToAgents: boolean
+    cacheResources: boolean
     anchors: string[]
     maxRounds: number
     temperature: number

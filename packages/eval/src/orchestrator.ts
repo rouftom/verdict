@@ -166,6 +166,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
     const evidence = await harvestProject(project, {
       maxVideoMinutes: options.maxVideoMinutes,
       frameIntervalSeconds: options.frameIntervalSeconds,
+      useCache: options.cacheResources,
       signal,
       onLog: (message) => log(message),
     })
@@ -367,6 +368,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
 
   // 7. Final ranking and report
+  emit('stage', { message: 'reporting' })
   const finalByTrack = new Map<string, RankedProject[]>()
   await mapLimit([...tracks.entries()], 2, async ([track, projects]) => {
     const projectVerifications = verifications.filter((verification) => projects.some((project) => project.id === verification.projectId))

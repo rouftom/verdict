@@ -380,6 +380,8 @@ export interface RunOptions {
   evaluatorModels: ModelRef[]
   verifierModels: ModelRef[]
   showRanksToAgents: boolean
+  /** Reuse a repository or video harvested earlier in this session. */
+  cacheResources: boolean
   anchors: string[]
   maxRounds: number
   temperature: number
