@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { listProviders, modelPool, resetProviderModelCache } from './registry'
+import {
+  listProviders,
+  modelPool,
+  resetProviderModelCache,
+  rewriteCompletionTokens,
+  usesCompletionTokens,
+  withCompletionTokens,
+} from './registry'
 
 const ENV_KEYS = [
   'MODEL_API_KEY',
@@ -203,5 +210,64 @@ describe('provider catalog', () => {
       { provider: 'meta', model: 'muse-spark-1.3' },
       { provider: 'meta', model: 'muse-wonder-1.0' },
     ])
+  })
+})
+
+describe('completion token compatibility', () => {
+  test('reasoning models are recognised behind a gateway prefix', () => {
+    expect(usesCompletionTokens('openai-gpt-6-luna')).toBe(true)
+    expect(usesCompletionTokens('openai/gpt-5.1')).toBe(true)
+    expect(usesCompletionTokens('gpt-6')).toBe(true)
+    expect(usesCompletionTokens('o3-mini')).toBe(true)
+    expect(usesCompletionTokens('o4-mini-2025-04-16')).toBe(true)
+  })
+
+  test('chat models keep max_tokens', () => {
+    expect(usesCompletionTokens('gpt-4o')).toBe(false)
+    expect(usesCompletionTokens('openai-gpt-4.1')).toBe(false)
+    expect(usesCompletionTokens('deepseek:v4.1@flash-1017')).toBe(false)
+    expect(usesCompletionTokens('anthropic-claude-sonnet-5-5')).toBe(false)
+  })
+
+  test('rewrites max_tokens only for a reasoning model request', () => {
+    const body = JSON.stringify({ model: 'openai-gpt-6-luna', max_tokens: 8192, messages: [] })
+    expect(JSON.parse(rewriteCompletionTokens(body))).toEqual({
+      model: 'openai-gpt-6-luna',
+      max_completion_tokens: 8192,
+      messages: [],
+    })
+  })
+
+  test('keeps an explicit max_completion_tokens and drops max_tokens', () => {
+    const body = JSON.stringify({ model: 'openai-gpt-6-luna', max_tokens: 10, max_completion_tokens: 20 })
+    expect(JSON.parse(rewriteCompletionTokens(body))).toEqual({
+      model: 'openai-gpt-6-luna',
+      max_completion_tokens: 20,
+    })
+  })
+
+  test('leaves other bodies untouched', () => {
+    const chat = JSON.stringify({ model: 'openai-gpt-4o', max_tokens: 4096 })
+    expect(rewriteCompletionTokens(chat)).toBe(chat)
+    const silent = JSON.stringify({ model: 'gpt-6' })
+    expect(rewriteCompletionTokens(silent)).toBe(silent)
+    expect(rewriteCompletionTokens('not json')).toBe('not json')
+    expect(rewriteCompletionTokens('[1,2]')).toBe('[1,2]')
+  })
+
+  test('the fetch wrapper rewrites the request before sending it', async () => {
+    let sent: unknown
+    const fake = (async (_input: unknown, init?: RequestInit) => {
+      sent = init?.body
+      return new Response('{}', { status: 200 })
+    }) as unknown as typeof fetch
+
+    const wrapped = withCompletionTokens(fake)
+    await wrapped('https://runware.test/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'openai-gpt-6-luna', max_tokens: 64 }),
+    })
+
+    expect(JSON.parse(String(sent))).toEqual({ model: 'openai-gpt-6-luna', max_completion_tokens: 64 })
   })
 })
