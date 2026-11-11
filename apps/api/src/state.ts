@@ -50,23 +50,24 @@ export function parseInputs(input: CreateRunInput): ParsedInputs {
   }
 }
 
-function resolveModels(): { evaluators: ModelRef[]; verifiers: ModelRef[] } {
-  const evaluators = modelPool('EVAL_MODELS', 6)
-  const verifiers = modelPool('VERIFIER_MODELS', 2)
+async function resolveModels(): Promise<{ evaluators: ModelRef[]; verifiers: ModelRef[] }> {
+  const evaluators = await modelPool('EVAL_MODELS', 6)
+  const verifiers = await modelPool('VERIFIER_MODELS', 2)
   return { evaluators, verifiers }
 }
 
-export function createRun(input: CreateRunInput): RunSnapshot {
+export async function createRun(input: CreateRunInput): Promise<RunSnapshot> {
   const parsed = parseInputs(input)
   const options = runOptionsSchema.parse(input.options ?? {})
-  const pools = resolveModels()
+  const pools = await resolveModels()
 
   const evaluatorModels = options.evaluatorModels.length > 0 ? options.evaluatorModels : pools.evaluators
   const verifierModels = options.verifierModels.length > 0 ? options.verifierModels : pools.verifiers
-  if (evaluatorModels.length === 0) throw new Error('No evaluator model is configured. Set MODEL_API_KEY or another provider key.')
-  if (verifierModels.length === 0) throw new Error('No verifier model is configured. Set MODEL_API_KEY or another provider key.')
+  if (evaluatorModels.length === 0) throw new Error('No evaluator model is configured. Add a provider key or a model to the provider catalog.')
+  if (verifierModels.length === 0) throw new Error('No verifier model is configured. Add a provider key or a model to the provider catalog.')
 
-  const configured = new Set(listProviders().filter((provider) => provider.configured).map((provider) => provider.id))
+  const providers = await listProviders()
+  const configured = new Set(providers.filter((provider) => provider.configured).map((provider) => provider.id))
   for (const model of [...evaluatorModels, ...verifierModels]) {
     if (!configured.has(model.provider)) throw new Error(`Provider "${model.provider}" is not configured.`)
   }

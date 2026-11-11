@@ -74,6 +74,7 @@
     "noProvider": "No provider is configured. Add a key to .env (for example MODEL_API_KEY or OPENAI_API_KEY), then reload.",
     "hidden_one": "{{count}} provider without a key is hidden.",
     "hidden_other": "{{count}} providers without a key are hidden.",
+    "catalogError": "{{providers}}: the model endpoint failed, so the list is empty or comes from the env fallback.",
     "modelAria": "{{slot}} model {{index}}",
     "reasoningAria": "{{slot}} reasoning effort {{index}}"
   },

@@ -70,6 +70,7 @@
     "noMatch": "没有匹配的已配置模型。",
     "noProvider": "未配置任何提供方。请在 .env 中添加密钥（例如 MODEL_API_KEY 或 OPENAI_API_KEY），然后重新加载。",
     "hidden_other": "已隐藏 {{count}} 个没有密钥的提供方。",
+    "catalogError": "{{providers}}：模型端点失败，列表为空或来自环境变量回退。",
     "modelAria": "{{slot}}模型 {{index}}",
     "reasoningAria": "{{slot}}推理强度 {{index}}"
   },

@@ -262,16 +262,21 @@ pinned run bar, the collapsed state, keyboard focus and the absence of
 - After a merge, delete the branch, sync the base branch and report the link.
 - Keep `apps/web/AGENTS.md` and other generated files out of commits.
 
-## Adding a provider or model
+## Adding a provider or a model
 
-1. Declare the provider and its models in `packages/providers/src/registry.ts`.
+1. Declare the provider, its key, its base URL and its model discovery in
+   `packages/providers/src/registry.ts`. Model lists are never hardcoded: the
+   registry reads each provider's model endpoint and treats `<PROVIDER>_MODELS`
+   as a fallback only.
 2. Map the reasoning effort in `packages/providers/src/reasoning.ts` and its
-   tests.
+   tests. Runware ids can arrive hyphenated from `/v1/models`, so family
+   detection accepts both `:` and `-`.
 3. Add the variable names to `.env.example` and to the README environment
    section. Never add values.
-4. Confirm the model pickers show the provider only when it is configured.
+4. Confirm the model pickers show the provider only when it is configured, and
+   that a failed endpoint surfaces the provider name instead of an empty list.
 5. Run `bun run test`, because the registry and reasoning tests cover the public
-   shape.
+   shape, discovery, the fallback and the model pool.
 
 ## Adding an input format or criterion
 
@@ -286,6 +291,9 @@ rubric. Preserve the rule that supplied ranks never enter scoring prompts.
   `127.0.0.1`, and check `WEB_ORIGIN` and `NEXT_PUBLIC_API_URL`.
 - **A provider is missing from the pickers**: its key is not configured in the
   API process. The UI only shows configured providers.
+- **A configured provider has no models**: its model endpoint failed. The Models
+  section names it, `<PROVIDER>_MODELS` is used as the fallback, and
+  `GET /providers?refresh=1` retries without waiting for the cache.
 - **A stale bundle in development**: run the app in dev mode, where any service
   worker is unregistered and caches are cleared. Hard-reload once if a worker
   from a previous production test is still controlling the page.

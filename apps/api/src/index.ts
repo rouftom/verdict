@@ -29,19 +29,25 @@ app.get('/health', async () => ({
   runs: listRuns().length,
 }))
 
-app.get('/providers', async () => ({
-  providers: listProviders(),
-  /** The env-configured starting pool; the UI uses it for a fresh workspace. */
-  defaults: {
-    evaluators: modelPool('EVAL_MODELS', 6),
-    verifiers: modelPool('VERIFIER_MODELS', 2),
-  },
-  /** Personas only: the pipeline graph labels one node per agent. */
-  agents: {
-    evaluators: EVALUATORS.map((agent) => ({ ...agent })),
-    verifiers: VERIFIERS.map((agent) => ({ ...agent })),
-  },
-}))
+app.get('/providers', async (request) => {
+  const query = z.object({ refresh: z.string().optional() }).safeParse(request.query)
+  const force = query.success && query.data.refresh === '1'
+  const providers = await listProviders({ force })
+  const defaults = {
+    evaluators: await modelPool('EVAL_MODELS', 6),
+    verifiers: await modelPool('VERIFIER_MODELS', 2),
+  }
+  return {
+    providers,
+    /** The env-configured starting pool; the UI uses it for a fresh workspace. */
+    defaults,
+    /** Personas only: the pipeline graph labels one node per agent. */
+    agents: {
+      evaluators: EVALUATORS.map((agent) => ({ ...agent })),
+      verifiers: VERIFIERS.map((agent) => ({ ...agent })),
+    },
+  }
+})
 
 app.post('/parse/manifest', async (request, reply) => {
   const schema = z.object({ text: z.string().min(1) })
@@ -74,7 +80,7 @@ app.post('/runs', async (request, reply) => {
     })
   }
   try {
-    const run = createRun(body.data)
+    const run = await createRun(body.data)
     return reply.code(201).send({
       id: run.id,
       status: run.status,

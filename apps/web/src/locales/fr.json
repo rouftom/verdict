@@ -74,6 +74,7 @@
     "noProvider": "Aucun fournisseur n'est configuré. Ajoutez une clé dans .env (par exemple MODEL_API_KEY ou OPENAI_API_KEY), puis rechargez.",
     "hidden_one": "{{count}} fournisseur sans clé est masqué.",
     "hidden_other": "{{count}} fournisseurs sans clé sont masqués.",
+    "catalogError": "{{providers}} : l'endpoint de modèles a échoué, la liste est vide ou vient du repli env.",
     "modelAria": "modèle {{index}} du {{slot}}",
     "reasoningAria": "effort de raisonnement {{index}} du {{slot}}"
   },
