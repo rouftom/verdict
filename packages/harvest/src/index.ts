@@ -7,6 +7,7 @@ export * from './youtube'
 export * from './transcribe'
 export * from './env'
 export * from './proc'
+export * from './cache'
 
 export interface HarvestOptions {
   maxVideoMinutes?: number
@@ -27,7 +28,15 @@ export async function harvestProject(project: ProjectInput, options: HarvestOpti
   if (project.github) {
     options.onLog?.(`[${project.name}] repository: ${project.github}`)
     try {
-      evidence.repo = await harvestRepo(project.github, { signal: options.signal })
+      evidence.repo = await harvestRepo(project.github, {
+        signal: options.signal,
+        onSource: (source) =>
+          options.onLog?.(
+            source === 'cache'
+              ? `[${project.name}] repository reused from the session cache, no download`
+              : `[${project.name}] repository downloaded`,
+          ),
+      })
       options.onLog?.(`[${project.name}] repository indexed: ${evidence.repo.filesCount} files, ${evidence.repo.loc} LOC`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -43,6 +52,12 @@ export async function harvestProject(project: ProjectInput, options: HarvestOpti
         maxMinutes: options.maxVideoMinutes,
         frameIntervalSeconds: options.frameIntervalSeconds,
         signal: options.signal,
+        onSource: (source) =>
+          options.onLog?.(
+            source === 'cache'
+              ? `[${project.name}] video reused from the session cache, no download`
+              : `[${project.name}] video downloaded`,
+          ),
       })
       const segments = evidence.video.transcript?.segments.length ?? 0
       options.onLog?.(`[${project.name}] video indexed: ${segments} transcript segments, ${evidence.video.frames.length} frames`)

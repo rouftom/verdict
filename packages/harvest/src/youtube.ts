@@ -4,6 +4,7 @@ import type { FrameEvidence, VideoArtifact } from '@verdict/shared'
 import { cookiesFile, env, ffmpegPath, hasYtdlp, temporaryDirectory, removeDirectory, ytdlpPath } from './env'
 import { run } from './proc'
 import { transcribeVideo } from './transcribe'
+import { createSessionCache, videoCacheKey } from './cache'
 
 export interface YouTubeRef {
   id: string
@@ -268,15 +269,32 @@ export interface HarvestVideoOptions {
   frameIntervalSeconds?: number
   maxFrames?: number
   signal?: AbortSignal
+  /** Tells the caller whether the artifact came from the session cache. */
+  onSource?: (source: 'cache' | 'network') => void
 }
 
-/** Download a public video, extract frames, then transcribe it. */
+interface VideoSettings {
+  maxMinutes: number
+  frameIntervalSeconds: number
+  maxFrames: number
+  maxHeight: number
+}
+
+/** Approximate memory footprint of an artifact, used by the LRU bound. */
+function weighVideo(artifact: VideoArtifact): number {
+  return (artifact.transcript?.text.length ?? 0) + artifact.frames.length * 256 + 2_048
+}
+
+const videoCache = createSessionCache<VideoArtifact>()
+
+/**
+ * Download a public video, extract frames, then transcribe it. A second
+ * harvest of the same video with the same sampling options reuses the first
+ * one: the download and the transcription are the expensive parts.
+ */
 export async function harvestVideo(value: string, options: HarvestVideoOptions = {}): Promise<VideoArtifact> {
   const ref = parseYouTubeUrl(value)
   if (!ref) throw new Error(`Unsupported video URL: ${value}`)
-  if (!(await hasYtdlp())) {
-    throw new Error(`yt-dlp is not available (YTDLP_PATH=${ytdlpPath()}). Install it or set YTDLP_COOKIES_BASE64/YTDLP_PATH.`)
-  }
 
   const maxMinutes = options.maxMinutes ?? Number(env('MAX_VIDEO_MINUTES') || 20)
   const frameInterval = Math.max(2, options.frameIntervalSeconds ?? 20)
@@ -285,6 +303,23 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
   // enough. `YTDLP_MAX_HEIGHT` raises it when a closer read is needed.
   const requestedHeight = Number(env('YTDLP_MAX_HEIGHT') || 360)
   const maxHeight = Number.isFinite(requestedHeight) && requestedHeight >= 144 ? Math.round(requestedHeight) : 360
+  const settings: VideoSettings = { maxMinutes, frameIntervalSeconds: frameInterval, maxFrames, maxHeight }
+
+  const { value: artifact, hit } = await videoCache.load(
+    videoCacheKey(ref.id, settings),
+    () => harvestVideoUncached(ref, settings, options),
+    weighVideo,
+  )
+  options.onSource?.(hit ? 'cache' : 'network')
+  return artifact
+}
+
+async function harvestVideoUncached(ref: YouTubeRef, settings: VideoSettings, options: HarvestVideoOptions): Promise<VideoArtifact> {
+  const { maxMinutes, frameIntervalSeconds: frameInterval, maxFrames, maxHeight } = settings
+  if (!(await hasYtdlp())) {
+    throw new Error(`yt-dlp is not available (YTDLP_PATH=${ytdlpPath()}). Install it or set YTDLP_COOKIES_BASE64/YTDLP_PATH.`)
+  }
+
   const workspace = await temporaryDirectory('verdict-video')
 
   try {

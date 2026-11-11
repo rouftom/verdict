@@ -4,6 +4,7 @@ import * as tar from 'tar'
 import type { CommitInfo, FileEntry, RepoArtifact } from '@verdict/shared'
 import { env, temporaryDirectory, removeDirectory } from './env'
 import { humanBytes } from './proc'
+import { createSessionCache, repoCacheKey } from './cache'
 
 export interface RepoRef {
   owner: string
@@ -166,14 +167,38 @@ interface LanguageMap {
 export interface HarvestRepoOptions {
   maxBytes?: number
   signal?: AbortSignal
+  /** Tells the caller whether the artifact came from the session cache. */
+  onSource?: (source: 'cache' | 'network') => void
 }
 
-/** Fetch a public repository as a tarball, then index it. No code is executed. */
+/** Approximate memory footprint of an artifact, used by the LRU bound. */
+function weighRepo(artifact: RepoArtifact): number {
+  const keyFiles = artifact.keyFiles.reduce((total, file) => total + file.content.length, 0)
+  return artifact.readme.length + keyFiles + artifact.files.length * 96 + artifact.tree.length
+}
+
+const repoCache = createSessionCache<RepoArtifact>()
+
+/**
+ * Fetch a public repository as a tarball, then index it. No code is executed.
+ * A second harvest of the same repository in the same session reuses the first
+ * one instead of downloading the tarball again.
+ */
 export async function harvestRepo(value: string, options: HarvestRepoOptions = {}): Promise<RepoArtifact> {
   const ref = parseRepoUrl(value)
   if (!ref) throw new Error(`Unsupported repository URL: ${value}`)
 
   const maxBytes = options.maxBytes ?? Number(env('MAX_REPO_BYTES') || 60 * 1024 * 1024)
+  const { value: artifact, hit } = await repoCache.load(
+    repoCacheKey(ref.owner, ref.repo, maxBytes),
+    () => harvestRepoUncached(ref, maxBytes, options),
+    weighRepo,
+  )
+  options.onSource?.(hit ? 'cache' : 'network')
+  return artifact
+}
+
+async function harvestRepoUncached(ref: RepoRef, maxBytes: number, options: HarvestRepoOptions): Promise<RepoArtifact> {
   const meta = await githubJson<RepoMeta>(`https://api.github.com/repos/${ref.owner}/${ref.repo}`, options.signal)
   if (!meta && !env('GITHUB_TOKEN')) {
     // The API can be rate-limited without a token; the tarball may still work.
