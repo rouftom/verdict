@@ -14,6 +14,7 @@ import {
   type RunOptions,
   type RunSnapshot,
   type Rubric,
+  type StageOneResult,
 } from '@verdict/shared'
 import { runEvaluation } from '@verdict/eval'
 import { listProviders, modelPool, type ModelRef } from '@verdict/providers'
@@ -129,6 +130,7 @@ export async function createRun(input: CreateRunInput): Promise<RunSnapshot> {
     manifest: parsed.manifest,
     rubric: parsed.rubric,
     evidence: [],
+    stageOne: [],
     evaluations: [],
     revisions: [],
     consensus: [],
@@ -185,7 +187,10 @@ async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verif
         pushEvent(snapshot, event)
         switch (event.type) {
           case 'stage':
-            snapshot.status = event.message === 'harvesting' ? 'harvesting' : event.message === 'evaluating' ? 'evaluating' : event.message === 'reviewing' ? 'reviewing' : event.message === 'consensus' ? 'consensus' : event.message === 'verifying' ? 'verifying' : snapshot.status
+            snapshot.status = event.message === 'harvesting' ? 'harvesting' : event.message === 'screening' ? 'screening' : event.message === 'evaluating' ? 'evaluating' : event.message === 'reviewing' ? 'reviewing' : event.message === 'consensus' ? 'consensus' : event.message === 'verifying' ? 'verifying' : snapshot.status
+            break
+          case 'screening':
+            upsert(snapshot.stageOne, event.data as StageOneResult)
             break
           case 'evaluation':
             upsert(snapshot.evaluations, event.data as ProjectEvaluation)

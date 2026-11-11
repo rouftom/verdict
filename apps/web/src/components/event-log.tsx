@@ -44,6 +44,11 @@ const TONES: Record<RunEvent['type'], EventTone> = {
     chip: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
     row: '',
   },
+  screening: {
+    text: 'text-fuchsia-700 dark:text-fuchsia-300',
+    chip: 'bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300',
+    row: '',
+  },
   evaluation: {
     text: 'text-violet-700 dark:text-violet-300',
     chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',

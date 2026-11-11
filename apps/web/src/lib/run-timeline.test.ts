@@ -44,6 +44,15 @@ describe('stageTimings', () => {
     const stages = stageTimings([...events, event(at(100), 'stage', 'verifying')])
     expect(stages.get('verify')?.start).toBe(Date.parse(at(60)))
   })
+
+  test('times the Stage One gate between harvest and evaluation', () => {
+    const stages = stageTimings([
+      event(at(0), 'stage', 'harvesting'),
+      event(at(10), 'stage', 'screening'),
+      event(at(20), 'stage', 'evaluating'),
+    ])
+    expect(stages.get('stageOne')).toEqual({ start: Date.parse(at(10)), end: Date.parse(at(20)) })
+  })
 })
 
 describe('reportTiming', () => {
@@ -82,6 +91,10 @@ describe('statusFromEvents', () => {
 
   test('is undefined without stage events', () => {
     expect(statusFromEvents([event(at(0), 'log', 'started')])).toBeUndefined()
+  })
+
+  test('rebuilds the Stage One step', () => {
+    expect(statusFromEvents([event(at(0), 'stage', 'harvesting'), event(at(10), 'stage', 'screening')])).toBe('screening')
   })
 })
 

@@ -18,19 +18,28 @@ browser keeps snapshots and the last workspace configuration in IndexedDB.
 
 These are product promises, not implementation details. Do not weaken them.
 
-1. **Six evaluator agents** score every project independently, and every
+1. **Stage One gate**: before any scoring, every project is screened pass or
+   fail on two statements: it reasonably fits a published track it entered, and
+   it uses the event's AI tooling at runtime. The gate is deliberately strict
+   and generic: prompts never name a vendor or a model. Only projects that pass
+   are evaluated, reviewed, ranked or verified. Failed projects stay visible in
+   the results with their rationale. A screening call that cannot complete
+   fails open, with an explicit manual-review note, so a broken call never
+   silently drops a project.
+2. **Six evaluator agents** score every project independently, and every
    evaluator scores the same four criteria:
    Impact 30%, Use of AI Tooling 25%, Technical Depth and Execution 20%,
    Demo 25%.
-2. **One cross-review round**: each evaluator sees the other five, anonymised,
+3. **One cross-review round**: each evaluator sees the other five, anonymised,
    and may revise with a written justification.
-3. **Consensus**: trimmed mean per criterion, spread and MAD dispersion.
-4. **Comparative ranking** per track, aggregated by Borda count. A project can
+4. **Consensus**: trimmed mean per criterion, spread and MAD dispersion.
+5. **Comparative ranking** per track, aggregated by Borda count. A project can
    enter several tracks through `tracks`, so it is ranked in each of them. A
-   ranking is always produced, even for a single project.
-5. **Two verifier agents** audit the evaluations, then reconcile criterion
+   ranking is always produced, even for a single project, and a track with no
+   passing project keeps its empty ranking so the track selector still lists it.
+6. **Two verifier agents** audit the evaluations, then reconcile criterion
    scores and the per-track ranking.
-6. **Report**: final scores, ranking, supplied-rank delta, harvest errors and
+7. **Report**: final scores, ranking, supplied-rank delta, harvest errors and
    token usage.
 
 Supplied ranks are optional and **never** influence criterion scores. A supplied
@@ -41,6 +50,10 @@ Duplicate supplied ranks are normal across tracks: the manifest parser reports
 them as one generic warning and never lists the affected projects or tracks.
 Up to three projects can be chosen as calibration anchors. Anchors get no bonus
 and may come from another track.
+
+Every model call is bounded (five minutes) and still honours run cancellation,
+so a provider that never answers cannot freeze the pipeline. A failed call is
+recorded as an error event and the run moves on.
 
 Repository and video content is untrusted data. The prompts say so explicitly.
 Never let harvested text become an instruction.

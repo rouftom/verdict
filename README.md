@@ -28,16 +28,19 @@
 Upload a manifest of projects, the rules, and a rubric. `verdict` harvests each
 project's GitHub repository and demo video, then runs:
 
-1. **6 evaluator agents**: each scores the *same* weighted criteria
+1. **Stage One gate**: pass or fail per project, on track fit and runtime use of
+   the event AI tooling. Only projects that pass are scored; failed projects stay
+   in the results with their rationale.
+2. **6 evaluator agents**: each scores the *same* weighted criteria
    independently.
-2. **1 cross-review round**: every agent sees the other five, anonymised, and
+3. **1 cross-review round**: every agent sees the other five, anonymised, and
    may revise with a written justification.
-3. **Consensus**: trimmed mean per criterion, spread, and MAD dispersion.
-4. **Comparative ranking**: one ordinal pass per track, aggregated by Borda
+4. **Consensus**: trimmed mean per criterion, spread, and MAD dispersion.
+5. **Comparative ranking**: one ordinal pass per track, aggregated by Borda
    count. Ranking is always produced, even with a single project.
-5. **2 verifier agents**: audit the six evaluations, then reconcile final
+6. **2 verifier agents**: audit the six evaluations, then reconcile final
    criterion scores and the per-track ranking.
-6. **Report**: final scores, ranking, supplied-rank delta, evidence errors,
+7. **Report**: final scores, ranking, supplied-rank delta, evidence errors,
    token usage.
 
 No authentication, no database. Run snapshots and the last workspace

@@ -33,6 +33,7 @@ import type {
   ProjectVerification,
   RunEvent,
   RunStatus,
+  StageOneResult,
 } from '@verdict/shared'
 import { agentTimings, durationOf, reportTiming, stageTimings, statusFromEvents, type Timing } from '@/lib/run-timeline'
 
@@ -362,6 +363,7 @@ const nodeTypes = { stage: StageNode, agent: AgentNode }
 
 const STAGES = [
   { id: 'harvest', titleKey: 'pipeline.harvest', detailKey: 'pipeline.harvestDetail' },
+  { id: 'stageOne', titleKey: 'pipeline.stageOne', detailKey: 'pipeline.stageOneDetail' },
   { id: 'review', titleKey: 'pipeline.review', detailKey: 'pipeline.reviewDetail' },
   { id: 'consensus', titleKey: 'pipeline.consensus', detailKey: 'pipeline.consensusDetail' },
   { id: 'rank', titleKey: 'pipeline.rank', detailKey: 'pipeline.rankDetail' },
@@ -370,7 +372,7 @@ const STAGES = [
 
 type Phase = 'before' | 'active' | 'after'
 
-const ORDER: RunStatus[] = ['queued', 'parsing', 'harvesting', 'evaluating', 'reviewing', 'consensus', 'verifying', 'done']
+const ORDER: RunStatus[] = ['queued', 'parsing', 'harvesting', 'screening', 'evaluating', 'reviewing', 'consensus', 'verifying', 'done']
 
 function phaseOf(stage: 'evaluate' | 'review' | 'verify', status?: RunStatus): Phase {
   if (!status || status === 'failed' || status === 'cancelled') return 'before'
@@ -387,16 +389,18 @@ function statusIndex(status: RunStatus | undefined): number {
       return -1
     case 'harvesting':
       return 0
-    case 'evaluating':
+    case 'screening':
       return 1
-    case 'reviewing':
+    case 'evaluating':
       return 2
-    case 'consensus':
+    case 'reviewing':
       return 3
-    case 'verifying':
+    case 'consensus':
       return 4
-    case 'done':
+    case 'verifying':
       return 5
+    case 'done':
+      return 6
     default:
       return -1
   }
@@ -459,6 +463,7 @@ export interface PipelineGraphProps {
   evaluations: ProjectEvaluation[]
   revisions: ProjectRevision[]
   verifications: ProjectVerification[]
+  stageOne?: StageOneResult[]
   agents?: { evaluators: AgentInfo[]; verifiers: AgentInfo[] }
   evaluatorModels: ModelRef[]
   verifierModels: ModelRef[]
@@ -478,6 +483,7 @@ export function PipelineGraph({
   evaluations,
   revisions,
   verifications,
+  stageOne = [],
   agents,
   evaluatorModels,
   verifierModels,
@@ -565,7 +571,7 @@ export function PipelineGraph({
       // The report is not a stage event: it runs from the end of the last
       // stage to its own event, never from the harvest start.
       if (id === 'report') return reportTiming(events)
-      if (id === 'harvest' || id === 'review' || id === 'consensus') return stages.get(id)
+      if (id === 'harvest' || id === 'stageOne' || id === 'review' || id === 'consensus') return stages.get(id)
       if (id === 'rank') {
         const start = stages.get('consensus')?.end
         if (start === undefined) return undefined
@@ -589,18 +595,34 @@ export function PipelineGraph({
 
     const stageNodes = STAGES.map((stage) => {
       let stageStatus: StageStatus = 'idle'
-      const index = stage.id === 'harvest' ? 0 : stage.id === 'review' ? 2 : stage.id === 'consensus' ? 3 : stage.id === 'rank' ? 4 : 5
+      const index =
+        stage.id === 'harvest'
+          ? 0
+          : stage.id === 'stageOne'
+            ? 1
+            : stage.id === 'review'
+              ? 3
+              : stage.id === 'consensus'
+                ? 4
+                : stage.id === 'rank'
+                  ? 5
+                  : 6
       if (failed && index === Math.max(0, activeIndex)) stageStatus = 'error'
       else if (current === 'done' || hasReport) stageStatus = 'done'
       else if (index < activeIndex) stageStatus = 'done'
       else if (index === activeIndex) stageStatus = 'active'
 
       const detail =
-        stage.id === 'review' && revisions.length > 0
-          ? t('pipeline.revisionCount', { count: revisions.length })
-          : stage.id === 'report' && hasReport
-            ? t('pipeline.reportDetail')
-            : t(stage.detailKey)
+        stage.id === 'stageOne' && stageOne.length > 0
+          ? t('pipeline.stageOneCount', {
+              passed: stageOne.filter((result) => result.passed).length,
+              total: stageOne.length,
+            })
+          : stage.id === 'review' && revisions.length > 0
+            ? t('pipeline.revisionCount', { count: revisions.length })
+            : stage.id === 'report' && hasReport
+              ? t('pipeline.reportDetail')
+              : t(stage.detailKey)
       const duration = durationOf(stageTimingFor(stage.id), now)
 
       return {
@@ -608,14 +630,16 @@ export function PipelineGraph({
         type: 'stage',
         position:
           stage.id === 'harvest'
-            ? { x: 0, y: 96 }
-            : stage.id === 'review'
-              ? { x: 596, y: 96 }
-              : stage.id === 'consensus'
-                ? { x: 786, y: 96 }
-                : stage.id === 'rank'
-                  ? { x: 976, y: 96 }
-                  : { x: 1356, y: 96 },
+            ? { x: -200, y: 96 }
+            : stage.id === 'stageOne'
+              ? { x: 0, y: 96 }
+              : stage.id === 'review'
+                ? { x: 596, y: 96 }
+                : stage.id === 'consensus'
+                  ? { x: 786, y: 96 }
+                  : stage.id === 'rank'
+                    ? { x: 976, y: 96 }
+                    : { x: 1356, y: 96 },
         data: { title: t(stage.titleKey), detail, status: stageStatus, ...(duration ? { duration } : {}) } satisfies StageData,
       }
     })
@@ -672,6 +696,7 @@ export function PipelineGraph({
     now,
     projectNames,
     revisions.length,
+    stageOne,
     stages,
     t,
     verifierSummaries,
@@ -682,11 +707,20 @@ export function PipelineGraph({
     const evalPhase = phaseOf('evaluate', current)
     const verifyPhase = phaseOf('verify', current)
 
+    list.push({
+      id: 'harvest-stageOne',
+      source: 'harvest',
+      target: 'stageOne',
+      type: 'smoothstep',
+      animated: current === 'screening',
+      style: { strokeWidth: 1.5 },
+    })
+
     for (const summary of evaluatorSummaries) {
       const target = `agent-${summary.agent.id}`
       list.push({
-        id: `harvest-${summary.agent.id}`,
-        source: 'harvest',
+        id: `stageOne-${summary.agent.id}`,
+        source: 'stageOne',
         target,
         type: 'smoothstep',
         animated: evalPhase === 'active',

@@ -41,6 +41,7 @@ import {
   type RunEvent,
   type RunSnapshot,
   type RunStatus,
+  type StageOneResult,
 } from '@verdict/shared'
 import {
   createRun,
@@ -66,7 +67,7 @@ import { AppearanceMenu } from './appearance-menu'
 import { LanguageMenu } from './language-menu'
 import { SectionCard } from './section-card'
 
-const RUNNING: RunStatus[] = ['queued', 'parsing', 'harvesting', 'evaluating', 'reviewing', 'consensus', 'verifying']
+const RUNNING: RunStatus[] = ['queued', 'parsing', 'harvesting', 'screening', 'evaluating', 'reviewing', 'consensus', 'verifying']
 
 interface WorkspaceSettings {
   evaluatorModels: ModelRef[]
@@ -78,6 +79,7 @@ interface WorkspaceSettings {
 }
 
 interface LiveState {
+  stageOne: StageOneResult[]
   evaluations: ProjectEvaluation[]
   revisions: ProjectRevision[]
   consensus: ProjectConsensus[]
@@ -85,7 +87,7 @@ interface LiveState {
   report?: Report
 }
 
-const EMPTY_LIVE: LiveState = { evaluations: [], revisions: [], consensus: [], verifications: [] }
+const EMPTY_LIVE: LiveState = { stageOne: [], evaluations: [], revisions: [], consensus: [], verifications: [] }
 
 const DOCK_PANEL_CLASS: Record<LogDock, string> = {
   top: 'h-[min(34vh,320px)] w-full border-b',
@@ -343,6 +345,11 @@ export function VerdictWorkspace() {
       case 'stage':
         if (event.message) setStatus(event.message as RunStatus)
         break
+      case 'screening': {
+        const screening = event.data as StageOneResult
+        setLive((previous) => ({ ...previous, stageOne: upsert(previous.stageOne, screening, (entry) => entry.projectId) }))
+        break
+      }
       case 'evaluation': {
         const evaluation = event.data as ProjectEvaluation
         setLive((previous) => ({ ...previous, evaluations: upsert(previous.evaluations, evaluation, (entry) => `${entry.projectId}:${entry.agentId}`) }))
@@ -394,6 +401,7 @@ export function VerdictWorkspace() {
         setStatus(snapshot.status)
         setEvents(snapshot.events)
         setLive({
+          stageOne: snapshot.stageOne ?? [],
           evaluations: snapshot.evaluations,
           revisions: snapshot.revisions,
           consensus: snapshot.consensus,
@@ -585,6 +593,7 @@ export function VerdictWorkspace() {
     setClearedEvents(0)
     setRunError(snapshot.error ?? null)
     setLive({
+      stageOne: snapshot.stageOne ?? [],
       evaluations: snapshot.evaluations,
       revisions: snapshot.revisions,
       consensus: snapshot.consensus,
@@ -965,6 +974,7 @@ export function VerdictWorkspace() {
               evaluations={live.evaluations}
               revisions={live.revisions}
               verifications={live.verifications}
+              stageOne={live.stageOne}
               agents={agents}
               evaluatorModels={evaluatorModels}
               verifierModels={verifierModels}
@@ -985,6 +995,7 @@ export function VerdictWorkspace() {
               report={live.report}
               rubric={preview?.rubric}
               manifest={projects}
+              stageOne={live.stageOne}
               consensus={live.consensus}
               evaluations={live.evaluations}
               verifications={live.verifications}

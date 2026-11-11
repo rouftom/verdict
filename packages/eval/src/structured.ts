@@ -30,6 +30,8 @@ export interface StructuredOptions<T> {
   jsonContract?: string
   /** Abort the in-flight model call when the run is cancelled. */
   signal?: AbortSignal
+  /** Per-call ceiling. Overridable so a test does not have to wait minutes. */
+  timeoutMs?: number
 }
 
 /**
@@ -41,6 +43,22 @@ export interface StructuredOptions<T> {
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192
 /** The rejected answer sent back for a correction is bounded on purpose. */
 const MAX_REPAIR_CHARS = 6000
+
+/**
+ * A provider that never answers must not freeze the run. Every call is bounded
+ * by this ceiling, and the run cancellation still aborts immediately.
+ */
+export const MODEL_CALL_TIMEOUT_MS = 300_000
+
+/**
+ * Combine the run cancellation with a per-call timeout. `AbortSignal.timeout`
+ * fires on its own; `AbortSignal.any` keeps the caller's abort working too, so
+ * a cancelled run does not wait for the ceiling.
+ */
+export function callSignal(signal: AbortSignal | undefined, timeoutMs = MODEL_CALL_TIMEOUT_MS): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
 
 function usageOf(usage: unknown): UsageTotals {
   const source = (usage ?? {}) as Record<string, unknown>
@@ -210,7 +228,7 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
     ...(providerOptions ? { providerOptions } : {}),
     maxOutputTokens,
     maxRetries: 1,
-    ...(options.signal ? { abortSignal: options.signal } : {}),
+    abortSignal: callSignal(options.signal, options.timeoutMs),
   }
 
   try {

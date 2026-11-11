@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowUp,
   Bot,
+  CheckCircle2,
   ChevronRight,
   Coins,
   FileCode2,
@@ -16,6 +17,7 @@ import {
   Minus,
   ShieldCheck,
   Trophy,
+  XCircle,
 } from 'lucide-react'
 import { Badge, Card, CardContent, CardHeader, CardTitle, Select, cn } from '@verdict/ui'
 import {
@@ -29,6 +31,7 @@ import {
   type Report,
   type Rubric,
   type RunUsage,
+  type StageOneResult,
   type TrackRanking,
   type UsageStage,
 } from '@verdict/shared'
@@ -38,6 +41,7 @@ export interface ResultsPanelProps {
   report?: Report
   rubric?: Rubric
   manifest: ProjectInput[]
+  stageOne?: StageOneResult[]
   consensus: ProjectConsensus[]
   evaluations: ProjectEvaluation[]
   verifications: ProjectVerification[]
@@ -51,16 +55,22 @@ interface CriterionMeta {
   weight: number
 }
 
-/** One flat row per track header and per ranked project, so a huge manifest virtualises. */
+/** One flat row per track header and per ranked project, plus the Stage One failures. */
 type RankingRow =
   | { kind: 'track'; track: string; count: number; first: boolean }
   | { kind: 'entry'; track: string; entry: TrackRanking['entries'][number] }
+  | { kind: 'failedHeader'; count: number }
+  | { kind: 'failed'; result: StageOneResult }
 
-function flattenRankings(rankings: TrackRanking[]): RankingRow[] {
-  return rankings.flatMap((track, index) => [
-    { kind: 'track' as const, track: track.track, count: track.entries.length, first: index === 0 },
-    ...track.entries.map((entry) => ({ kind: 'entry' as const, track: track.track, entry })),
-  ])
+function flattenRankings(rankings: TrackRanking[], failed: StageOneResult[]): RankingRow[] {
+  return [
+    ...rankings.flatMap((track, index) => [
+      { kind: 'track' as const, track: track.track, count: track.entries.length, first: index === 0 },
+      ...track.entries.map((entry) => ({ kind: 'entry' as const, track: track.track, entry })),
+    ]),
+    ...(failed.length > 0 ? [{ kind: 'failedHeader' as const, count: failed.length }] : []),
+    ...failed.map((result) => ({ kind: 'failed' as const, result })),
+  ]
 }
 
 const TRACK_TONES = [
@@ -80,6 +90,7 @@ function trackTone(track: string): string {
 }
 
 const STAGE_KEYS: Record<UsageStage, string> = {
+  screening: 'results.stageScreening',
   evaluation: 'results.stageEvaluation',
   revision: 'results.stageRevision',
   ranking: 'results.stageRanking',
@@ -161,8 +172,15 @@ function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: b
   )
 }
 
-function provisionalRankings(manifest: ProjectInput[], consensus: ProjectConsensus[], rubric?: Rubric): TrackRanking[] {
+function provisionalRankings(
+  manifest: ProjectInput[],
+  consensus: ProjectConsensus[],
+  rubric?: Rubric,
+  stageOne: StageOneResult[] = [],
+): TrackRanking[] {
   const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
+  const passed = new Set(stageOne.filter((result) => result.passed).map((result) => result.projectId))
+  const scored = stageOne.length > 0 ? (project: ProjectInput) => passed.has(project.id) : () => true
   const groups = new Map<string, ProjectInput[]>()
   for (const project of manifest) {
     for (const track of projectTracks(project)) {
@@ -171,18 +189,20 @@ function provisionalRankings(manifest: ProjectInput[], consensus: ProjectConsens
   }
   const tieBreakers = rubric?.ranking.tieBreakers ?? []
   return [...groups.entries()].map(([track, projects]) => {
-    const sorted = [...projects].sort((left, right) => {
-      const l = byId.get(left.id)
-      const r = byId.get(right.id)
-      const delta = (r?.overall ?? 0) - (l?.overall ?? 0)
-      if (delta !== 0) return delta
-      for (const criterionId of tieBreakers) {
-        const lc = l?.criteria.find((entry) => entry.criterionId === criterionId)?.score ?? 0
-        const rc = r?.criteria.find((entry) => entry.criterionId === criterionId)?.score ?? 0
-        if (rc !== lc) return rc - lc
-      }
-      return 0
-    })
+    const sorted = projects
+      .filter(scored)
+      .sort((left, right) => {
+        const l = byId.get(left.id)
+        const r = byId.get(right.id)
+        const delta = (r?.overall ?? 0) - (l?.overall ?? 0)
+        if (delta !== 0) return delta
+        for (const criterionId of tieBreakers) {
+          const lc = l?.criteria.find((entry) => entry.criterionId === criterionId)?.score ?? 0
+          const rc = r?.criteria.find((entry) => entry.criterionId === criterionId)?.score ?? 0
+          if (rc !== lc) return rc - lc
+        }
+        return 0
+      })
     return {
       track,
       entries: sorted.map((project, index) => ({
@@ -239,15 +259,19 @@ function evaluatorScore(evaluation: ProjectEvaluation, criterionId: string): Cri
  */
 function RankingList({
   rankings,
+  failed,
+  names,
   selected,
   onSelect,
 }: {
   rankings: TrackRanking[]
+  failed: StageOneResult[]
+  names: Map<string, string>
   selected?: string
   onSelect: (projectId: string) => void
 }) {
   const { t } = useTranslation()
-  const rows = React.useMemo(() => flattenRankings(rankings), [rankings])
+  const rows = React.useMemo(() => flattenRankings(rankings, failed), [failed, rankings])
 
   return (
     <Virtuoso
@@ -256,19 +280,71 @@ function RankingList({
       // A project can be ranked in several tracks, so the track has to be part
       // of the key. Without it Virtuoso saw duplicate keys, reused the wrong
       // row and made entries repeat or disappear while scrolling.
-      computeItemKey={(_index, row) => (row.kind === 'track' ? `track:${row.track}` : `entry:${row.track}:${row.entry.projectId}`)}
-      itemContent={(_index, row) =>
-        row.kind === 'track' ? (
-          <div className={cn('px-2 pb-1', row.first ? 'pt-2' : 'pt-3')}>
-            <div className={cn('flex items-center gap-2 rounded-md border px-2 py-1.5', trackTone(row.track))}>
-              <Layers className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide">{row.track}</span>
-              <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[9px] tabular-nums">
-                {t('results.trackProjects', { count: row.count })}
-              </span>
+      computeItemKey={(_index, row) => {
+        if (row.kind === 'track') return `track:${row.track}`
+        if (row.kind === 'failedHeader') return 'stage-one-failed'
+        if (row.kind === 'failed') return `failed:${row.result.projectId}`
+        return `entry:${row.track}:${row.entry.projectId}`
+      }}
+      itemContent={(_index, row) => {
+        if (row.kind === 'failedHeader') {
+          return (
+            <div className="px-2 pb-1 pt-3">
+              <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-destructive">
+                <XCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide">
+                  {t('results.stageOneFailedGroup')}
+                </span>
+                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[9px] tabular-nums">
+                  {t('results.trackProjects', { count: row.count })}
+                </span>
+              </div>
             </div>
-          </div>
-        ) : (
+          )
+        }
+
+        if (row.kind === 'failed') {
+          return (
+            <button
+              type="button"
+              onClick={() => onSelect(row.result.projectId)}
+              className={cn(
+                'flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-left hover:bg-muted/50',
+                selected === row.result.projectId && 'bg-brand-primary/5',
+              )}
+            >
+              <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground">-</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-medium">
+                  {names.get(row.result.projectId) ?? row.result.projectId}
+                </span>
+                <span className="block truncate text-[10px] text-muted-foreground" title={row.result.rationale}>
+                  {row.result.rationale}
+                </span>
+              </span>
+              <Badge tone="danger" className="shrink-0">
+                {t('results.stageOneFailed')}
+              </Badge>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+          )
+        }
+
+        if (row.kind === 'track') {
+          return (
+            <div className={cn('px-2 pb-1', row.first ? 'pt-2' : 'pt-3')}>
+              <div className={cn('flex items-center gap-2 rounded-md border px-2 py-1.5', trackTone(row.track))}>
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide">{row.track}</span>
+                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[9px] tabular-nums">
+                  {t('results.trackProjects', { count: row.count })}
+                </span>
+              </div>
+            </div>
+          )
+        }
+
+        return (
           <button
             type="button"
             onClick={() => onSelect(row.entry.projectId)}
@@ -282,7 +358,7 @@ function RankingList({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[12px] font-medium">{row.entry.name}</span>
-              <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                 <span>{t(`status.${row.entry.status}`, { defaultValue: row.entry.status })}</span>
                 <span>·</span>
                 <span>{t('results.conf', { value: pct(row.entry.confidence) })}</span>
@@ -293,6 +369,9 @@ function RankingList({
                     <DeltaPill delta={row.entry.rankDelta} />
                   </>
                 ) : null}
+                <Badge tone="success" className="px-1 py-0 text-[9px]">
+                  {t('results.stageOnePassed')}
+                </Badge>
               </span>
             </span>
             <Badge tone={scoreTone(row.entry.overall)} className="tabular-nums">
@@ -301,8 +380,35 @@ function RankingList({
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </button>
         )
-      }
+      }}
     />
+  )
+}
+
+function StageOneNote({ result }: { result: StageOneResult }) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className={cn(
+        'rounded-md border p-2',
+        result.passed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-destructive/30 bg-destructive/5',
+      )}
+    >
+      <p className={cn('flex items-center gap-1 text-[10px] font-semibold', result.passed ? 'text-emerald-600' : 'text-destructive')}>
+        {result.passed ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+        {result.passed ? t('results.stageOnePassed') : t('results.stageOneFailed')}
+      </p>
+      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{result.rationale}</p>
+      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
+        <span>
+          {t('results.stageOneTheme')}: {result.themeFit ? t('results.stageOneMet') : t('results.stageOneNotMet')}
+        </span>
+        <span>
+          {t('results.stageOneTooling')}: {result.toolingUse ? t('results.stageOneMet') : t('results.stageOneNotMet')}
+        </span>
+      </p>
+      {!result.passed ? <p className="mt-1 text-[10px] font-medium text-destructive">{t('results.stageOneNotScored')}</p> : null}
+    </div>
   )
 }
 
@@ -310,6 +416,7 @@ export function ResultsPanel({
   report,
   rubric,
   manifest,
+  stageOne,
   consensus,
   evaluations,
   verifications,
@@ -318,24 +425,37 @@ export function ResultsPanel({
 }: ResultsPanelProps) {
   const { t } = useTranslation()
   const [trackFilter, setTrackFilter] = React.useState('all')
+  const gate = report?.stageOne ?? stageOne ?? []
   const hasResults =
-    Boolean(report) || consensus.length > 0 || evaluations.length > 0 || verifications.length > 0
+    Boolean(report) || gate.length > 0 || consensus.length > 0 || evaluations.length > 0 || verifications.length > 0
   if (!hasResults) return null
 
   const criteria: CriterionMeta[] = report?.criteria ?? rubric?.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.weight })) ?? []
-  const rankings = report?.rankings ?? provisionalRankings(manifest, consensus, rubric)
+  const rankings = report?.rankings ?? provisionalRankings(manifest, consensus, rubric, gate)
+  const failedResults = gate.filter((result) => !result.passed)
+  const projectNames = new Map(manifest.map((project) => [project.id, project.name]))
+  const projectsById = new Map(manifest.map((project) => [project.id, project]))
   const reportsById = new Map((report?.projects ?? []).map((project) => [project.projectId, project]))
   // Multi-track runs rank every project in each of its tracks. The filter keeps
   // one track on screen at a time; a stale value falls back to every track.
   const trackNames = rankings.map((ranking) => ranking.track)
   const activeTrack = trackFilter !== 'all' && trackNames.includes(trackFilter) ? trackFilter : 'all'
   const visibleRankings = activeTrack === 'all' ? rankings : rankings.filter((ranking) => ranking.track === activeTrack)
-  const fallbackId = rankings[0]?.entries[0]?.projectId
+  const visibleFailed =
+    activeTrack === 'all'
+      ? failedResults
+      : failedResults.filter((result) => {
+          const project = projectsById.get(result.projectId)
+          return project ? projectTracks(project).includes(activeTrack) : false
+        })
+  const rankedIds = visibleRankings.flatMap((ranking) => ranking.entries.map((entry) => entry.projectId))
+  const selectable = new Set([...rankedIds, ...visibleFailed.map((result) => result.projectId)])
+  const fallbackId = rankedIds[0] ?? visibleFailed[0]?.projectId
   const requested = selectedId ?? fallbackId
-  const selected = visibleRankings.some((ranking) => ranking.entries.some((entry) => entry.projectId === requested))
-    ? requested
-    : visibleRankings[0]?.entries[0]?.projectId
+  const selected = requested !== undefined && selectable.has(requested) ? requested : fallbackId
   const selectedReport = selected ? reportsById.get(selected) : undefined
+  const selectedGate = selected ? gate.find((result) => result.projectId === selected) : undefined
+  const selectedFailed = selectedGate ? !selectedGate.passed : false
   const selectedConsensus = selectedReport?.consensus ?? consensus.find((entry) => entry.projectId === selected)
   const selectedEvaluations = evaluations.filter((evaluation) => evaluation.projectId === selected)
   const selectedVerifications = selectedReport?.verifications ?? verifications.filter((verification) => verification.projectId === selected)
@@ -379,7 +499,7 @@ export function ResultsPanel({
           {manifest.length === 0 ? (
             <p className="p-4 text-xs text-muted-foreground">{t('results.uploadManifest')}</p>
           ) : (
-            <RankingList rankings={visibleRankings} selected={selected} onSelect={onSelect} />
+            <RankingList rankings={visibleRankings} failed={visibleFailed} names={projectNames} selected={selected} onSelect={onSelect} />
           )}
         </CardContent>
       </Card>
@@ -387,11 +507,18 @@ export function ResultsPanel({
       <Card className="flex min-h-0 flex-col overflow-hidden">
         <CardHeader className="border-b border-border">
           <CardTitle className="truncate">{selectedProject?.name ?? t('results.projectDetail')}</CardTitle>
-          {selectedConsensus ? (
-            <Badge tone={selectedConsensus.status === 'consensus' ? 'success' : 'warning'} className="ml-auto">
-              {t(`status.${selectedConsensus.status}`, { defaultValue: selectedConsensus.status })}
-            </Badge>
-          ) : null}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {selectedGate ? (
+              <Badge tone={selectedGate.passed ? 'success' : 'danger'}>
+                {selectedGate.passed ? t('results.stageOnePassed') : t('results.stageOneFailed')}
+              </Badge>
+            ) : null}
+            {!selectedFailed && selectedConsensus ? (
+              <Badge tone={selectedConsensus.status === 'consensus' ? 'success' : 'warning'}>
+                {t(`status.${selectedConsensus.status}`, { defaultValue: selectedConsensus.status })}
+              </Badge>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-auto">
           {!selected ? (
@@ -399,6 +526,9 @@ export function ResultsPanel({
           ) : (
             <div className="flex flex-col gap-3">
               {report?.usage ? <CostSummary usage={report.usage} /> : null}
+              {selectedGate ? <StageOneNote result={selectedGate} /> : null}
+              {selectedFailed ? null : (
+                <>
               <div className="flex flex-wrap items-end gap-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.finalOverall')}</p>
@@ -529,6 +659,8 @@ export function ResultsPanel({
                   <p className="mt-0.5 text-[10px] text-muted-foreground">{selectedConsensus.disagreements.join(', ')}</p>
                 </div>
               ) : null}
+                </>
+              )}
 
               {selectedReport?.evidence.errors.length ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
