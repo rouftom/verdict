@@ -16,6 +16,8 @@ export interface SelectProps {
   options: SelectOption[]
   /** Accessible name for the trigger (the visible label already sits outside). */
   ariaLabel?: string
+  /** Optional leading icon rendered inside the trigger, before the value. */
+  icon?: React.ReactNode
   placeholder?: string
   id?: string
   disabled?: boolean
@@ -37,6 +39,7 @@ export function Select({
   onValueChange,
   options,
   ariaLabel,
+  icon,
   placeholder = 'n/a',
   id,
   disabled = false,
@@ -133,8 +136,15 @@ export function Select({
           triggerClassName,
         )}
       >
-        <span className={cn('min-w-0 truncate', !selected && 'text-muted-foreground')}>
-          {selected?.label ?? placeholder}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {icon ? (
+            <span className="shrink-0 text-muted-foreground" aria-hidden="true">
+              {icon}
+            </span>
+          ) : null}
+          <span className={cn('min-w-0 truncate', !selected && 'text-muted-foreground')}>
+            {selected?.label ?? placeholder}
+          </span>
         </span>
         <ChevronDown
           className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}

@@ -16,16 +16,14 @@ export function LanguageMenu() {
   }
 
   return (
-    <div className="flex items-center gap-1">
-      <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <Select
-        value={current}
-        onValueChange={changeLanguage}
-        options={LANGUAGES.map((language) => ({ value: language.value, label: language.short }))}
-        ariaLabel={t('app.language')}
-        className="w-[68px]"
-        triggerClassName="h-7 rounded-full"
-      />
-    </div>
+    <Select
+      value={current}
+      onValueChange={changeLanguage}
+      options={LANGUAGES.map((language) => ({ value: language.value, label: language.short }))}
+      ariaLabel={t('app.language')}
+      icon={<Globe className="h-3.5 w-3.5" />}
+      className="w-[68px]"
+      triggerClassName="h-7 gap-1 rounded-full px-1.5"
+    />
   )
 }
