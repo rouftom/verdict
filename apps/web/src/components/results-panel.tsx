@@ -6,11 +6,15 @@ import { Virtuoso } from 'react-virtuoso'
 import {
   ArrowDown,
   ArrowUp,
+  Bot,
   ChevronRight,
+  Coins,
   FileCode2,
   Film,
   Flag,
+  Layers,
   Minus,
+  ShieldCheck,
   Trophy,
 } from 'lucide-react'
 import { Badge, Card, CardContent, CardHeader, CardTitle, Select, cn } from '@verdict/ui'
@@ -24,9 +28,11 @@ import {
   type ProjectVerification,
   type Report,
   type Rubric,
+  type RunUsage,
   type TrackRanking,
+  type UsageStage,
 } from '@verdict/shared'
-import { formatDate, pct, scoreTone } from '@/lib/format'
+import { formatDate, formatTokens, pct, scoreTone } from '@/lib/format'
 
 export interface ResultsPanelProps {
   report?: Report
@@ -47,14 +53,112 @@ interface CriterionMeta {
 
 /** One flat row per track header and per ranked project, so a huge manifest virtualises. */
 type RankingRow =
-  | { kind: 'track'; track: string; count: number }
-  | { kind: 'entry'; entry: TrackRanking['entries'][number] }
+  | { kind: 'track'; track: string; count: number; first: boolean }
+  | { kind: 'entry'; track: string; entry: TrackRanking['entries'][number] }
 
 function flattenRankings(rankings: TrackRanking[]): RankingRow[] {
-  return rankings.flatMap((track) => [
-    { kind: 'track' as const, track: track.track, count: track.entries.length },
-    ...track.entries.map((entry) => ({ kind: 'entry' as const, entry })),
+  return rankings.flatMap((track, index) => [
+    { kind: 'track' as const, track: track.track, count: track.entries.length, first: index === 0 },
+    ...track.entries.map((entry) => ({ kind: 'entry' as const, track: track.track, entry })),
   ])
+}
+
+const TRACK_TONES = [
+  'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+  'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300',
+  'border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300',
+]
+
+/** A stable colour per track name, so a track keeps its identity across renders. */
+function trackTone(track: string): string {
+  let hash = 0
+  for (const char of track) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return TRACK_TONES[hash % TRACK_TONES.length] ?? TRACK_TONES[0]!
+}
+
+const STAGE_KEYS: Record<UsageStage, string> = {
+  evaluation: 'results.stageEvaluation',
+  revision: 'results.stageRevision',
+  ranking: 'results.stageRanking',
+  verification: 'results.stageVerification',
+  verifier_ranking: 'results.stageVerifierRanking',
+}
+
+/**
+ * Token and call summary for the whole pipeline. Tokens are the billable unit
+ * the run actually reports, so the table stays honest about what a model cost
+ * without inventing a price.
+ */
+function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: boolean }) {
+  const { t } = useTranslation()
+  if (!usage) return null
+
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+          <Coins className="h-3 w-3 text-brand-primary" /> {t('results.pipelineUsage')}
+        </span>
+        <span className="tabular-nums">{t('results.calls', { count: usage.total.calls })}</span>
+        <span className="tabular-nums">{t('results.tokensIn', { value: formatTokens(usage.total.inputTokens) })}</span>
+        <span className="tabular-nums">{t('results.tokensOut', { value: formatTokens(usage.total.outputTokens) })}</span>
+        {usage.byAgent.length > 0 ? (
+          <span className="ml-auto">{t('results.agentCount', { count: usage.byAgent.length })}</span>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-md border border-border">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
+        <Coins className="h-3.5 w-3.5 text-brand-primary" />
+        <span className="text-[11px] font-semibold">{t('results.pipelineUsage')}</span>
+        <span className="ml-auto flex flex-wrap gap-3 text-[10px] tabular-nums text-muted-foreground">
+          <span>{t('results.calls', { count: usage.total.calls })}</span>
+          <span>{t('results.tokensIn', { value: formatTokens(usage.total.inputTokens) })}</span>
+          <span>{t('results.tokensOut', { value: formatTokens(usage.total.outputTokens) })}</span>
+        </span>
+      </div>
+      <div className="grid gap-3 p-2 sm:grid-cols-2">
+        <div>
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.costPerAgent')}</p>
+          <ul className="flex flex-col gap-0.5">
+            {usage.byAgent.map((agent) => (
+              <li key={`${agent.role}:${agent.agentId}`} className="flex items-center gap-1.5 text-[10px]">
+                {agent.role === 'verifier' ? (
+                  <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-600" />
+                ) : (
+                  <Bot className="h-3 w-3 shrink-0 text-brand-primary" />
+                )}
+                <span className="min-w-0 flex-1 truncate" title={agent.agentName}>
+                  {t(`agents.${agent.agentId}.name`, { defaultValue: agent.agentName })}
+                </span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">{agent.calls}×</span>
+                <span className="w-10 shrink-0 text-right tabular-nums">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.costPerStage')}</p>
+          <ul className="flex flex-col gap-0.5">
+            {usage.byStage.map((stage) => (
+              <li key={stage.stage} className="flex items-center gap-1.5 text-[10px]">
+                <span className="min-w-0 flex-1 truncate">{t(STAGE_KEYS[stage.stage])}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">{stage.calls}×</span>
+                <span className="w-10 shrink-0 text-right tabular-nums">{formatTokens(stage.inputTokens + stage.outputTokens)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[9px] leading-tight text-muted-foreground">{t('results.costNote')}</p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function provisionalRankings(manifest: ProjectInput[], consensus: ProjectConsensus[], rubric?: Rubric): TrackRanking[] {
@@ -149,12 +253,20 @@ function RankingList({
     <Virtuoso
       data={rows}
       className="h-full"
-      computeItemKey={(_index, row) => (row.kind === 'track' ? `track:${row.track}` : `entry:${row.entry.projectId}`)}
+      // A project can be ranked in several tracks, so the track has to be part
+      // of the key. Without it Virtuoso saw duplicate keys, reused the wrong
+      // row and made entries repeat or disappear while scrolling.
+      computeItemKey={(_index, row) => (row.kind === 'track' ? `track:${row.track}` : `entry:${row.track}:${row.entry.projectId}`)}
       itemContent={(_index, row) =>
         row.kind === 'track' ? (
-          <div className="flex items-center justify-between border-b border-border bg-muted/60 px-3 py-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{row.track}</span>
-            <span className="text-[10px] text-muted-foreground">{t('results.trackProjects', { count: row.count })}</span>
+          <div className={cn('px-2 pb-1', row.first ? 'pt-2' : 'pt-3')}>
+            <div className={cn('flex items-center gap-2 rounded-md border px-2 py-1.5', trackTone(row.track))}>
+              <Layers className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide">{row.track}</span>
+              <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[9px] tabular-nums">
+                {t('results.trackProjects', { count: row.count })}
+              </span>
+            </div>
           </div>
         ) : (
           <button
@@ -233,7 +345,7 @@ export function ResultsPanel({
   const sourceOfRanks = report ? 'final' : 'provisional'
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+    <div className="grid h-full min-h-0 grid-cols-1 grid-rows-2 gap-2 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:grid-rows-1">
       <Card className="flex min-h-0 flex-col overflow-hidden">
         <CardHeader className="border-b border-border">
           <Trophy className="h-3.5 w-3.5 text-brand-primary" />
@@ -242,6 +354,11 @@ export function ResultsPanel({
             {t(`results.${sourceOfRanks}`)}
           </Badge>
         </CardHeader>
+        {report?.usage ? (
+          <div className="border-b border-border px-3 py-1.5">
+            <CostSummary usage={report.usage} compact />
+          </div>
+        ) : null}
         {trackNames.length > 1 ? (
           <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
             <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.track')}</span>
@@ -281,6 +398,7 @@ export function ResultsPanel({
             <p className="text-xs text-muted-foreground">{t('results.selectProject')}</p>
           ) : (
             <div className="flex flex-col gap-3">
+              {report?.usage ? <CostSummary usage={report.usage} /> : null}
               <div className="flex flex-wrap items-end gap-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.finalOverall')}</p>

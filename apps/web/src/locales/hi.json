@@ -191,7 +191,22 @@
     "trackProjects_one": "{{count}} परियोजना",
     "trackProjects_other": "{{count}} परियोजनाएँ",
     "conf": "विश्वास {{value}}",
-    "wasRank": "पहले #{{rank}}"
+    "wasRank": "पहले #{{rank}}",
+    "pipelineUsage": "पाइपलाइन उपयोग",
+    "calls_one": "{{count}} कॉल",
+    "calls_other": "{{count}} कॉल",
+    "tokensIn": "{{value}} इनपुट",
+    "tokensOut": "{{value}} आउटपुट",
+    "agentCount_one": "{{count}} एजेंट",
+    "agentCount_other": "{{count}} एजेंट",
+    "costPerAgent": "प्रति एजेंट",
+    "costPerStage": "प्रति चरण",
+    "costNote": "प्रदाता द्वारा बताए गए टोकन और कॉल. प्रति टोकन कीमत प्रदाता पर निर्भर करती है.",
+    "stageEvaluation": "मूल्यांकन",
+    "stageRevision": "क्रॉस-रिव्यू",
+    "stageRanking": "तुलनात्मक रैंकिंग",
+    "stageVerification": "सत्यापन",
+    "stageVerifierRanking": "सत्यापनकर्ता रैंकिंग"
   },
   "log": {
     "title": "रन लॉग",
@@ -206,7 +221,9 @@
     "dockBottom": "रन लॉग को नीचे डॉक करें",
     "dockTop": "रन लॉग को ऊपर डॉक करें",
     "dockLeft": "रन लॉग को बाएँ डॉक करें",
-    "dockRight": "रन लॉग को दाएँ डॉक करें"
+    "dockRight": "रन लॉग को दाएँ डॉक करें",
+    "copy": "पूरा रन लॉग कॉपी करें",
+    "copied": "कॉपी हो गया"
   },
   "sw": {
     "ready": "नया संस्करण तैयार है।",

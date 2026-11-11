@@ -191,7 +191,22 @@
     "trackProjects_one": "{{count}} project",
     "trackProjects_other": "{{count}} projects",
     "conf": "conf {{value}}",
-    "wasRank": "was #{{rank}}"
+    "wasRank": "was #{{rank}}",
+    "pipelineUsage": "Pipeline usage",
+    "calls_one": "{{count}} call",
+    "calls_other": "{{count}} calls",
+    "tokensIn": "{{value}} in",
+    "tokensOut": "{{value}} out",
+    "agentCount_one": "{{count}} agent",
+    "agentCount_other": "{{count}} agents",
+    "costPerAgent": "Per agent",
+    "costPerStage": "Per stage",
+    "costNote": "Tokens and calls reported by the provider. The price per token depends on the provider.",
+    "stageEvaluation": "Evaluation",
+    "stageRevision": "Cross-review",
+    "stageRanking": "Comparative ranking",
+    "stageVerification": "Verification",
+    "stageVerifierRanking": "Verifier ranking"
   },
   "log": {
     "title": "Run log",
@@ -206,7 +221,9 @@
     "dockBottom": "Dock run log at the bottom",
     "dockTop": "Dock run log at the top",
     "dockLeft": "Dock run log on the left",
-    "dockRight": "Dock run log on the right"
+    "dockRight": "Dock run log on the right",
+    "copy": "Copy the whole run log",
+    "copied": "Copied"
   },
   "sw": {
     "ready": "A new version is ready.",

@@ -17,8 +17,12 @@ import {
   type RunEvent,
   type RunEventType,
   type RunOptions,
+  type RunUsage,
   type Rubric,
   type TrackRanking,
+  type UsageByAgent,
+  type UsageByStage,
+  type UsageStage,
 } from '@verdict/shared'
 import { harvestProject } from '@verdict/harvest'
 import { EVALUATORS, VERIFIERS } from './agents'
@@ -113,6 +117,26 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   const { runId, manifest, rubric, rulesText, options, evaluatorModels, verifierModels, onEvent, signal, waitForResume } = args
   const warnings = [...(args.warnings ?? [])]
   const usage = emptyUsage()
+  const usageByAgent = new Map<string, UsageByAgent>()
+  const usageByStage = new Map<UsageStage, UsageTotals>()
+
+  /** Add one call to the run total, its agent and its stage in one place. */
+  const recordUsage = (
+    stage: UsageStage,
+    addition: UsageTotals,
+    agent?: { id: string; name: string; role: UsageByAgent['role'] },
+  ) => {
+    addUsage(usage, addition)
+    const stageTotals = usageByStage.get(stage) ?? emptyUsage()
+    addUsage(stageTotals, addition)
+    usageByStage.set(stage, stageTotals)
+    if (!agent) return
+    const key = `${agent.role}:${agent.id}`
+    const entry = usageByAgent.get(key) ?? { agentId: agent.id, agentName: agent.name, role: agent.role, ...emptyUsage() }
+    addUsage(entry, addition)
+    usageByAgent.set(key, entry)
+  }
+
   const emit = (type: RunEventType, partial: Omit<RunEvent, 'type' | 'runId' | 'at'> = {}) =>
     onEvent({ type, runId, at: new Date().toISOString(), ...partial })
   const log = (message: string) => emit('log', { message })
@@ -181,7 +205,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             temperature: options.temperature,
             signal,
           })
-          addUsage(usage, result.usage)
+          recordUsage('evaluation', result.usage, { id: agent.id, name: agent.name, role: 'evaluator' })
           emit('evaluation', {
             projectId: project.id,
             message: `${agent.name} → ${result.evaluation.overall}`,
@@ -229,7 +253,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             round: 2,
             signal,
           })
-          addUsage(usage, result.usage)
+          recordUsage('revision', result.usage, { id: agent.id, name: agent.name, role: 'evaluator' })
           emit('revision', {
             projectId: project.id,
             message: `${agent.name} revised${result.revision.changed ? '' : ' (unchanged)'}`,
@@ -260,10 +284,12 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   await checkpoint()
   const tracks = groupByTrack(manifest)
   const comparativeOrders = new Map<string, string[]>()
-  for (const [track, projects] of tracks) {
+  // Two lanes handle the tracks at once. A track is independent of the others,
+  // so waiting for a slow track no longer delays the rest of the ranking.
+  await mapLimit([...tracks.entries()], 2, async ([track, projects]) => {
     if (projects.length <= 1) {
       comparativeOrders.set(track, projects.map((project) => project.id))
-      continue
+      return
     }
     await checkpoint()
     log(`[${track}] comparative ranking with ${evaluatorModels.length} model(s).`)
@@ -282,9 +308,9 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       onLog: log,
       signal,
     })
-    addUsage(usage, result.usage)
+    recordUsage('ranking', result.usage)
     comparativeOrders.set(track, result.order)
-  }
+  })
 
   // 6. Verification
   await checkpoint()
@@ -312,7 +338,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             temperature: options.temperature,
             signal,
           })
-          addUsage(usage, result.usage)
+          recordUsage('verification', result.usage, { id: agent.id, name: agent.name, role: 'verifier' })
           emit('verification', {
             projectId: project.id,
             message: `${agent.name} → ${result.verification.finalOverall}`,
@@ -342,7 +368,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
 
   // 7. Final ranking and report
   const finalByTrack = new Map<string, RankedProject[]>()
-  for (const [track, projects] of tracks) {
+  await mapLimit([...tracks.entries()], 2, async ([track, projects]) => {
     const projectVerifications = verifications.filter((verification) => projects.some((project) => project.id === verification.projectId))
     const rankingResult = await verifyRanking({
       track,
@@ -356,7 +382,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       onLog: log,
       signal,
     })
-    addUsage(usage, rankingResult.usage)
+    recordUsage('verifier_ranking', rankingResult.usage)
     const comparative = comparativeOrders.get(track) ?? []
     const finalScores = new Map<string, number>()
     for (const project of projects) {
@@ -392,9 +418,23 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
         } satisfies RankedProject
       }),
     )
-  }
+  })
 
   const rankings: TrackRanking[] = [...finalByTrack.entries()].map(([track, entries]) => ({ track, entries }))
+  const usageSummary: RunUsage = {
+    total: { ...usage },
+    byAgent: [...usageByAgent.values()]
+      .map((entry) => ({ ...entry }))
+      .sort((left, right) =>
+        left.role === right.role ? left.agentName.localeCompare(right.agentName) : left.role.localeCompare(right.role),
+      ),
+    byStage: (['evaluation', 'revision', 'ranking', 'verification', 'verifier_ranking'] as const)
+      .map((stage) => {
+        const totals = usageByStage.get(stage)
+        return totals ? ({ stage, ...totals } as UsageByStage) : null
+      })
+      .filter((entry): entry is UsageByStage => entry !== null),
+  }
   const report: Report = {
     runId,
     createdAt: new Date().toISOString(),
@@ -434,6 +474,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
         },
       }
     }),
+    usage: usageSummary,
     warnings,
   }
 

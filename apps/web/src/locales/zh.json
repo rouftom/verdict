@@ -182,7 +182,20 @@
     "reportGenerated": "报告生成于 {{date}} · {{evaluators}} 个评估模型 · {{verifiers}} 个校验模型",
     "trackProjects_other": "{{count}} 个项目",
     "conf": "置信度 {{value}}",
-    "wasRank": "原为第 {{rank}} 名"
+    "wasRank": "原为第 {{rank}} 名",
+    "pipelineUsage": "流水线用量",
+    "calls_other": "{{count}} 次调用",
+    "tokensIn": "输入 {{value}}",
+    "tokensOut": "输出 {{value}}",
+    "agentCount_other": "{{count}} 个智能体",
+    "costPerAgent": "按智能体",
+    "costPerStage": "按阶段",
+    "costNote": "令牌和调用次数由提供商报告。每个令牌的价格取决于提供商。",
+    "stageEvaluation": "评估",
+    "stageRevision": "交叉复核",
+    "stageRanking": "比较排名",
+    "stageVerification": "校验",
+    "stageVerifierRanking": "校验员排名"
   },
   "log": {
     "title": "运行日志",
@@ -196,7 +209,9 @@
     "dockBottom": "将运行日志停靠到底部",
     "dockTop": "将运行日志停靠到顶部",
     "dockLeft": "将运行日志停靠到左侧",
-    "dockRight": "将运行日志停靠到右侧"
+    "dockRight": "将运行日志停靠到右侧",
+    "copy": "复制完整运行日志",
+    "copied": "已复制"
   },
   "sw": {
     "ready": "新版本已就绪。",

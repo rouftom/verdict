@@ -138,35 +138,46 @@ export async function verifyRanking(args: VerifyRankingArgs): Promise<VerifyRank
   const orders: string[][] = []
   let failures = 0
 
-  for (const modelRef of modelRefs) {
-    try {
-      const result = await generateStructured({
-        model: createLanguageModel(modelRef),
-        modelRef,
-        schema: rankingOutputSchema,
-        system: `You verify the final ranking of one track. Use the verified scores and the evidence packets. Return every project id exactly once, best first. Never use a supplied rank.`,
-        prompt: verifierRankingPrompt(track, packets, scoreLines.join('\n')),
-        temperature,
-        jsonContract: `{ "order": ["project-id"], "rationale": "one sentence" }`,
-        ...(signal ? { signal } : {}),
-      })
-      usage.inputTokens += result.usage.inputTokens
-      usage.outputTokens += result.usage.outputTokens
-      usage.calls += 1
-      const seen = new Set<string>()
-      const order: string[] = []
-      for (const id of result.object.order) {
-        if (ids.has(id) && !seen.has(id)) {
-          seen.add(id)
-          order.push(id)
+  // Both verifier models rank the track independently: run them together so
+  // the final order waits for one round of calls, not two.
+  const outcomes = await Promise.all(
+    modelRefs.map(async (modelRef) => {
+      try {
+        const result = await generateStructured({
+          model: createLanguageModel(modelRef),
+          modelRef,
+          schema: rankingOutputSchema,
+          system: `You verify the final ranking of one track. Use the verified scores and the evidence packets. Return every project id exactly once, best first. Never use a supplied rank.`,
+          prompt: verifierRankingPrompt(track, packets, scoreLines.join('\n')),
+          temperature,
+          jsonContract: `{ "order": ["project-id"], "rationale": "one sentence" }`,
+          ...(signal ? { signal } : {}),
+        })
+        const seen = new Set<string>()
+        const order: string[] = []
+        for (const id of result.object.order) {
+          if (ids.has(id) && !seen.has(id)) {
+            seen.add(id)
+            order.push(id)
+          }
         }
+        for (const id of fallback) if (!seen.has(id)) order.push(id)
+        return { order, usage: result.usage }
+      } catch (error) {
+        onLog?.(`[${track}] verifier ranking ${modelRefKey(modelRef)} failed: ${error instanceof Error ? error.message : String(error)}`)
+        return null
       }
-      for (const id of fallback) if (!seen.has(id)) order.push(id)
-      orders.push(order)
-    } catch (error) {
+    }),
+  )
+  for (const outcome of outcomes) {
+    if (!outcome) {
       failures += 1
-      onLog?.(`[${track}] verifier ranking ${modelRefKey(modelRef)} failed: ${error instanceof Error ? error.message : String(error)}`)
+      continue
     }
+    usage.inputTokens += outcome.usage.inputTokens
+    usage.outputTokens += outcome.usage.outputTokens
+    usage.calls += outcome.usage.calls
+    orders.push(outcome.order)
   }
 
   if (orders.length === 0) return { track, order: fallback, borda: {}, usage, failures }
