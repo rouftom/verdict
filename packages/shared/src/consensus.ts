@@ -42,40 +42,77 @@ export function weightedOverall(scores: Record<string, number>, rubric: Rubric):
   return weighted / totalWeight
 }
 
-function evaluationScores(evaluation: ProjectEvaluation): Record<string, number> {
-  return Object.fromEntries(evaluation.scores.map((score) => [score.criterionId, score.score]))
+/** Whether one criterion observation carries enough citations for the rubric. */
+function isCited(citations: string[] | undefined, minimum: number): boolean {
+  return (citations?.filter((citation) => citation.trim().length > 0).length ?? 0) >= minimum
+}
+
+/**
+ * Weighted score over the criteria an evaluation actually supports. Uncited
+ * observations are left out instead of falling back to the scale minimum, so a
+ * missing citation can no longer pull an evaluator's overall down to zero.
+ */
+function citedOverall(evaluation: ProjectEvaluation, rubric: Rubric, requireEvidence: boolean, minimum: number): number {
+  const usable = requireEvidence
+    ? evaluation.scores.filter((score) => isCited(score.evidence, minimum))
+    : evaluation.scores
+  const pool = usable.length > 0 ? usable : evaluation.scores
+  const weights = new Map(rubric.criteria.map((criterion) => [criterion.id, Math.max(0, criterion.weight)]))
+  const totalWeight = pool.reduce((sum, score) => sum + (weights.get(score.criterionId) ?? 0), 0)
+  if (totalWeight <= 0) return mean(pool.map((score) => score.score))
+  return pool.reduce((sum, score) => sum + score.score * (weights.get(score.criterionId) ?? 0), 0) / totalWeight
 }
 
 /**
  * Build one project's consensus from the six independent evaluations.
- * Per criterion: trimmed mean and spread. Overall: weighted score of the
- * consensus. Dispersion: MAD of the evaluators' overall scores.
+ * Per criterion: trimmed mean and spread over the cited observations only.
+ * Overall: weighted score of the consensus. Dispersion: MAD of the evaluators'
+ * overall scores. A criterion spread above the tolerance escalates the project,
+ * even when the overall dispersion is small.
  */
 export function buildConsensus(projectId: string, evaluations: ProjectEvaluation[], rubric: Rubric): ProjectConsensus {
   const relevant = evaluations.filter((evaluation) => evaluation.projectId === projectId)
+  const requireEvidence = rubric.consensus.requireEvidence
+  const minimum = Math.max(0, Math.trunc(rubric.consensus.minEvidencePerCriterion))
+
   const criteria = rubric.criteria.map((criterion) => {
-    const values = relevant
-      .map((evaluation) => evaluation.scores.find((score) => score.criterionId === criterion.id)?.score)
-      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    const observations = relevant.flatMap((evaluation) => {
+      const score = evaluation.scores.find((entry) => entry.criterionId === criterion.id)
+      return score && typeof score.score === 'number' && Number.isFinite(score.score) ? [{ evaluation, score }] : []
+    })
+    const cited = requireEvidence
+      ? observations.filter((observation) => isCited(observation.score.evidence, minimum))
+      : observations
+    // With no citation anywhere the requirement cannot discriminate: keep the
+    // observations and let the verifier see the problem instead of zeroing all.
+    const counted = cited.length > 0 ? cited : observations
+    const values = counted.map((observation) => observation.score.score)
     const score = rubric.consensus.aggregation === 'mean' ? mean(values) : rubric.consensus.aggregation === 'median' ? median(values) : trimmedMean(values)
     const spread = values.length > 0 ? Math.max(...values) - Math.min(...values) : 0
+
+    const excluded = observations
+      .filter((observation) => cited.length > 0 && !cited.includes(observation))
+      .map((observation) => `${observation.evaluation.agentName}: score excluded, no citation`)
+    const outliers = counted
+      .filter((observation) => Math.abs(observation.score.score - score) > rubric.consensus.tolerancePoints)
+      .map((observation) => `${observation.evaluation.agentName}: ${observation.score.rationale ?? ''}`)
+      .filter((note) => !note.endsWith(': '))
+
     return {
       criterionId: criterion.id,
       score: Math.round(score * 100) / 100,
       spread: Math.round(spread * 100) / 100,
       scores: values,
-      notes: relevant
-        .filter((evaluation) => Math.abs((evaluation.scores.find((entry) => entry.criterionId === criterion.id)?.score ?? 0) - score) > rubric.consensus.tolerancePoints)
-        .map((evaluation) => `${evaluation.agentName}: ${evaluation.scores.find((entry) => entry.criterionId === criterion.id)?.rationale ?? ''}`)
-        .filter(Boolean)
-        .slice(0, 4),
+      notes: [...excluded, ...outliers].slice(0, 4),
     }
   })
 
   const consensusScores = Object.fromEntries(criteria.map((criterion) => [criterion.criterionId, criterion.score]))
-  const overalls = relevant.map((evaluation) => weightedOverall(evaluationScores(evaluation), rubric))
+  const overalls = relevant.map((evaluation) => citedOverall(evaluation, rubric, requireEvidence, minimum))
   const dispersion = mad(overalls)
   const span = Math.max(1, rubric.scale.max - rubric.scale.min)
+  const disagreements = criteria.filter((criterion) => criterion.spread > rubric.consensus.tolerancePoints).map((criterion) => criterion.criterionId)
+  const unresolved = dispersion > rubric.consensus.tolerancePoints || disagreements.length > 0
 
   return {
     projectId,
@@ -83,8 +120,8 @@ export function buildConsensus(projectId: string, evaluations: ProjectEvaluation
     overall: Math.round(weightedOverall(consensusScores, rubric) * 100) / 100,
     dispersion: Math.round(dispersion * 100) / 100,
     confidence: Math.round(Math.min(0.95, Math.max(0.3, 1 - dispersion / span)) * 100) / 100,
-    status: dispersion > rubric.consensus.tolerancePoints ? 'escalated' : 'consensus',
-    disagreements: criteria.filter((criterion) => criterion.spread > rubric.consensus.tolerancePoints).map((criterion) => criterion.criterionId),
+    status: unresolved && rubric.consensus.onUnresolved === 'escalate' ? 'escalated' : 'consensus',
+    disagreements,
   }
 }
 
