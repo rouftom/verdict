@@ -12,6 +12,8 @@ export interface RunOptions {
   maxBuffer?: number
   cwd?: string
   env?: Record<string, string | undefined>
+  /** Kill the child when the run is cancelled. */
+  signal?: AbortSignal
 }
 
 /**
@@ -21,6 +23,9 @@ export interface RunOptions {
 export function run(command: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
   const timeoutMs = options.timeoutMs ?? 120_000
   const maxBuffer = options.maxBuffer ?? 4 * 1024 * 1024
+  if (options.signal?.aborted) {
+    return Promise.resolve({ stdout: '', stderr: 'Cancelled.', code: -1, timedOut: false })
+  }
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -39,10 +44,17 @@ export function run(command: string, args: string[], options: RunOptions = {}): 
       child.kill('SIGKILL')
     }, timeoutMs)
 
+    // A cancel must also stop yt-dlp and ffmpeg, not only the model calls.
+    const onAbort = () => {
+      child.kill('SIGKILL')
+    }
+    options.signal?.addEventListener('abort', onAbort, { once: true })
+
     const finish = (result: RunResult) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      options.signal?.removeEventListener('abort', onAbort)
       resolve(result)
     }
 
@@ -56,6 +68,7 @@ export function run(command: string, args: string[], options: RunOptions = {}): 
       if (settled) return
       settled = true
       clearTimeout(timer)
+      options.signal?.removeEventListener('abort', onAbort)
       reject(error)
     })
     child.on('close', (code) => finish({ stdout, stderr, code: code ?? -1, timedOut }))

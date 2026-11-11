@@ -8,7 +8,9 @@ import {
   Download,
   History,
   Layers,
+  Loader2,
   Network,
+  Pause,
   Play,
   RefreshCw,
   Search,
@@ -44,7 +46,9 @@ import {
   cancelRun,
   fetchProviders,
   fetchRun,
+  pauseRun,
   previewInputs,
+  resumeRun,
   subscribeRun,
   type PreviewResponse,
   type RunRequest,
@@ -56,7 +60,7 @@ import { UploadCard } from './upload-card'
 import { ModelSlots } from './model-slots'
 import { PipelineGraph, StatusPill } from './pipeline-graph'
 import { ResultsPanel } from './results-panel'
-import { EventLog } from './event-log'
+import { EventLog, LogPeek, type LogDock } from './event-log'
 import { AppearanceMenu } from './appearance-menu'
 import { LanguageMenu } from './language-menu'
 import { SectionCard } from './section-card'
@@ -80,6 +84,13 @@ interface LiveState {
 }
 
 const EMPTY_LIVE: LiveState = { evaluations: [], revisions: [], consensus: [], verifications: [] }
+
+const DOCK_PANEL_CLASS: Record<LogDock, string> = {
+  top: 'h-[min(34vh,320px)] w-full border-b',
+  bottom: 'h-[min(34vh,320px)] w-full border-t',
+  left: 'h-full w-[min(92vw,420px)] border-r',
+  right: 'h-full w-[min(92vw,420px)] border-l',
+}
 
 function flatModels(providers: ProviderInfo[]): ModelRef[] {
   return providers
@@ -163,11 +174,19 @@ export function VerdictWorkspace() {
   const [live, setLive] = React.useState<LiveState>(EMPTY_LIVE)
   const [runError, setRunError] = React.useState<string | null>(null)
   const [starting, setStarting] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
+  const [paused, setPaused] = React.useState(false)
+  const [pausing, setPausing] = React.useState(false)
   const [selectedId, setSelectedId] = React.useState<string | undefined>()
 
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [inputsOpen, setInputsOpen] = React.useState(true)
+  const [modelsOpen, setModelsOpen] = React.useState(true)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [logReduced, setLogReduced] = React.useState(false)
+  const [logDock, setLogDock] = React.useState<LogDock>('bottom')
   const [view, setView] = React.useState<'pipeline' | 'results'>('pipeline')
   const [restored, setRestored] = React.useState(false)
 
@@ -319,6 +338,10 @@ export function VerdictWorkspace() {
         break
       }
       case 'error':
+        if (event.message === 'Run cancelled.') {
+          setStatus('cancelled')
+          break
+        }
         setRunError(event.message ?? t('run.failed'))
         setStatus('failed')
         break
@@ -327,43 +350,79 @@ export function VerdictWorkspace() {
     }
   }
 
-  const refreshRun = async (id: string) => {
-    try {
-      const snapshot: RunSnapshot = await fetchRun(id)
-      setStatus(snapshot.status)
-      setEvents(snapshot.events)
-      setLive({
-        evaluations: snapshot.evaluations,
-        revisions: snapshot.revisions,
-        consensus: snapshot.consensus,
-        verifications: snapshot.verifications,
-        ...(snapshot.report ? { report: snapshot.report } : {}),
-      })
-      setSelectedId((current) => current ?? snapshot.report?.rankings[0]?.entries[0]?.projectId ?? snapshot.manifest[0]?.id)
-      if (snapshot.error) setRunError(snapshot.error)
-      if (snapshot.report) {
-        await saveRun({
-          id: snapshot.id,
-          createdAt: snapshot.createdAt,
-          status: snapshot.status,
-          savedAt: new Date().toISOString(),
-          summary: {
-            projects: snapshot.manifest.length,
-            rubric: snapshot.rubric.name,
-            tracks: snapshot.report.rankings.length,
-          },
-          snapshot,
+  const refreshRun = React.useCallback(
+    async (id: string, manual = false) => {
+      if (manual) setRefreshing(true)
+      try {
+        const snapshot: RunSnapshot = await fetchRun(id)
+        setStatus(snapshot.status)
+        setEvents(snapshot.events)
+        setLive({
+          evaluations: snapshot.evaluations,
+          revisions: snapshot.revisions,
+          consensus: snapshot.consensus,
+          verifications: snapshot.verifications,
+          ...(snapshot.report ? { report: snapshot.report } : {}),
         })
-        setHistory(await listRuns())
+        setSelectedId((current) => current ?? snapshot.report?.rankings[0]?.entries[0]?.projectId ?? snapshot.manifest[0]?.id)
+        setPaused(Boolean(snapshot.paused))
+        // A cancelled run reports "Run cancelled." as its error; that is a user
+        // action, not a failure, so it must not raise the red banner.
+        if (snapshot.status === 'cancelled') setRunError(null)
+        else if (snapshot.error) setRunError(snapshot.error)
+        else if (snapshot.status !== 'failed') setRunError(null)
+        if (['done', 'failed', 'cancelled'].includes(snapshot.status)) {
+          unsubscribe.current?.()
+          unsubscribe.current = null
+        }
+        if (snapshot.report) {
+          await saveRun({
+            id: snapshot.id,
+            createdAt: snapshot.createdAt,
+            status: snapshot.status,
+            savedAt: new Date().toISOString(),
+            summary: {
+              projects: snapshot.manifest.length,
+              rubric: snapshot.rubric.name,
+              tracks: snapshot.report.rankings.length,
+            },
+            snapshot,
+          })
+          setHistory(await listRuns())
+        }
+      } catch (error) {
+        const message = messageOf(error)
+        if (/not found|404/i.test(message)) {
+          unsubscribe.current?.()
+          unsubscribe.current = null
+          setRunError(t('run.lost'))
+          setStatus('failed')
+        } else if (manual) {
+          setRunError(message)
+        }
+        // A transient failure is harmless while the SSE stream or the poll is
+        // still running; the next tick retries.
+      } finally {
+        if (manual) setRefreshing(false)
       }
-    } catch {
-      /* a transient fetch failure is harmless; the SSE stream keeps updating */
-    }
-  }
+    },
+    [t],
+  )
+
+  // If the SSE stream drops (a restart, a proxy, a laptop waking up), the run
+  // keeps going server-side. Poll the snapshot until it reaches a terminal
+  // status so the pipeline never freezes on a stale stage.
+  React.useEffect(() => {
+    if (!runId || !running) return
+    const timer = setInterval(() => void refreshRun(runId), 4000)
+    return () => clearInterval(timer)
+  }, [refreshRun, runId, running])
 
   const startRun = async () => {
     if (starting || running) return
     setStarting(true)
+    setCancelling(false)
+    setPaused(false)
     setRunError(null)
     setEvents([])
     setLive(EMPTY_LIVE)
@@ -392,6 +451,12 @@ export function VerdictWorkspace() {
       const run = await createRun(payload)
       setRunId(run.id)
       setStatus(run.status as RunStatus)
+      // Hand the screen to the pipeline: the inputs and the model slots are
+      // settled once the run is created, and the log is where the action is.
+      setInputsOpen(false)
+      setModelsOpen(false)
+      setLogReduced(false)
+      setLogOpen(true)
       unsubscribe.current = subscribeRun(
         run.id,
         (event) => {
@@ -415,12 +480,37 @@ export function VerdictWorkspace() {
   }
 
   const stopRun = async () => {
-    if (!runId) return
+    if (!runId || cancelling) return
+    setCancelling(true)
     try {
-      await cancelRun(runId)
-      setStatus('cancelled')
+      const result = await cancelRun(runId)
+      unsubscribe.current?.()
+      unsubscribe.current = null
+      setPaused(false)
+      if (result.cancelled) {
+        setStatus('cancelled')
+        setRunError(null)
+      } else {
+        await refreshRun(runId, true)
+      }
     } catch (error) {
       setRunError(messageOf(error))
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  /** Pause at the next step boundary; resume lets the held workers continue. */
+  const togglePause = async () => {
+    if (!runId || pausing) return
+    setPausing(true)
+    try {
+      const result = paused ? await resumeRun(runId) : await pauseRun(runId)
+      setPaused(Boolean(result.paused))
+    } catch (error) {
+      setRunError(messageOf(error))
+    } finally {
+      setPausing(false)
     }
   }
 
@@ -451,6 +541,7 @@ export function VerdictWorkspace() {
     setMaxVideoMinutes(snapshot.options.maxVideoMinutes)
     setTemperature(snapshot.options.temperature)
     setStatus(snapshot.status)
+    setPaused(false)
     setEvents(snapshot.events)
     setRunError(snapshot.error ?? null)
     setLive({
@@ -482,9 +573,26 @@ export function VerdictWorkspace() {
     setAnchors((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : current.length >= 3 ? current : [...current, id]))
   }
 
+  const sideDock = logDock === 'left' || logDock === 'right'
+  const docked = logOpen && !logReduced
+  const logPanel = (
+    <div className={cn('flex min-h-0 min-w-0 shrink-0 flex-col border-border bg-card', DOCK_PANEL_CLASS[logDock])}>
+      <EventLog
+        events={events}
+        onClose={() => setLogOpen(false)}
+        onReduce={() => setLogReduced(true)}
+        dock={logDock}
+        onDockChange={setLogDock}
+        className="rounded-none border-0 shadow-none"
+      />
+    </div>
+  )
+
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
+    <div className={cn('flex h-dvh overflow-hidden bg-background', sideDock ? 'flex-row' : 'flex-col')}>
+      {docked && logDock === 'left' ? logPanel : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="z-30 flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
           <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
           <div className="leading-none">
@@ -503,10 +611,15 @@ export function VerdictWorkspace() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-2 px-2 pt-2">
+      {docked && logDock === 'top' ? logPanel : null}
+
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-2 px-2 pt-2 pb-2">
         <SectionCard
           title={t('inputs.title')}
           icon={<Layers className="h-3.5 w-3.5 text-brand-primary" />}
+          open={inputsOpen}
+          onOpenChange={setInputsOpen}
           aside={
             <span className="ml-auto flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
               <span>{t('inputs.projectCount', { count: projects.length })}</span>
@@ -676,6 +789,8 @@ export function VerdictWorkspace() {
         <SectionCard
           title={t('models.title')}
           icon={<Settings2 className="h-3.5 w-3.5 text-brand-primary" />}
+          open={modelsOpen}
+          onOpenChange={setModelsOpen}
           aside={<span className="ml-auto text-[10px] text-muted-foreground">{t('models.aside')}</span>}
           contentClassName="grid grid-cols-1 gap-4 pt-0 md:grid-cols-2"
         >
@@ -787,61 +902,116 @@ export function VerdictWorkspace() {
             />
           </div>
         ) : null}
+        </div>
+      </main>
 
-        <div className="sticky bottom-0 z-20 -mx-2 mt-auto flex flex-wrap items-center gap-2 border-t border-border bg-background/95 px-2 py-2 backdrop-blur">
+      {docked && logDock === 'bottom' ? logPanel : null}
+
+      <div className="z-20 shrink-0 border-t border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center gap-1.5 px-2 py-1">
           {running ? (
-            <Button type="button" variant="destructive" onClick={() => void stopRun()}>
-              <Square className="h-4 w-4" /> {t('run.cancel')}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[11px]"
+                disabled={cancelling || pausing}
+                onClick={() => void stopRun()}
+              >
+                {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />} {t('run.cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant={paused ? 'primary' : 'outline'}
+                size="sm"
+                className="h-7 gap-1 px-2 text-[11px]"
+                disabled={pausing}
+                aria-pressed={paused}
+                aria-label={paused ? t('run.resume') : t('run.pause')}
+                onClick={() => void togglePause()}
+              >
+                {pausing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : paused ? (
+                  <Play className="h-3.5 w-3.5" />
+                ) : (
+                  <Pause className="h-3.5 w-3.5" />
+                )}
+                {paused ? t('run.resume') : t('run.pause')}
+              </Button>
+            </>
           ) : (
             <Button
               type="button"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[11px]"
               disabled={!manifestText.trim() || evaluatorModels.length === 0 || verifierModels.length === 0 || starting}
               onClick={() => void startRun()}
             >
-              <Play className="h-4 w-4" /> {starting ? t('run.starting') : t('run.evaluate')}
+              {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} {starting ? t('run.starting') : t('run.evaluate')}
             </Button>
           )}
-          <Button type="button" variant="outline" size="icon" aria-label={t('run.refresh')} disabled={!runId} onClick={() => runId && void refreshRun(runId)}>
-            <RefreshCw className="h-4 w-4" />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            aria-label={t('run.refresh')}
+            disabled={!runId || refreshing}
+            onClick={() => runId && void refreshRun(runId, true)}
+          >
+            {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           </Button>
-          <Button type="button" variant="outline" size="icon" aria-label={t('run.export')} disabled={!live.report} onClick={exportReport}>
-            <Download className="h-4 w-4" />
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" aria-label={t('run.export')} disabled={!live.report} onClick={exportReport}>
+            <Download className="h-3.5 w-3.5" />
           </Button>
           <Button
             type="button"
             variant={logOpen ? 'secondary' : 'outline'}
             size="icon"
+            className="h-7 w-7"
             aria-label={t('run.log')}
             aria-pressed={logOpen}
-            onClick={() => setLogOpen((value) => !value)}
+            onClick={() => {
+              if (logOpen) {
+                setLogOpen(false)
+              } else {
+                setLogReduced(false)
+                setLogOpen(true)
+              }
+            }}
           >
-            <Terminal className="h-4 w-4" />
+            <Terminal className="h-3.5 w-3.5" />
           </Button>
           <Button
             type="button"
             variant={view === 'results' ? 'secondary' : 'outline'}
             size="icon"
+            className="h-7 w-7"
             aria-label={view === 'pipeline' ? t('run.showResults') : t('run.showPipeline')}
             title={view === 'pipeline' ? t('run.showResults') : t('run.showPipeline')}
             disabled={!canToggleView}
             onClick={() => setView((current) => (current === 'pipeline' ? 'results' : 'pipeline'))}
           >
-            {view === 'pipeline' ? <BarChart3 className="h-4 w-4" /> : <Network className="h-4 w-4" />}
+            {view === 'pipeline' ? <BarChart3 className="h-3.5 w-3.5" /> : <Network className="h-3.5 w-3.5" />}
           </Button>
-          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
-            <StatusPill status={status} />
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-1.5">
+            <StatusPill status={status} paused={paused} />
             {runError ? <span className="min-w-0 truncate text-[10px] text-destructive">{runError}</span> : null}
             {!runError && live.report ? (
               <span className="text-[10px] text-muted-foreground">{t('run.reportReady', { date: formatDate(live.report.createdAt) })}</span>
             ) : null}
           </div>
         </div>
-      </main>
+      </div>
+      </div>
 
-      {logOpen ? (
-        <div className="fixed bottom-16 right-3 z-40 h-[min(45vh,420px)] w-[min(92vw,440px)] shadow-2xl">
-          <EventLog events={events} onClose={() => setLogOpen(false)} />
+      {docked && logDock === 'right' ? logPanel : null}
+
+      {logOpen && logReduced ? (
+        <div className="fixed right-3 bottom-14 z-40">
+          <LogPeek events={events} onExpand={() => setLogReduced(false)} onClose={() => setLogOpen(false)} />
         </div>
       ) : null}
 

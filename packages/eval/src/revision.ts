@@ -33,10 +33,11 @@ export interface ReviseArgs {
   own: ProjectEvaluation
   all: ProjectEvaluation[]
   round: number
+  signal?: AbortSignal
 }
 
 export async function reviseEvaluation(args: ReviseArgs): Promise<{ revision: ProjectRevision; usage: UsageTotals }> {
-  const { project, evidence, rubric, rulesText, agent, modelRef, temperature, own, all, round } = args
+  const { project, evidence, rubric, rulesText, agent, modelRef, temperature, own, all, round, signal } = args
   const peers = anonymisedEvaluations(all, agent.id)
   const dossier = buildDossier(project, evidence)
   const result = await generateStructured({
@@ -47,6 +48,7 @@ export async function reviseEvaluation(args: ReviseArgs): Promise<{ revision: Pr
     prompt: revisionPrompt(project, dossier, own, peers),
     temperature,
     jsonContract: JSON_CONTRACT,
+    ...(signal ? { signal } : {}),
     ...(project.youtube ? { videoUrl: project.youtube } : {}),
   })
 

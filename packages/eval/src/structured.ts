@@ -28,6 +28,8 @@ export interface StructuredOptions<T> {
   videoUrl?: string
   /** Human-readable JSON contract used by the text fallback. */
   jsonContract?: string
+  /** Abort the in-flight model call when the run is cancelled. */
+  signal?: AbortSignal
 }
 
 function usageOf(usage: unknown): UsageTotals {
@@ -80,6 +82,7 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
       ...(providerOptions ? { providerOptions } : {}),
       maxOutputTokens,
       maxRetries: 1,
+      ...(options.signal ? { abortSignal: options.signal } : {}),
     })
     return { object: result.object as T, usage: usageOf(result.usage), mode: 'object' }
   } catch (objectError) {
@@ -91,6 +94,7 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
       ...(providerOptions ? { providerOptions } : {}),
       maxOutputTokens,
       maxRetries: 1,
+      ...(options.signal ? { abortSignal: options.signal } : {}),
     })
     try {
       const parsed = schema.parse(JSON.parse(extractJson(fallback.text)))

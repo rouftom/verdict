@@ -69,8 +69,6 @@
     "searchModel": "搜索模型",
     "noMatch": "没有匹配的已配置模型。",
     "noProvider": "未配置任何提供方。请在 .env 中添加密钥（例如 MODEL_API_KEY 或 OPENAI_API_KEY），然后重新加载。",
-    "hidden_other": "已隐藏 {{count}} 个没有密钥的提供方。",
-    "catalogError": "{{providers}}：模型端点失败，列表为空或来自环境变量回退。",
     "modelAria": "{{slot}}模型 {{index}}",
     "reasoningAria": "{{slot}}推理强度 {{index}}"
   },
@@ -128,18 +126,22 @@
     "done": "已完成",
     "failed": "失败",
     "cancelled": "已取消",
+    "paused": "已暂停",
     "escalated": "已升级"
   },
   "run": {
     "evaluate": "评估",
     "starting": "正在启动…",
     "cancel": "取消运行",
+    "pause": "暂停运行",
+    "resume": "继续运行",
     "refresh": "刷新运行",
     "export": "导出报告",
     "log": "运行日志",
     "showPipeline": "显示流水线",
     "showResults": "显示结果",
     "reportReady": "报告已就绪 · {{date}}",
+    "lost": "该运行已不可用。API 可能已重启，请重新启动一次运行。",
     "failed": "运行失败。"
   },
   "history": {
@@ -185,7 +187,14 @@
     "title": "运行日志",
     "events_other": "{{count}} 个事件",
     "empty": "暂无内容。启动运行以流式查看阶段和模型判定。",
-    "close": "关闭运行日志"
+    "close": "关闭运行日志",
+    "reduce": "缩小运行日志",
+    "expand": "展开运行日志",
+    "jump": "跳到最新事件",
+    "dockBottom": "将运行日志停靠到底部",
+    "dockTop": "将运行日志停靠到顶部",
+    "dockLeft": "将运行日志停靠到左侧",
+    "dockRight": "将运行日志停靠到右侧"
   },
   "sw": {
     "ready": "新版本已就绪。",

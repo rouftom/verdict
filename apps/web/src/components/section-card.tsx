@@ -18,6 +18,9 @@ export interface SectionCardProps {
   icon?: React.ReactNode
   aside?: React.ReactNode
   defaultOpen?: boolean
+  /** Controlled mode: pass both `open` and `onOpenChange`. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   className?: string
   contentClassName?: string
   children: React.ReactNode
@@ -29,14 +32,22 @@ export function SectionCard({
   icon,
   aside,
   defaultOpen = true,
+  open,
+  onOpenChange,
   className,
   contentClassName,
   children,
 }: SectionCardProps) {
-  const [open, setOpen] = React.useState(defaultOpen)
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen)
+  const controlled = open !== undefined
+  const expanded = controlled ? open : internalOpen
+  const change = (next: boolean) => {
+    if (!controlled) setInternalOpen(next)
+    onOpenChange?.(next)
+  }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className={cn('min-w-0', className)}>
+    <Collapsible open={expanded} onOpenChange={change} className={cn('min-w-0', className)}>
       <Card className="h-full min-w-0">
         <CardHeader className="gap-2">
           <CollapsibleTrigger asChild>
@@ -47,7 +58,7 @@ export function SectionCard({
               <ChevronDown
                 className={cn(
                   'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
-                  !open && '-rotate-90',
+                  !expanded && '-rotate-90',
                 )}
               />
               {icon}

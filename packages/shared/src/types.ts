@@ -406,6 +406,8 @@ export interface RunSnapshot {
   events: RunEvent[]
   warnings: string[]
   error?: string
+  /** The run is between two steps: in-flight calls finish, then it holds. */
+  paused?: boolean
 }
 
 export interface UsageTotals {

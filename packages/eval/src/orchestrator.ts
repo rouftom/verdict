@@ -38,6 +38,8 @@ export interface OrchestratorArgs {
   verifierModels: ModelRef[]
   onEvent: (event: RunEvent) => void
   signal?: AbortSignal
+  /** Awaited at every step boundary while the user has the run paused. */
+  waitForResume?: (signal?: AbortSignal) => Promise<void>
   warnings?: string[]
 }
 
@@ -108,12 +110,22 @@ function failureEvaluation(projectId: string, agentId: string, agentName: string
 }
 
 export async function runEvaluation(args: OrchestratorArgs): Promise<OrchestratorResult> {
-  const { runId, manifest, rubric, rulesText, options, evaluatorModels, verifierModels, onEvent, signal } = args
+  const { runId, manifest, rubric, rulesText, options, evaluatorModels, verifierModels, onEvent, signal, waitForResume } = args
   const warnings = [...(args.warnings ?? [])]
   const usage = emptyUsage()
   const emit = (type: RunEventType, partial: Omit<RunEvent, 'type' | 'runId' | 'at'> = {}) =>
     onEvent({ type, runId, at: new Date().toISOString(), ...partial })
   const log = (message: string) => emit('log', { message })
+
+  /**
+   * Step boundary: abort if cancelled, hold while paused, abort again if the
+   * user cancelled while waiting.
+   */
+  const checkpoint = async (): Promise<void> => {
+    throwIfAborted(signal)
+    if (waitForResume) await waitForResume(signal)
+    throwIfAborted(signal)
+  }
 
   if (evaluatorModels.length === 0) throw new Error('No evaluator model is configured.')
   if (verifierModels.length === 0) throw new Error('No verifier model is configured.')
@@ -122,10 +134,10 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   const verifiers = VERIFIERS.slice(0, Math.max(1, rubric.consensus.verifiers))
 
   // 1. Harvest
-  throwIfAborted(signal)
+  await checkpoint()
   emit('stage', { message: 'harvesting' })
   const evidenceList = await mapLimit(manifest, options.concurrency, async (project) => {
-    throwIfAborted(signal)
+    await checkpoint()
     emit('project', { projectId: project.id, message: 'harvesting', data: { name: project.name } })
     const evidence = await harvestProject(project, {
       maxVideoMinutes: options.maxVideoMinutes,
@@ -149,11 +161,11 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   const evidenceMap = new Map(evidenceList.map((evidence) => [evidence.projectId, evidence]))
 
   // 2. Independent evaluation
-  throwIfAborted(signal)
+  await checkpoint()
   emit('stage', { message: 'evaluating' })
   const evaluations: ProjectEvaluation[] = []
   await mapLimit(manifest, options.concurrency, async (project) => {
-    throwIfAborted(signal)
+    await checkpoint()
     const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
     const projectEvaluations = await Promise.all(
       evaluators.map(async (agent, index) => {
@@ -167,6 +179,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             agent,
             modelRef,
             temperature: options.temperature,
+            signal,
           })
           addUsage(usage, result.usage)
           emit('evaluation', {
@@ -188,11 +201,11 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
 
   // 3. Cross-review
-  throwIfAborted(signal)
+  await checkpoint()
   emit('stage', { message: 'reviewing' })
   const revisions: ProjectRevision[] = []
   await mapLimit(manifest, options.concurrency, async (project) => {
-    throwIfAborted(signal)
+    await checkpoint()
     const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
     const ownEvaluations = evaluations.filter((evaluation) => evaluation.projectId === project.id)
     const projectRevisions = await Promise.all(
@@ -214,6 +227,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             own,
             all: ownEvaluations,
             round: 2,
+            signal,
           })
           addUsage(usage, result.usage)
           emit('revision', {
@@ -232,7 +246,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
 
   // 4. Consensus
-  throwIfAborted(signal)
+  await checkpoint()
   emit('stage', { message: 'consensus' })
   const consensus = manifest.map((project) => {
     const projectRevisions = revisions.filter((revision) => revision.projectId === project.id)
@@ -243,7 +257,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
   })
 
   // 5. Comparative ranking pass
-  throwIfAborted(signal)
+  await checkpoint()
   const tracks = groupByTrack(manifest)
   const comparativeOrders = new Map<string, string[]>()
   for (const [track, projects] of tracks) {
@@ -251,6 +265,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       comparativeOrders.set(track, projects.map((project) => project.id))
       continue
     }
+    await checkpoint()
     log(`[${track}] comparative ranking with ${evaluatorModels.length} model(s).`)
     const result = await rankTrack({
       track,
@@ -265,17 +280,18 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       allConsensus: consensus,
       showProvidedRanks: options.showRanksToAgents,
       onLog: log,
+      signal,
     })
     addUsage(usage, result.usage)
     comparativeOrders.set(track, result.order)
   }
 
   // 6. Verification
-  throwIfAborted(signal)
+  await checkpoint()
   emit('stage', { message: 'verifying' })
   const verifications: ProjectVerification[] = []
   await mapLimit(manifest, options.concurrency, async (project) => {
-    throwIfAborted(signal)
+    await checkpoint()
     const evidence = evidenceMap.get(project.id) ?? { projectId: project.id, errors: ['No evidence.'] }
     const projectConsensus = consensus.find((entry) => entry.projectId === project.id)
     if (!projectConsensus) return
@@ -294,6 +310,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
             agent,
             modelRef,
             temperature: options.temperature,
+            signal,
           })
           addUsage(usage, result.usage)
           emit('verification', {
@@ -337,6 +354,7 @@ export async function runEvaluation(args: OrchestratorArgs): Promise<Orchestrato
       modelRefs: verifierModels,
       temperature: options.temperature,
       onLog: log,
+      signal,
     })
     addUsage(usage, rankingResult.usage)
     const comparative = comparativeOrders.get(track) ?? []

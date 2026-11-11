@@ -38,7 +38,7 @@ interface Probe {
   thumbnail?: string
 }
 
-async function probe(ref: YouTubeRef, workDirectory: string): Promise<Probe | null> {
+async function probe(ref: YouTubeRef, workDirectory: string, signal?: AbortSignal): Promise<Probe | null> {
   const cookies = await cookiesFile(workDirectory)
   const result = await run(
     ytdlpPath(),
@@ -50,7 +50,7 @@ async function probe(ref: YouTubeRef, workDirectory: string): Promise<Probe | nu
       ...(cookies ? ['--cookies', cookies] : []),
       ref.url,
     ],
-    { timeoutMs: 90_000, maxBuffer: 8 * 1024 * 1024 },
+    { timeoutMs: 90_000, maxBuffer: 8 * 1024 * 1024, ...(signal ? { signal } : {}) },
   )
   if (result.code !== 0) return null
   try {
@@ -81,7 +81,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
   const workspace = await temporaryDirectory('verdict-video')
 
   try {
-    const meta = await probe(ref, workspace)
+    const meta = await probe(ref, workspace, options.signal)
     if (typeof meta?.duration === 'number' && meta.duration > maxMinutes * 60) {
       throw new Error(`Video is ${Math.round(meta.duration / 60)} min, above the ${maxMinutes} min cap.`)
     }
@@ -104,7 +104,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
         ...(cookies ? ['--cookies', cookies] : []),
         ref.url,
       ],
-      { timeoutMs: 15 * 60_000, maxBuffer: 2 * 1024 * 1024 },
+      { timeoutMs: 15 * 60_000, maxBuffer: 2 * 1024 * 1024, ...(options.signal ? { signal: options.signal } : {}) },
     )
     if (downloaded.code !== 0) throw new Error(`yt-dlp download failed: ${downloaded.stderr.slice(-400)}`)
 
@@ -124,7 +124,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
         '-q:v', '3',
         join(framesDirectory, 'frame-%03d.jpg'),
       ],
-      { timeoutMs: 10 * 60_000 },
+      { timeoutMs: 10 * 60_000, ...(options.signal ? { signal: options.signal } : {}) },
     )
     if (framesResult.code !== 0) throw new Error(`FFmpeg frame extraction failed: ${framesResult.stderr.slice(-300)}`)
 
@@ -137,7 +137,7 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
       caption: `Keyframe at ${index * frameInterval}s (${name}).`,
     }))
 
-    const transcription = await transcribeVideo(videoPath, workspace)
+    const transcription = await transcribeVideo(videoPath, workspace, undefined, options.signal)
 
     return {
       url: ref.url,

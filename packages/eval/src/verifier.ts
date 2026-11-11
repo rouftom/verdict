@@ -32,10 +32,11 @@ export interface VerifyProjectArgs {
   agent: AgentDefinition
   modelRef: ModelRef
   temperature: number
+  signal?: AbortSignal
 }
 
 export async function verifyProject(args: VerifyProjectArgs): Promise<{ verification: ProjectVerification; usage: UsageTotals }> {
-  const { project, evidence, evaluations, consensus, rubric, rulesText, agent, modelRef, temperature } = args
+  const { project, evidence, evaluations, consensus, rubric, rulesText, agent, modelRef, temperature, signal } = args
   const result = await generateStructured({
     model: createLanguageModel(modelRef),
     modelRef,
@@ -52,6 +53,7 @@ export async function verifyProject(args: VerifyProjectArgs): Promise<{ verifica
   "redFlags": [],
   "ranking": ["project-id"]
 }`,
+    ...(signal ? { signal } : {}),
     ...(project.youtube ? { videoUrl: project.youtube } : {}),
   })
 
@@ -102,6 +104,7 @@ export interface VerifyRankingArgs {
   modelRefs: ModelRef[]
   temperature: number
   onLog?: (message: string) => void
+  signal?: AbortSignal
 }
 
 export interface VerifyRankingResult {
@@ -114,7 +117,7 @@ export interface VerifyRankingResult {
 
 /** Each verifier orders the track from the verified scores; Borda merges them. */
 export async function verifyRanking(args: VerifyRankingArgs): Promise<VerifyRankingResult> {
-  const { track, projects, consensus, verifications, evidence, rubric, modelRefs, temperature, onLog } = args
+  const { track, projects, consensus, verifications, evidence, rubric, modelRefs, temperature, onLog, signal } = args
   const usage: UsageTotals = { inputTokens: 0, outputTokens: 0, calls: 0 }
   const ids = new Set(projects.map((project) => project.id))
   const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
@@ -141,6 +144,7 @@ export async function verifyRanking(args: VerifyRankingArgs): Promise<VerifyRank
         prompt: verifierRankingPrompt(track, packets, scoreLines.join('\n')),
         temperature,
         jsonContract: `{ "order": ["project-id"], "rationale": "one sentence" }`,
+        ...(signal ? { signal } : {}),
       })
       usage.inputTokens += result.usage.inputTokens
       usage.outputTokens += result.usage.outputTokens

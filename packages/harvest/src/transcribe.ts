@@ -31,7 +31,7 @@ interface TranscriptionResponse {
   segments?: Array<{ start?: number; end?: number; text?: string }>
 }
 
-async function callEndpoint(filePath: string, offset: number, index: number): Promise<TranscriptionResponse> {
+async function callEndpoint(filePath: string, offset: number, index: number, signal?: AbortSignal): Promise<TranscriptionResponse> {
   const buffer = await readFile(filePath)
   const form = new FormData()
   form.append('file', new Blob([buffer], { type: 'audio/mpeg' }), `segment-${index}.mp3`)
@@ -43,7 +43,7 @@ async function callEndpoint(filePath: string, offset: number, index: number): Pr
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey()}` },
     body: form,
-    signal: AbortSignal.timeout(180_000),
+    signal: signal ?? AbortSignal.timeout(180_000),
   })
 
   if (!response.ok) {
@@ -62,6 +62,7 @@ export async function transcribeVideo(
   videoPath: string,
   workDirectory: string,
   segmentSecondsOverride?: number,
+  signal?: AbortSignal,
 ): Promise<TranscriptionResult> {
   const configuredSegment = Number(env('TRANSCRIPTION_SEGMENT_SECONDS'))
   const segmentSeconds =
@@ -73,14 +74,14 @@ export async function transcribeVideo(
 
   try {
     const audio = join(workDirectory, 'audio.mp3')
-    const extracted = await run(ffmpegPath(), ['-y', '-i', videoPath, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', audio], { timeoutMs: 180_000 })
+    const extracted = await run(ffmpegPath(), ['-y', '-i', videoPath, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '64k', audio], { timeoutMs: 180_000, ...(signal ? { signal } : {}) })
     if (extracted.code !== 0) return { error: `FFmpeg audio extraction failed: ${extracted.stderr.slice(-300)}` }
 
     const pattern = join(workDirectory, 'segment-%03d.mp3')
     const segmented = await run(
       ffmpegPath(),
       ['-y', '-i', audio, '-f', 'segment', '-segment_time', String(segmentSeconds), '-c:a', 'libmp3lame', '-b:a', '64k', pattern],
-      { timeoutMs: 180_000 },
+      { timeoutMs: 180_000, ...(signal ? { signal } : {}) },
     )
     if (segmented.code !== 0) return { error: `FFmpeg segmentation failed: ${segmented.stderr.slice(-300)}` }
 
@@ -95,7 +96,7 @@ export async function transcribeVideo(
 
     for (const [index, chunk] of chunks.entries()) {
       try {
-        const result = await callEndpoint(join(workDirectory, chunk), index * segmentSeconds, index)
+        const result = await callEndpoint(join(workDirectory, chunk), index * segmentSeconds, index, signal)
         if (result.language && !language) language = result.language
         if (Array.isArray(result.segments) && result.segments.length > 0) {
           for (const segment of result.segments) {

@@ -10,7 +10,7 @@ import {
   type RunEvent,
 } from '@verdict/shared'
 import { config } from './config'
-import { cancelRun, createRun, getRun, listRuns, parseInputs, subscribe } from './state'
+import { cancelRun, createRun, getRun, listRuns, parseInputs, pauseRun, resumeRun, subscribe } from './state'
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -154,11 +154,25 @@ app.get<{ Params: { id: string } }>('/runs/:id/events', (request, reply) => {
     return
   }
 
+  // `reply.raw.writeHead` bypasses the Fastify CORS hook, and EventSource is a
+  // cross-origin request in development. Echo the allowed origin here or the
+  // browser blocks the stream as soon as it opens.
+  const allowedOrigins = config.webOrigin
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+  const requestOrigin = request.headers.origin
+  const allowOrigin =
+    requestOrigin && (allowedOrigins.includes('*') || allowedOrigins.includes(requestOrigin))
+      ? requestOrigin
+      : allowedOrigins[0]
+
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
+    ...(allowOrigin ? { 'Access-Control-Allow-Origin': allowOrigin, Vary: 'Origin' } : {}),
   })
 
   const terminal = ['done', 'failed', 'cancelled'].includes(run.status)
@@ -208,6 +222,22 @@ app.post<{ Params: { id: string } }>('/runs/:id/cancel', async (request, reply) 
   if (!run) return reply.code(404).send({ error: 'Run not found.' })
   const cancelled = cancelRun(run.id)
   return { cancelled, status: run.status }
+})
+
+app.post<{ Params: { id: string } }>('/runs/:id/pause', async (request, reply) => {
+  const run = getRun(request.params.id)
+  if (!run) return reply.code(404).send({ error: 'Run not found.' })
+  const result = pauseRun(run.id)
+  if (!result) return reply.code(409).send({ error: 'Run is not active.' })
+  return { paused: result.paused, status: run.status }
+})
+
+app.post<{ Params: { id: string } }>('/runs/:id/resume', async (request, reply) => {
+  const run = getRun(request.params.id)
+  if (!run) return reply.code(404).send({ error: 'Run not found.' })
+  const result = resumeRun(run.id)
+  if (!result) return reply.code(409).send({ error: 'Run is not active.' })
+  return { paused: result.paused, status: run.status }
 })
 
 app.setErrorHandler((error, _request, reply) => {
