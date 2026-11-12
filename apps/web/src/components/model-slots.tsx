@@ -8,10 +8,6 @@ import {
   Button,
   SearchSelect,
   Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
   cn,
   type SearchSelectGroup,
 } from '@verdict/ui'
@@ -61,31 +57,50 @@ function reasoningGroup(efforts: readonly ReasoningEffort[], t: TFunction): Sear
 }
 
 /**
- * Slot label with the agent role behind it. Hover and keyboard focus both open
- * the same hint, so the role is reachable without a pointer.
+ * Slot label with the agent role behind it. The hint is the same dark Tailwind
+ * pill used across the FSM and policy sandbox consoles, opened from pointer
+ * enter/leave and from keyboard focus so both paths show the same text.
  */
 function AgentHint({ agentId, label }: { agentId: string; label: string }) {
   const { t } = useTranslation()
+  const id = React.useId()
+  const [open, setOpen] = React.useState(false)
   const name = t(`agents.${agentId}.name`, { defaultValue: label })
   const lens = t(`agents.${agentId}.lens`, { defaultValue: '' })
   const focus = t(`agents.${agentId}.focus`, { defaultValue: '' })
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={focus ? `${name}: ${focus}` : name}
-          className="inline-flex w-6 shrink-0 cursor-help items-center justify-end rounded text-[10px] tabular-nums text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-        >
-          {label}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="right" align="start" className="max-w-[17rem] text-[11px] leading-snug">
-        <p className="font-semibold text-foreground">{name}</p>
-        {lens ? <p className="text-muted-foreground">{lens}</p> : null}
-        {focus ? <p className="mt-1">{focus}</p> : null}
-      </TooltipContent>
-    </Tooltip>
+    <span
+      className="relative inline-flex w-6 shrink-0 justify-end"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false)
+      }}
+    >
+      <button
+        type="button"
+        aria-describedby={open ? id : undefined}
+        aria-label={focus ? `${name}: ${focus}` : name}
+        className="w-full cursor-help rounded text-right text-[10px] tabular-nums text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+      >
+        {label}
+      </button>
+      <span
+        id={id}
+        role="tooltip"
+        aria-hidden={!open}
+        className={cn(
+          'pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-64 -translate-y-1/2 rounded-lg bg-brand-primary px-3 py-2 text-left text-[11px] font-normal leading-snug tracking-normal text-white shadow-lg transition-opacity duration-150',
+          open ? 'visible opacity-100' : 'invisible opacity-0',
+        )}
+      >
+        <span className="block font-semibold">{name}</span>
+        {lens ? <span className="block text-white/75">{lens}</span> : null}
+        {focus ? <span className="mt-1 block text-white/90">{focus}</span> : null}
+      </span>
+    </span>
   )
 }
 
@@ -224,47 +239,45 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
           <Shuffle className="h-3 w-3" /> {t('modelSlots.diversify')}
         </Button>
       </div>
-      <TooltipProvider delayDuration={150}>
-        <div className="flex flex-col gap-1">
-          {Array.from({ length: slots }, (_, index) => {
-            const current = value[index]
-            const key = current ? `${current.provider}:${current.model}` : ''
-            const effort = current?.reasoningEffort ?? 'default'
-            const efforts = current ? reasoningEffortsFor(current.provider, current.model) : REASONING_EFFORTS
-            const slotLabel = idPrefix === 'eval' ? t('role.evaluator') : t('role.verifier')
-            const agentId = agents?.[index]?.id ?? `${idPrefix === 'eval' ? 'e' : 'v'}${index + 1}`
-            const slotCode = `${idPrefix === 'eval' ? 'E' : 'V'}${index + 1}`
-            return (
-              <div key={`${idPrefix}-${index}`} className="flex min-w-0 items-center gap-1.5">
-                <AgentHint agentId={agentId} label={slotCode} />
-                <SearchSelect
-                  value={key}
-                  onValueChange={(next) => updateModel(index, next)}
-                  groups={groups}
-                  ariaLabel={t('modelSlots.modelAria', { slot: slotLabel, index: index + 1 })}
-                  placeholder={t('modelSlots.searchModel')}
-                  emptyLabel={t('modelSlots.noMatch')}
-                  className="min-w-0 flex-1"
-                  triggerClassName="w-full min-w-0"
-                  size="sm"
-                />
-                <SearchSelect
-                  value={effort}
-                  onValueChange={(next) => updateReasoning(index, next)}
-                  groups={reasoningGroup(efforts, t)}
-                  ariaLabel={t('modelSlots.reasoningAria', { slot: slotLabel, index: index + 1 })}
-                  placeholder={t('modelSlots.auto')}
-                  searchable={false}
-                  className="w-[84px] shrink-0"
-                  triggerClassName="w-full"
-                  size="sm"
-                  align="end"
-                />
-              </div>
-            )
-          })}
-        </div>
-      </TooltipProvider>
+      <div className="flex flex-col gap-1">
+        {Array.from({ length: slots }, (_, index) => {
+          const current = value[index]
+          const key = current ? `${current.provider}:${current.model}` : ''
+          const effort = current?.reasoningEffort ?? 'default'
+          const efforts = current ? reasoningEffortsFor(current.provider, current.model) : REASONING_EFFORTS
+          const slotLabel = idPrefix === 'eval' ? t('role.evaluator') : t('role.verifier')
+          const agentId = agents?.[index]?.id ?? `${idPrefix === 'eval' ? 'e' : 'v'}${index + 1}`
+          const slotCode = `${idPrefix === 'eval' ? 'E' : 'V'}${index + 1}`
+          return (
+            <div key={`${idPrefix}-${index}`} className="flex min-w-0 items-center gap-1.5">
+              <AgentHint agentId={agentId} label={slotCode} />
+              <SearchSelect
+                value={key}
+                onValueChange={(next) => updateModel(index, next)}
+                groups={groups}
+                ariaLabel={t('modelSlots.modelAria', { slot: slotLabel, index: index + 1 })}
+                placeholder={t('modelSlots.searchModel')}
+                emptyLabel={t('modelSlots.noMatch')}
+                className="min-w-0 flex-1"
+                triggerClassName="w-full min-w-0"
+                size="sm"
+              />
+              <SearchSelect
+                value={effort}
+                onValueChange={(next) => updateReasoning(index, next)}
+                groups={reasoningGroup(efforts, t)}
+                ariaLabel={t('modelSlots.reasoningAria', { slot: slotLabel, index: index + 1 })}
+                placeholder={t('modelSlots.auto')}
+                searchable={false}
+                className="w-[84px] shrink-0"
+                triggerClassName="w-full"
+                size="sm"
+                align="end"
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
