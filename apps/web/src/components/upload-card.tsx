@@ -13,6 +13,8 @@ export interface UploadCardProps {
   filename?: string
   text: string
   required?: boolean
+  /** A run is starting or live: the picker must not change the inputs. */
+  disabled?: boolean
   /** Extra controls aligned to the end of the picker row (rubric mode, presets). */
   actions?: React.ReactNode
   onFile: (filename: string, text: string) => void
@@ -27,6 +29,7 @@ export function UploadCard({
   filename,
   text,
   required = false,
+  disabled = false,
   actions,
   onFile,
   onClear,
@@ -38,6 +41,7 @@ export function UploadCard({
   const [error, setError] = React.useState<string | null>(null)
 
   const read = async (file: File) => {
+    if (disabled) return
     if (file.size > 8 * 1024 * 1024) {
       setError(t('upload.tooLarge'))
       return
@@ -64,7 +68,14 @@ export function UploadCard({
           {required ? <span className="ml-1 text-destructive">*</span> : null}
         </Label>
         {text ? (
-          <Button type="button" variant="ghost" size="icon-sm" aria-label={t('upload.clear', { label })} onClick={onClear}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t('upload.clear', { label })}
+            onClick={onClear}
+            disabled={disabled}
+          >
             <X className="h-3.5 w-3.5" />
           </Button>
         ) : null}
@@ -73,22 +84,31 @@ export function UploadCard({
       <div
         onDragOver={(event) => {
           event.preventDefault()
-          setDragging(true)
+          if (!disabled) setDragging(true)
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => {
           event.preventDefault()
           setDragging(false)
+          if (disabled) return
           const file = event.dataTransfer.files?.[0]
           if (file) void read(file)
         }}
+        aria-disabled={disabled}
         className={cn(
           'relative flex flex-1 flex-col rounded-lg border border-dashed border-border bg-muted/20 p-2.5 transition-colors',
-          dragging && 'border-brand-primary bg-brand-primary/5',
+          dragging && !disabled && 'border-brand-primary bg-brand-primary/5',
+          disabled && 'cursor-not-allowed opacity-60',
         )}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()} disabled={reading}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => input.current?.click()}
+            disabled={reading || disabled}
+          >
             <Upload className="h-3.5 w-3.5" />
             {reading ? t('upload.reading') : t('upload.chooseFile')}
           </Button>
@@ -98,6 +118,7 @@ export function UploadCard({
             type="file"
             accept={accept}
             className="sr-only"
+            disabled={disabled}
             onChange={(event) => {
               const file = event.target.files?.[0]
               if (file) void read(file)

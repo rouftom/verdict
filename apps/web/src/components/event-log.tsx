@@ -12,6 +12,12 @@ import { SpiralStream } from './stream-indicator'
 
 export type LogDock = 'bottom' | 'top' | 'left' | 'right'
 
+/** Virtuoso scroller with the console's thin scrollbar. */
+const VirtuosoScroller = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => <div ref={ref} className={cn('custom-scrollbar', className)} {...props} />,
+)
+VirtuosoScroller.displayName = 'VirtuosoScroller'
+
 const DOCK_ICONS = {
   bottom: PanelBottom,
   top: PanelTop,
@@ -213,10 +219,10 @@ function EventLine({ event, origin }: { event: RunEvent; origin?: string }) {
   const agentLabel = agent ? t(`agents.${agent.id}.name`, { defaultValue: agent.name ?? agent.id }) : undefined
   const elapsed = elapsedOf(event, origin)
   return (
-    <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-2 border-transparent px-2 py-0.5 font-mono text-[10px] leading-relaxed', tone.text, tone.row)}>
+    <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-2 border-transparent px-2 py-0.5 font-mono text-[11px] leading-relaxed', tone.text, tone.row)}>
       <span className="shrink-0 tabular-nums text-muted-foreground/70">{timeOf(event)}</span>
       {elapsed ? <span className="shrink-0 tabular-nums text-muted-foreground/50">{elapsed}</span> : null}
-      <span className={cn('shrink-0 rounded px-1 text-[9px] font-semibold uppercase tracking-wide', tone.chip)}>{event.type}</span>
+      <span className={cn('shrink-0 rounded px-1 text-[10px] font-semibold uppercase tracking-wide', tone.chip)}>{event.type}</span>
       {agent && agentLabel ? (
         <span className={cn('shrink-0 font-semibold', AGENT_TONES[agent.id] ?? 'text-foreground')}>[{agentLabel}]</span>
       ) : null}
@@ -400,6 +406,7 @@ export function EventLog({
             }}
             data={events}
             className="h-full"
+            components={{ Scroller: VirtuosoScroller }}
             followOutput="auto"
             initialTopMostItemIndex={{ index: Math.max(0, events.length - 1), align: 'end' }}
             itemContent={(index, event) => (

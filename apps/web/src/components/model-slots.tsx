@@ -29,6 +29,8 @@ export interface ModelSlotsProps {
   compact?: boolean
   /** Agent personas, so each slot can explain its role on hover. */
   agents?: AgentInfo[]
+  /** A run is starting or live: the model choices must not change. */
+  disabled?: boolean
   /** Providers are still being fetched: show shimmer rows instead of the empty state. */
   loading?: boolean
 }
@@ -155,7 +157,7 @@ function assignmentKey(models: ModelRef[]): string {
   return models.map((model) => `${model.provider}:${model.model}:${model.reasoningEffort ?? ''}`).join('|')
 }
 
-export function ModelSlots({ providers, value, slots, onChange, idPrefix, compact = false, agents, loading = false }: ModelSlotsProps) {
+export function ModelSlots({ providers, value, slots, onChange, idPrefix, compact = false, agents, disabled = false, loading = false }: ModelSlotsProps) {
   const { t } = useTranslation()
   const flat = React.useMemo(() => flatten(providers), [providers])
   const groups = React.useMemo(() => modelGroups(providers), [providers])
@@ -235,7 +237,14 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
         <span className="text-[11px] text-muted-foreground">
           {t('modelSlots.modelCount', { count: flat.length })} · {t('modelSlots.providerCount', { count: providerCount })}
         </span>
-        <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={cycle}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[11px]"
+          onClick={cycle}
+          disabled={disabled}
+        >
           <Shuffle className="h-3 w-3" /> {t('modelSlots.diversify')}
         </Button>
       </div>
@@ -261,6 +270,7 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
                 className="min-w-0 flex-1"
                 triggerClassName="w-full min-w-0"
                 size="sm"
+                disabled={disabled}
               />
               <SearchSelect
                 value={effort}
@@ -273,6 +283,7 @@ export function ModelSlots({ providers, value, slots, onChange, idPrefix, compac
                 triggerClassName="w-full"
                 size="sm"
                 align="end"
+                disabled={disabled}
               />
             </div>
           )

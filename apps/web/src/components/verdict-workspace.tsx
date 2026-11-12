@@ -349,6 +349,8 @@ export function VerdictWorkspace() {
   const unsubscribe = React.useRef<(() => void) | null>(null)
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const running = status !== undefined && RUNNING.includes(status)
+  /** A run is starting or live: every input block freezes its actions. */
+  const locked = running || starting
 
   // The report closes the run: switch to the results view and hide the log
   // instead of leaving the reader on the graph. The key keeps a manual switch
@@ -1037,7 +1039,7 @@ export function VerdictWorkspace() {
 
       {docked && logDock === 'top' ? logPanel : null}
 
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-2 px-2 pt-2 pb-2">
         <SectionCard
           title={t('inputs.title')}
@@ -1056,6 +1058,7 @@ export function VerdictWorkspace() {
                 aria-pressed={offlineOpen}
                 aria-label={t('offline.toggleAria')}
                 onClick={() => setOfflineOpen((value) => !value)}
+                disabled={locked}
               >
                 <FolderUp className="h-3 w-3" /> {offline ? t('offline.attached') : t('offline.toggle')}
               </Button>
@@ -1146,7 +1149,7 @@ export function VerdictWorkspace() {
                     size="sm"
                     className="ml-auto h-6 px-2 text-[10px]"
                     onClick={() => void runMatchingAgent()}
-                    disabled={matching || !manifestText.trim()}
+                    disabled={matching || locked || !manifestText.trim()}
                   >
                     {matching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                     {matching ? t('offline.matching') : t('offline.matchAgent')}
@@ -1192,6 +1195,7 @@ export function VerdictWorkspace() {
                             aria-label={t('offline.repositoryAria', { name: project.name })}
                             className="h-6 max-w-[190px] rounded border border-border bg-background px-1 text-[10px]"
                             value={match.repository ?? ''}
+                            disabled={locked}
                             onChange={(event) => setOfflineMatch(project.id, 'repository', event.target.value)}
                           >
                             <option value="">{t('offline.noRepository')}</option>
@@ -1210,6 +1214,7 @@ export function VerdictWorkspace() {
                             aria-label={t('offline.videoAria', { name: project.name })}
                             className="h-6 max-w-[190px] rounded border border-border bg-background px-1 text-[10px]"
                             value={match.video ?? ''}
+                            disabled={locked}
                             onChange={(event) => setOfflineMatch(project.id, 'video', event.target.value)}
                           >
                             <option value="">{t('offline.noVideo')}</option>
@@ -1239,6 +1244,7 @@ export function VerdictWorkspace() {
                 filename={manifestName}
                 text={manifestText}
                 required
+                disabled={locked}
                 onFile={(filename, text) => {
                   setManifestText(text)
                   setManifestName(filename)
@@ -1256,6 +1262,7 @@ export function VerdictWorkspace() {
                 accept=".md,.markdown,.txt,.yaml,.yml"
                 filename={rulesName}
                 text={rulesText}
+                disabled={locked}
                 onFile={(filename, text) => {
                   setRulesText(text)
                   setRulesName(filename)
@@ -1273,6 +1280,7 @@ export function VerdictWorkspace() {
                 accept=".yaml,.yml,.json,.md,.markdown"
                 filename={rubricName}
                 text={rubricText}
+                disabled={locked}
                 actions={
                   <>
                     <Button
@@ -1280,6 +1288,7 @@ export function VerdictWorkspace() {
                       variant={rubricMode === 'builtin' ? 'primary' : 'outline'}
                       size="sm"
                       className="h-6 px-2 text-[11px]"
+                      disabled={locked}
                       onClick={() => {
                         setRubricText('')
                         setRubricName(undefined)
@@ -1293,6 +1302,7 @@ export function VerdictWorkspace() {
                       variant="outline"
                       size="sm"
                       className="h-6 px-2 text-[11px]"
+                      disabled={locked}
                       onClick={() => void loadPreset('generic', '/rules/judging-rubric.generic.yaml', 'rubric')}
                     >
                       {t('inputs.genericYaml')}
@@ -1380,6 +1390,7 @@ export function VerdictWorkspace() {
                             type="button"
                             onClick={() => toggleAnchor(project.id)}
                             title={project.name}
+                            disabled={locked}
                             className={cn(
                               'inline-flex max-w-[12rem] items-center rounded-full border px-2 py-0.5 text-[10px]',
                               anchors.includes(project.id)
@@ -1423,6 +1434,7 @@ export function VerdictWorkspace() {
               onChange={setEvaluatorModels}
               idPrefix="eval"
               agents={agents?.evaluators}
+              disabled={locked}
               compact
               loading={providers.length === 0 && !providersError}
             />
@@ -1440,6 +1452,7 @@ export function VerdictWorkspace() {
               onChange={setVerifierModels}
               idPrefix="verify"
               agents={agents?.verifiers}
+              disabled={locked}
               compact
               loading={providers.length === 0 && !providersError}
             />
@@ -1685,7 +1698,7 @@ export function VerdictWorkspace() {
               </Button>
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground">{t('history.stored')}</p>
-            <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
+            <div className="custom-scrollbar mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
               {historyLoading && history.length === 0 ? (
                 <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
                   {Array.from({ length: 3 }, (_, index) => (
