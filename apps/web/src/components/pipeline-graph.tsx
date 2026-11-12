@@ -17,20 +17,29 @@ import { Badge, cn } from '@verdict/ui'
 import {
   Activity,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Flag,
   Loader2,
   Pause,
   ShieldCheck,
   UserRound,
+  Workflow,
   XCircle,
 } from 'lucide-react'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { A11y } from 'swiper/modules'
+import type { Swiper as SwiperClass } from 'swiper'
+import 'swiper/css'
 import type {
   AgentInfo,
   ModelRef,
+  ProjectConsensus,
   ProjectEvaluation,
   ProjectRevision,
   ProjectVerification,
+  Report,
   RunEvent,
   RunStatus,
   StageOneResult,
@@ -39,11 +48,26 @@ import { agentTimings, durationOf, reportTiming, stageTimings, statusFromEvents,
 
 type StageStatus = 'idle' | 'active' | 'done' | 'error'
 
+interface StageMetric {
+  label: string
+  value: string
+}
+
+interface StageRow {
+  label: string
+  value: string
+  /** `undefined` means informational, `true` passed, `false` failed. */
+  ok?: boolean
+}
+
 interface StageData extends Record<string, unknown> {
+  nodeId: string
   title: string
   detail: string
   status: StageStatus
   duration?: string
+  metrics?: StageMetric[]
+  rows?: StageRow[]
 }
 
 export interface CriterionMeta {
@@ -59,13 +83,24 @@ interface AgentSummary {
   evaluation?: ProjectEvaluation
   revision?: ProjectRevision
   verification?: ProjectVerification
+  /** Every project this agent returned a result for, in project order. */
+  returns: AgentReturn[]
   count: number
+}
+
+/** One agent result for one project, as a slide in the agent card. */
+interface AgentReturn {
+  projectId: string
+  projectName: string
+  evaluation?: ProjectEvaluation
+  revision?: ProjectRevision
+  verification?: ProjectVerification
 }
 
 type AgentData = AgentSummary &
   Record<string, unknown> & {
+    nodeId: string
     criteria: CriterionMeta[]
-    projectName?: string
     duration?: string
   }
 
@@ -81,19 +116,35 @@ function useNow(active: boolean): number {
   return now
 }
 
+/** One spinner everywhere in the graph: node status, card and initial load. */
+function NodeLoader({ className }: { className?: string }) {
+  return <Loader2 aria-hidden strokeWidth={2.5} className={cn('h-3.5 w-3.5 animate-spin text-brand-primary', className)} />
+}
+
 function StatusIcon({ status, className }: { status: StageStatus; className?: string }) {
   if (status === 'done') return <CheckCircle2 className={cn('h-3.5 w-3.5 text-emerald-500', className)} />
-  if (status === 'active') return <Loader2 className={cn('h-3.5 w-3.5 animate-spin text-brand-primary', className)} />
+  if (status === 'active') return <NodeLoader className={className} />
   if (status === 'error') return <XCircle className={cn('h-3.5 w-3.5 text-destructive', className)} />
   return <Circle className={cn('h-3.5 w-3.5 text-muted-foreground/50', className)} />
 }
 
 function StageNode({ data }: NodeProps) {
   const stage = data as StageData
+  const popover = React.useContext(NodePopoverContext)
+  const open = popover.openId === stage.nodeId
   return (
-    <div
+    <button
+      type="button"
+      title={stage.title}
+      aria-expanded={open}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation()
+        popover.open(stage.nodeId, event.currentTarget.getBoundingClientRect())
+      }}
       className={cn(
-        'w-[172px] rounded-lg border bg-card px-3 py-2 shadow-sm transition-colors',
+        'nodrag nopan w-[172px] cursor-pointer rounded-lg border bg-card px-3 py-2 text-left shadow-sm transition-colors',
+        'hover:border-brand-primary/60 hover:bg-brand-primary/5',
         stage.status === 'active' && 'border-brand-primary ring-2 ring-brand-primary/20',
         stage.status === 'done' && 'border-emerald-500/40',
         stage.status === 'error' && 'border-destructive/50',
@@ -110,6 +161,75 @@ function StageNode({ data }: NodeProps) {
       </div>
       <p className="mt-0.5 truncate pl-5 text-[10px] leading-tight text-muted-foreground">{stage.detail}</p>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
+    </button>
+  )
+}
+
+/** Read-only synthesis for a pipeline stage, opened from its node. */
+function StageCard({ data }: { data: StageData }) {
+  const { t } = useTranslation()
+  const tone = data.status === 'done' ? 'success' : data.status === 'active' ? 'brand' : data.status === 'error' ? 'danger' : 'neutral'
+  const hasDetail = Boolean(data.metrics?.length) || Boolean(data.rows?.length)
+  return (
+    <div className="custom-scrollbar flex max-h-[70vh] flex-col gap-2 overflow-y-auto pr-1">
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-brand-primary/10 text-brand-primary">
+          <Workflow className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12px] font-semibold leading-tight">{data.title}</p>
+          <p className="text-[10px] text-muted-foreground">{data.detail}</p>
+        </div>
+        <Badge tone={tone}>{t(`pipeline.stageState.${data.status}`)}</Badge>
+      </div>
+
+      {data.duration ? (
+        <Badge tone="neutral" className="w-fit font-mono text-[10px] tabular-nums">
+          {data.duration}
+        </Badge>
+      ) : null}
+
+      {data.status === 'active' ? (
+        <p className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2 py-1.5 text-[10px] text-muted-foreground">
+          <NodeLoader className="h-3 w-3" />
+          {t('pipeline.cardRunning')}
+        </p>
+      ) : null}
+
+      {data.metrics?.length ? (
+        <div className="grid grid-cols-2 gap-1.5">
+          {data.metrics.map((metric) => (
+            <div key={metric.label} className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
+              <p className="text-[9px] text-muted-foreground">{metric.label}</p>
+              <p className="text-[12px] font-semibold tabular-nums">{metric.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {data.rows?.length ? (
+        <div className="flex flex-col gap-1">
+          {data.rows.map((row) => (
+            <div key={`${row.label}-${row.value}`} className="flex items-center gap-2 text-[10px]">
+              {row.ok === undefined ? (
+                <Circle className="h-2.5 w-2.5 shrink-0 text-muted-foreground/60" />
+              ) : row.ok ? (
+                <CheckCircle2 className="h-2.5 w-2.5 shrink-0 text-emerald-500" />
+              ) : (
+                <XCircle className="h-2.5 w-2.5 shrink-0 text-destructive" />
+              )}
+              <span className="min-w-0 flex-1 truncate">{row.label}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {!hasDetail && data.status !== 'active' ? (
+        <p className="rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
+          {t('pipeline.cardWaiting')}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -121,38 +241,148 @@ function scoreClass(score: number): string {
 }
 
 function modelName(model: ModelRef | undefined, notSet: string): string {
-  return model ? model.model : notSet
+  return model ? `${model.provider} | ${model.model}` : notSet
 }
 
-function AgentCard({ data }: { data: AgentData }) {
+function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn }) {
   const { t } = useTranslation()
-  const latest = data.revision ?? data.evaluation
+  const latest = entry.revision ?? entry.evaluation
   const criteriaScores = React.useMemo(() => {
     const map = new Map<string, { score: number; confidence: number; rationale?: string }>()
     if (latest) {
-      for (const entry of latest.scores) {
-        map.set(entry.criterionId, { score: entry.score, confidence: entry.confidence, rationale: entry.rationale })
+      for (const score of latest.scores) {
+        map.set(score.criterionId, { score: score.score, confidence: score.confidence, rationale: score.rationale })
       }
     }
-    if (data.verification) {
-      for (const [criterionId, score] of Object.entries(data.verification.finalScores)) {
+    if (entry.verification) {
+      for (const [criterionId, score] of Object.entries(entry.verification.finalScores)) {
         const previous = map.get(criterionId)
         map.set(criterionId, { score, confidence: previous?.confidence ?? 1, rationale: previous?.rationale })
       }
     }
     return map
-  }, [data.verification, latest])
+  }, [entry.verification, latest])
 
-  const overall = data.verification?.finalOverall ?? latest?.overall
+  const overall = entry.verification?.finalOverall ?? latest?.overall
   const confidence =
     latest && latest.scores.length > 0
-      ? latest.scores.reduce((sum, entry) => sum + entry.confidence, 0) / latest.scores.length
+      ? latest.scores.reduce((sum, score) => sum + score.confidence, 0) / latest.scores.length
       : undefined
-  const redFlags = data.verification?.redFlags ?? latest?.redFlags ?? []
-  const summary = data.verification?.notes || latest?.summary || ''
+  const redFlags = entry.verification?.redFlags ?? latest?.redFlags ?? []
+  const summary = entry.verification?.notes || latest?.summary || ''
 
   return (
-    <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto">
+    <div className="custom-scrollbar flex max-h-[48vh] flex-col gap-2 overflow-y-auto px-7 pb-1">
+      <div className="flex items-center gap-1.5">
+        <p className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={entry.projectName}>
+          {entry.projectName}
+        </p>
+        {entry.revision ? (
+          <Badge tone="warning" className="text-[9px]">
+            {t('pipeline.revised', { round: entry.revision.round })}
+          </Badge>
+        ) : null}
+        {entry.verification ? (
+          <Badge tone={entry.verification.approved ? 'success' : 'danger'} className="text-[9px]">
+            {entry.verification.approved ? t('pipeline.approved') : t('pipeline.flagged')}
+          </Badge>
+        ) : null}
+        {overall !== undefined ? <span className={cn('text-lg font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span> : null}
+      </div>
+
+      {overall !== undefined ? (
+        <>
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] text-muted-foreground">
+                {entry.verification
+                  ? t('pipeline.verifierFinalScore')
+                  : confidence !== undefined
+                    ? t('pipeline.confidence', { value: Math.round(confidence * 100) })
+                    : t('pipeline.evaluatorScore')}
+              </p>
+            </div>
+            <span className="min-w-0 truncate text-[10px] tabular-nums text-muted-foreground">
+              {data.model ? data.model.model : t('pipeline.modelNotSet')}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            {data.criteria.map((criterion) => {
+              const score = criteriaScores.get(criterion.id)
+              return (
+                <div key={criterion.id} className="flex items-center gap-2 text-[10px]">
+                  <span className="min-w-0 flex-1 truncate">{criterion.label}</span>
+                  <span className={cn('w-8 text-right font-semibold tabular-nums', score ? scoreClass(score.score) : 'text-muted-foreground')}>
+                    {score ? score.score.toFixed(0) : '-'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {summary ? (
+            <div className="rounded-md border border-border bg-muted/20 p-2">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.synthesis')}</p>
+              <p className="mt-0.5 text-[10px] leading-snug text-foreground">{summary}</p>
+            </div>
+          ) : null}
+
+          {redFlags.length > 0 ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
+              <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-destructive">
+                <Flag className="h-2.5 w-2.5" /> {t('pipeline.redFlags')}
+              </p>
+              <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
+                {redFlags.slice(0, 6).map((flag) => (
+                  <li key={flag}>{flag}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {entry.verification && entry.verification.adjustments.length > 0 ? (
+            <div className="rounded-md border border-border p-2">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.adjustments')}</p>
+              <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
+                {entry.verification.adjustments.map((adjustment) => (
+                  <li key={adjustment.criterionId}>
+                    {adjustment.criterionId}: {adjustment.from} → {adjustment.to}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p className="flex items-start gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
+          {data.status === 'active' ? <NodeLoader className="mt-0.5 h-3 w-3" /> : null}
+          <span>{t('pipeline.waiting')}</span>
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AgentCard({ data }: { data: AgentData }) {
+  const { t } = useTranslation()
+  const returns = data.returns
+  const [active, setActive] = React.useState(0)
+  const swiperRef = React.useRef<SwiperClass | null>(null)
+
+  React.useEffect(() => {
+    setActive((index) => Math.min(index, Math.max(0, returns.length - 1)))
+  }, [returns.length])
+
+  const go = (direction: -1 | 1) => {
+    const swiper = swiperRef.current
+    if (!swiper) return
+    if (direction < 0) swiper.slidePrev()
+    else swiper.slideNext()
+  }
+
+  return (
+    <div className="flex max-h-[70vh] flex-col gap-2">
       <div className="flex items-start gap-2">
         <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-brand-primary/10 text-brand-primary">
           {data.role === 'evaluator' ? <UserRound className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
@@ -184,88 +414,76 @@ function AgentCard({ data }: { data: AgentData }) {
             {data.duration}
           </Badge>
         ) : null}
-        {data.revision ? (
-          <Badge tone="warning" className="text-[10px]">
-            {t('pipeline.revised', { round: data.revision.round })}
-          </Badge>
-        ) : null}
-        {data.verification ? (
-          <Badge tone={data.verification.approved ? 'success' : 'danger'} className="text-[10px]">
-            {data.verification.approved ? t('pipeline.approved') : t('pipeline.flagged')}
-          </Badge>
-        ) : null}
       </div>
 
       <p className="text-[10px] leading-tight text-muted-foreground">
         {t(`agents.${data.agent.id}.focus`, { defaultValue: data.agent.focus })}
       </p>
 
-      {overall !== undefined ? (
-        <>
-          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[10px] text-muted-foreground">{data.projectName ?? t('pipeline.latestProject')}</p>
-              <p className="text-[9px] text-muted-foreground">
-                {data.verification
-                  ? t('pipeline.verifierFinalScore')
-                  : confidence !== undefined
-                    ? t('pipeline.confidence', { value: Math.round(confidence * 100) })
-                    : t('pipeline.evaluatorScore')}
-              </p>
-            </div>
-            <span className={cn('text-xl font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            {data.criteria.map((criterion) => {
-              const entry = criteriaScores.get(criterion.id)
-              return (
-                <div key={criterion.id} className="flex items-center gap-2 text-[10px]">
-                  <span className="min-w-0 flex-1 truncate">{criterion.label}</span>
-                  <span className={cn('w-8 text-right font-semibold tabular-nums', entry ? scoreClass(entry.score) : 'text-muted-foreground')}>
-                    {entry ? entry.score.toFixed(0) : '-'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-
-          {summary ? (
-            <div className="rounded-md border border-border bg-muted/20 p-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.synthesis')}</p>
-              <p className="mt-0.5 text-[10px] leading-snug text-foreground">{summary}</p>
-            </div>
+      {returns.length > 0 ? (
+        <div className="relative">
+          {returns.length > 1 ? (
+            <>
+              <button
+                type="button"
+                aria-label={t('pipeline.previousProject')}
+                onClick={() => go(-1)}
+                disabled={active === 0}
+                className="absolute top-1/2 left-0 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-popover/95 text-popover-foreground shadow-md backdrop-blur transition-opacity hover:bg-muted disabled:opacity-30"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={t('pipeline.nextProject')}
+                onClick={() => go(1)}
+                disabled={active === returns.length - 1}
+                className="absolute top-1/2 right-0 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-border bg-popover/95 text-popover-foreground shadow-md backdrop-blur transition-opacity hover:bg-muted disabled:opacity-30"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </>
           ) : null}
 
-          {redFlags.length > 0 ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
-              <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-destructive">
-                <Flag className="h-2.5 w-2.5" /> {t('pipeline.redFlags')}
-              </p>
-              <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
-                {redFlags.slice(0, 6).map((flag) => (
-                  <li key={flag}>{flag}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          <Swiper
+            modules={[A11y]}
+            slidesPerView={1}
+            spaceBetween={8}
+            onSwiper={(swiper) => {
+              swiperRef.current = swiper
+            }}
+            onSlideChange={(swiper) => setActive(swiper.activeIndex)}
+            className="w-full"
+          >
+            {returns.map((entry) => (
+              <SwiperSlide key={entry.projectId} className="!h-auto">
+                <AgentReturnView data={data} entry={entry} />
+              </SwiperSlide>
+            ))}
+          </Swiper>
 
-          {data.verification && data.verification.adjustments.length > 0 ? (
-            <div className="rounded-md border border-border p-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.adjustments')}</p>
-              <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
-                {data.verification.adjustments.map((adjustment) => (
-                  <li key={adjustment.criterionId}>
-                    {adjustment.criterionId}: {adjustment.from} → {adjustment.to}
-                  </li>
-                ))}
-              </ul>
+          {returns.length > 1 ? (
+            <div className="mt-1 flex items-center justify-center gap-1.5">
+              {returns.map((entry, index) => (
+                <button
+                  key={entry.projectId}
+                  type="button"
+                  aria-label={t('pipeline.goToProject', { project: entry.projectName })}
+                  aria-current={index === active ? 'true' : undefined}
+                  onClick={() => swiperRef.current?.slideTo(index)}
+                  className={cn(
+                    'h-1.5 rounded-full transition-all',
+                    index === active ? 'w-5 bg-brand-primary' : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60',
+                  )}
+                />
+              ))}
             </div>
           ) : null}
-        </>
+        </div>
       ) : (
-        <p className="rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
-          {t('pipeline.waiting')}
+        <p className="flex items-start gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
+          {data.status === 'active' ? <NodeLoader className="mt-0.5 h-3 w-3" /> : null}
+          <span>{t('pipeline.waiting')}</span>
         </p>
       )}
 
@@ -278,25 +496,25 @@ function AgentCard({ data }: { data: AgentData }) {
 }
 
 /**
- * Agent cards are opened from a fixed-position panel rendered in a portal. A
+ * Every node card opens from a fixed-position panel rendered in a portal. A
  * Radix popover inside a React Flow node fought the canvas for the click and
  * the dismissable layer, which is why a node could look inert. The panel is
  * independent of the canvas transform, of its overflow and of its pointer
  * event rules, so a click always opens exactly one card.
  */
-interface AgentPanel {
+interface NodePanel {
   id: string
   x: number
   y: number
 }
 
-const AgentPopoverContext = React.createContext<{
+const NodePopoverContext = React.createContext<{
   openId: string | null
   open: (id: string, anchor: DOMRect) => void
   close: () => void
 }>({ openId: null, open: () => {}, close: () => {} })
 
-const PANEL_WIDTH = 320
+const PANEL_WIDTH = 340
 const PANEL_MARGIN = 8
 
 /** Place the panel beside the node, switching sides when the viewport is tight. */
@@ -314,8 +532,8 @@ function AgentNode({ data }: NodeProps) {
   const agent = data as AgentData
   const latest = agent.revision ?? agent.evaluation
   const overall = agent.verification?.finalOverall ?? latest?.overall
-  const popover = React.useContext(AgentPopoverContext)
-  const open = popover.openId === agent.agent.id
+  const popover = React.useContext(NodePopoverContext)
+  const open = popover.openId === agent.nodeId
   return (
     <button
       type="button"
@@ -324,7 +542,7 @@ function AgentNode({ data }: NodeProps) {
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation()
-        popover.open(agent.agent.id, event.currentTarget.getBoundingClientRect())
+        popover.open(agent.nodeId, event.currentTarget.getBoundingClientRect())
       }}
       className={cn(
         'nodrag nopan cursor-pointer w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
@@ -423,8 +641,16 @@ function summariseAgents(
   verifications: ProjectVerification[],
   current: RunStatus | undefined,
   failed: boolean,
+  projects: { id: string; name: string }[],
   selectedProjectId?: string,
 ): AgentSummary[] {
+  const projectOrder = projects.map((project) => project.id)
+  const projectNames = new Map(projects.map((project) => [project.id, project.name]))
+  const latestRevisionFor = (items: ProjectRevision[], projectId: string): ProjectRevision | undefined =>
+    items
+      .filter((entry) => entry.projectId === projectId)
+      .reduce<ProjectRevision | undefined>((latest, entry) => (!latest || entry.round >= latest.round ? entry : latest), undefined)
+
   return pool.map((agent, index) => {
     const ownEvaluations =
       role === 'evaluator' ? evaluations.filter((entry) => entry.agentId === agent.id) : []
@@ -435,6 +661,32 @@ function summariseAgents(
     const revision = latestFor(ownRevisions, selectedProjectId)
     const verification = latestFor(ownVerifications, selectedProjectId)
     const hasResult = role === 'evaluator' ? Boolean(evaluation) : Boolean(verification)
+    // One slide per project, so the card can swipe through every return this
+    // agent produced instead of showing only the selected one.
+    const projectIds = new Set<string>()
+    for (const entry of role === 'evaluator' ? [...ownEvaluations, ...ownRevisions] : ownVerifications) {
+      projectIds.add(entry.projectId)
+    }
+    const ordered = [
+      ...projectOrder.filter((projectId) => projectIds.has(projectId)),
+      ...[...projectIds].filter((projectId) => !projectOrder.includes(projectId)),
+    ]
+    if (selectedProjectId && ordered.includes(selectedProjectId)) {
+      ordered.splice(ordered.indexOf(selectedProjectId), 1)
+      ordered.unshift(selectedProjectId)
+    }
+    const returns: AgentReturn[] = ordered.map((projectId) => {
+      const own = ownEvaluations.find((entry) => entry.projectId === projectId)
+      const revised = latestRevisionFor(ownRevisions, projectId)
+      const verified = ownVerifications.filter((entry) => entry.projectId === projectId).at(-1)
+      return {
+        projectId,
+        projectName: projectNames.get(projectId) ?? projectId,
+        ...(own ? { evaluation: own } : {}),
+        ...(revised ? { revision: revised } : {}),
+        ...(verified ? { verification: verified } : {}),
+      }
+    })
     // An agent is busy until its own result for the *current* pass arrives, so
     // the spinner keeps turning during the revision round instead of freezing
     // on the first evaluation.
@@ -453,6 +705,7 @@ function summariseAgents(
       ...(evaluation ? { evaluation } : {}),
       ...(revision ? { revision } : {}),
       ...(verification ? { verification } : {}),
+      returns,
       count: role === 'evaluator' ? ownEvaluations.length : ownVerifications.length,
     }
   })
@@ -464,6 +717,8 @@ export interface PipelineGraphProps {
   revisions: ProjectRevision[]
   verifications: ProjectVerification[]
   stageOne?: StageOneResult[]
+  consensus?: ProjectConsensus[]
+  report?: Report
   agents?: { evaluators: AgentInfo[]; verifiers: AgentInfo[] }
   evaluatorModels: ModelRef[]
   verifierModels: ModelRef[]
@@ -474,7 +729,7 @@ export interface PipelineGraphProps {
   failed?: boolean
   /** The streamed events, used for live stage and agent durations. */
   events?: RunEvent[]
-  /** The agent pool is still loading: show shimmer placeholders instead of an empty graph. */
+  /** The agent pool is still loading: show the Loader2 spinner instead of an empty graph. */
   loading?: boolean
 }
 
@@ -484,6 +739,8 @@ export function PipelineGraph({
   revisions,
   verifications,
   stageOne = [],
+  consensus = [],
+  report,
   agents,
   evaluatorModels,
   verifierModels,
@@ -502,30 +759,36 @@ export function PipelineGraph({
   const activeIndex = statusIndex(current)
   const evaluatorPool = agents?.evaluators ?? []
   const verifierPool = agents?.verifiers ?? []
-  const [panel, setPanel] = React.useState<AgentPanel | null>(null)
-  const openAgent = React.useCallback((id: string, anchor: DOMRect) => {
+  const [panel, setPanel] = React.useState<NodePanel | null>(null)
+  const openNode = React.useCallback((id: string, anchor: DOMRect) => {
     setPanel({ id, ...panelPosition(anchor) })
   }, [])
-  const closeAgent = React.useCallback(() => setPanel(null), [])
+  const closeNode = React.useCallback(() => setPanel(null), [])
   const popoverState = React.useMemo(
-    () => ({ openId: panel?.id ?? null, open: openAgent, close: closeAgent }),
-    [closeAgent, openAgent, panel?.id],
+    () => ({ openId: panel?.id ?? null, open: openNode, close: closeNode }),
+    [closeNode, openNode, panel?.id],
   )
-  // Close on Escape, resize or scroll: a fixed panel must not drift away from
-  // the node it describes.
+  const panelRef = React.useRef<HTMLDivElement | null>(null)
+  // Close on Escape or resize. A scroll only closes the card when it happens
+  // outside it: the card has its own scrollable content, and closing it while
+  // the reader scrolls a long synthesis made the panel feel unstable.
   React.useEffect(() => {
     if (!panel) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setPanel(null)
     }
     const close = () => setPanel(null)
+    const onScroll = (event: Event) => {
+      if (event.target instanceof Node && panelRef.current?.contains(event.target)) return
+      setPanel(null)
+    }
     window.addEventListener('keydown', onKey)
     window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
+    window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [panel])
   const projectNames = React.useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects])
@@ -545,9 +808,10 @@ export function PipelineGraph({
         verifications,
         current,
         failed,
+        projects,
         selectedProjectId,
       ),
-    [current, evaluations, evaluatorModels, evaluatorPool, failed, revisions, selectedProjectId, verifications],
+    [current, evaluations, evaluatorModels, evaluatorPool, failed, projects, revisions, selectedProjectId, verifications],
   )
 
   const verifierSummaries = React.useMemo(
@@ -561,9 +825,10 @@ export function PipelineGraph({
         verifications,
         current,
         failed,
+        projects,
         selectedProjectId,
       ),
-    [current, evaluations, failed, revisions, selectedProjectId, verifications, verifierModels, verifierPool],
+    [current, evaluations, failed, projects, revisions, selectedProjectId, verifications, verifierModels, verifierPool],
   )
 
   const nodes = React.useMemo<Node[]>(() => {
@@ -591,6 +856,78 @@ export function PipelineGraph({
       const candidate = timing?.end ?? stage?.end
       const end = candidate !== undefined && candidate >= start ? candidate : undefined
       return durationOf({ start, ...(end !== undefined ? { end } : {}) }, now)
+    }
+
+    const stageMetrics = (id: (typeof STAGES)[number]['id']): StageMetric[] => {
+      if (id === 'harvest') return [{ label: t('pipeline.projects'), value: String(projects.length) }]
+      if (id === 'stageOne') {
+        const passed = stageOne.filter((result) => result.passed).length
+        return [{ label: t('pipeline.stageOne'), value: t('pipeline.stageOneCount', { passed, total: stageOne.length }) }]
+      }
+      if (id === 'review') return [{ label: t('pipeline.revisions'), value: String(revisions.length) }]
+      if (id === 'consensus') {
+        const reached = consensus.filter((entry) => entry.status === 'consensus').length
+        const escalated = consensus.length - reached
+        return [
+          { label: t('pipeline.consensusReached'), value: `${reached}/${consensus.length}` },
+          { label: t('pipeline.escalated'), value: String(escalated) },
+        ]
+      }
+      if (id === 'rank') {
+        if (!report) return []
+        return [
+          { label: t('pipeline.tracks'), value: String(report.rankings.length) },
+          { label: t('pipeline.ranked'), value: String(report.rankings.reduce((sum, track) => sum + track.entries.length, 0)) },
+        ]
+      }
+      if (!report) return []
+      return [
+        { label: t('pipeline.criteria'), value: String(report.criteria.length) },
+        { label: t('pipeline.projects'), value: String(new Set(report.projects.map((project) => project.projectId)).size) },
+      ]
+    }
+
+    const stageRows = (id: (typeof STAGES)[number]['id']): StageRow[] | undefined => {
+      if (id === 'stageOne') {
+        return stageOne.slice(0, 10).map((result) => ({
+          label: projectNames.get(result.projectId) ?? result.projectId,
+          value: result.passed ? t('pipeline.passed') : t('pipeline.failed'),
+          ok: result.passed,
+        }))
+      }
+      if (id === 'review') {
+        const latestRound = new Map<string, number>()
+        for (const revision of revisions) {
+          latestRound.set(revision.projectId, Math.max(latestRound.get(revision.projectId) ?? 0, revision.round))
+        }
+        return [...latestRound].slice(0, 10).map(([projectId, round]) => ({
+          label: projectNames.get(projectId) ?? projectId,
+          value: t('pipeline.round', { round }),
+          ok: true,
+        }))
+      }
+      if (id === 'consensus') {
+        return consensus.slice(0, 10).map((entry) => ({
+          label: projectNames.get(entry.projectId) ?? entry.projectId,
+          value: Number.isFinite(entry.overall) ? entry.overall.toFixed(1) : '-',
+          ok: entry.status === 'consensus',
+        }))
+      }
+      if (id === 'rank') {
+        return report?.rankings.map((track) => ({
+          label: track.track,
+          value: String(track.entries.length),
+          ok: true,
+        }))
+      }
+      if (id === 'report') {
+        return report?.rankings.map((track) => ({
+          label: track.track,
+          value: track.entries[0]?.name ?? '-',
+          ok: true,
+        }))
+      }
+      return undefined
     }
 
     const stageNodes = STAGES.map((stage) => {
@@ -624,6 +961,8 @@ export function PipelineGraph({
               ? t('pipeline.reportDetail')
               : t(stage.detailKey)
       const duration = durationOf(stageTimingFor(stage.id), now)
+      const metrics = stageMetrics(stage.id)
+      const rows = stageRows(stage.id)
 
       return {
         id: stage.id,
@@ -640,14 +979,24 @@ export function PipelineGraph({
                   : stage.id === 'rank'
                     ? { x: 976, y: 96 }
                     : { x: 1356, y: 96 },
-        data: { title: t(stage.titleKey), detail, status: stageStatus, ...(duration ? { duration } : {}) } satisfies StageData,
+        // React Flow disables pointer events on nodes when the canvas is not
+        // selectable or draggable. Every card must stay clickable.
+        style: { pointerEvents: 'all' as const },
+        data: {
+          nodeId: stage.id,
+          title: t(stage.titleKey),
+          detail,
+          status: stageStatus,
+          ...(duration ? { duration } : {}),
+          ...(metrics.length > 0 ? { metrics } : {}),
+          ...(rows && rows.length > 0 ? { rows } : {}),
+        } satisfies StageData,
       }
     })
 
     const evaluatorNodes = evaluatorSummaries.map((summary, index) => {
       const column = index % 2
       const row = Math.floor(index / 2)
-      const evaluation = summary.revision ?? summary.evaluation
       const duration = agentDurationOf(summary)
       return {
         id: `agent-${summary.agent.id}`,
@@ -658,9 +1007,9 @@ export function PipelineGraph({
         style: { pointerEvents: 'all' as const },
         data: {
           ...summary,
+          nodeId: `agent-${summary.agent.id}`,
           criteria,
           ...(duration ? { duration } : {}),
-          ...(evaluation ? { projectName: projectNames.get(evaluation.projectId) ?? evaluation.projectId } : {}),
         } satisfies AgentData,
       }
     })
@@ -674,11 +1023,9 @@ export function PipelineGraph({
         style: { pointerEvents: 'all' as const },
         data: {
           ...summary,
+          nodeId: `agent-${summary.agent.id}`,
           criteria,
           ...(duration ? { duration } : {}),
-          ...(summary.verification
-            ? { projectName: projectNames.get(summary.verification.projectId) ?? summary.verification.projectId }
-            : {}),
         } satisfies AgentData,
       }
     })
@@ -687,6 +1034,7 @@ export function PipelineGraph({
   }, [
     activeIndex,
     agentsTimings,
+    consensus,
     criteria,
     current,
     evaluatorSummaries,
@@ -695,7 +1043,9 @@ export function PipelineGraph({
     hasReport,
     now,
     projectNames,
-    revisions.length,
+    projects,
+    report,
+    revisions,
     stageOne,
     stages,
     t,
@@ -776,18 +1126,23 @@ export function PipelineGraph({
     return list
   }, [current, evaluatorSummaries, verifierSummaries])
 
-  const panelAgent = React.useMemo(() => {
+  const panelNode = React.useMemo(() => {
     if (!panel) return undefined
-    const node = nodes.find((entry) => entry.id === `agent-${panel.id}`)
-    return node ? (node.data as AgentData) : undefined
+    return nodes.find((entry) => entry.id === panel.id)
   }, [nodes, panel])
+
+  const panelLabel = panelNode
+    ? panelNode.type === 'agent'
+      ? t(`agents.${(panelNode.data as AgentData).agent.id}.name`, { defaultValue: (panelNode.data as AgentData).agent.name })
+      : (panelNode.data as StageData).title
+    : undefined
 
   return (
     <div className="verdict-flow h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted/10 md:h-[340px]">
-      <AgentPopoverContext.Provider value={popoverState}>
+      <NodePopoverContext.Provider value={popoverState}>
         {loading ? (
           <div className="flex h-full flex-col items-center justify-center gap-2" aria-busy="true" aria-live="polite">
-            <Loader2 className="h-5 w-5 animate-spin text-brand-primary" />
+            <NodeLoader className="h-5 w-5" />
             <p className="text-[11px] text-muted-foreground">{t('pipeline.loading')}</p>
           </div>
         ) : (
@@ -812,32 +1167,37 @@ export function PipelineGraph({
             <Controls showInteractive={false} className="!bottom-1.5 !left-1.5" />
           </ReactFlow>
         )}
-        {panel && panelAgent && typeof document !== 'undefined'
+        {panel && panelNode && panelLabel && typeof document !== 'undefined'
           ? createPortal(
               <div
                 className="fixed inset-0 z-[999]"
                 aria-hidden
                 onPointerDown={(event) => {
                   event.stopPropagation()
-                  closeAgent()
+                  closeNode()
                 }}
                 onWheel={(event) => event.stopPropagation()}
               >
                 <div
+                  ref={panelRef}
                   role="dialog"
-                  aria-label={t(`agents.${panelAgent.agent.id}.name`, { defaultValue: panelAgent.agent.name })}
-                  className="fixed w-[320px] rounded-2xl border border-border bg-popover p-2.5 text-popover-foreground shadow-xl"
+                  aria-label={panelLabel}
+                  className="fixed w-[340px] rounded-2xl border border-border bg-popover p-2.5 text-popover-foreground shadow-xl"
                   style={{ left: panel.x, top: panel.y }}
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <AgentCard data={panelAgent} />
+                  {panelNode.type === 'agent' ? (
+                    <AgentCard data={panelNode.data as AgentData} />
+                  ) : (
+                    <StageCard data={panelNode.data as StageData} />
+                  )}
                 </div>
               </div>,
               document.body,
             )
           : null}
-      </AgentPopoverContext.Provider>
+      </NodePopoverContext.Provider>
     </div>
   )
 }

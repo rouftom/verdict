@@ -65,6 +65,24 @@ describe('reasoning mapping', () => {
     })
   })
 
+  test('DeepSeek V4.1 on Runware only accepts low, high, xhigh and max', () => {
+    expect(reasoningProviderOptions('runware', 'medium', 'deepseek:v4.1@flash-1017')).toEqual({
+      runware: { reasoningEffort: 'high' },
+    })
+    expect(reasoningProviderOptions('runware', 'minimal', 'deepseek:v4.1@flash-1017')).toEqual({
+      runware: { reasoningEffort: 'low' },
+    })
+    expect(reasoningProviderOptions('runware', 'none', 'deepseek-v4-1-flash-1017')).toEqual({
+      runware: { reasoningEffort: 'low' },
+    })
+    expect(reasoningProviderOptions('runware', 'xhigh', 'deepseek:v4.1@flash-1017')).toEqual({
+      runware: { reasoningEffort: 'xhigh' },
+    })
+    expect(reasoningProviderOptions('runware', 'medium', 'deepseek:v4@flash')).toEqual({
+      runware: { reasoningEffort: 'medium' },
+    })
+  })
+
   test('the UI list follows the provider and the Runware family', () => {
     expect(reasoningEffortsFor('groq')).toEqual(['low', 'medium', 'high'])
     expect(reasoningEffortsFor('google')).toEqual(['none', 'minimal', 'low', 'medium', 'high'])
@@ -72,6 +90,8 @@ describe('reasoning mapping', () => {
     expect(reasoningEffortsFor('runware', 'anthropic:claude@opus-5.5')).toContain('max')
     expect(reasoningEffortsFor('runware', 'anthropic-claude-haiku-5-5')).toContain('max')
     expect(reasoningEffortsFor('runware', 'google-gemini-3-flash')).toEqual(['none', 'low', 'medium', 'high'])
+    expect(reasoningEffortsFor('runware', 'deepseek:v4.1@flash-1017')).toEqual(['low', 'high', 'xhigh', 'max'])
+    expect(reasoningEffortsFor('runware', 'deepseek-v4-1-flash')).toEqual(['low', 'high', 'xhigh', 'max'])
   })
 
   test('an unknown env value is ignored', () => {
@@ -91,7 +111,10 @@ describe('temperature policy', () => {
   test('Claude models reached through Runware reject temperature', () => {
     expect(supportsTemperature({ provider: 'runware', model: 'anthropic:claude@sonnet-5.5' })).toBe(false)
     expect(supportsTemperature({ provider: 'runware', model: 'anthropic-claude-sonnet-5-5' })).toBe(false)
+    expect(supportsTemperature({ provider: 'runware', model: 'openai-gpt-6-luna' })).toBe(false)
+    expect(supportsTemperature({ provider: 'runware', model: 'openai:gpt-6@luna' })).toBe(false)
     expect(supportsTemperature({ provider: 'runware', model: 'deepseek:v4.1@flash-1017' })).toBe(true)
+    expect(supportsTemperature({ provider: 'runware', model: 'zai-glm-5-3-flash' })).toBe(true)
     expect(supportsTemperature({ provider: 'anthropic', model: 'claude-sonnet-5-5' })).toBe(true)
   })
 })

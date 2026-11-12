@@ -7,7 +7,7 @@ import type {
   Rubric,
   TrackRanking,
 } from './types'
-import { primaryTrack, projectTracks } from './tracks'
+import { primaryTrack, projectTracks, scoreKey } from './tracks'
 
 export function mean(values: number[]): number {
   if (values.length === 0) return 0
@@ -70,8 +70,16 @@ function citedOverall(evaluation: ProjectEvaluation, rubric: Rubric, requireEvid
  * overall scores. A criterion spread above the tolerance escalates the project,
  * even when the overall dispersion is small.
  */
-export function buildConsensus(projectId: string, evaluations: ProjectEvaluation[], rubric: Rubric): ProjectConsensus {
-  const relevant = evaluations.filter((evaluation) => evaluation.projectId === projectId)
+export function buildConsensus(
+  projectId: string,
+  evaluations: ProjectEvaluation[],
+  rubric: Rubric,
+  track?: string,
+): ProjectConsensus {
+  const relevant = evaluations.filter(
+    (evaluation) =>
+      evaluation.projectId === projectId && (track === undefined || evaluation.track === undefined || evaluation.track === track),
+  )
   const requireEvidence = rubric.consensus.requireEvidence
   const minimum = Math.max(0, Math.trunc(rubric.consensus.minEvidencePerCriterion))
 
@@ -116,6 +124,7 @@ export function buildConsensus(projectId: string, evaluations: ProjectEvaluation
 
   return {
     projectId,
+    ...(track !== undefined ? { track } : {}),
     criteria,
     overall: Math.round(weightedOverall(consensusScores, rubric) * 100) / 100,
     dispersion: Math.round(dispersion * 100) / 100,
@@ -143,7 +152,11 @@ export function rankProjects(
   options: { scope?: 'track' | 'global' } = {},
 ): TrackRanking[] {
   const scope = options.scope ?? rubric.ranking.scope
-  const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
+  const byId = new Map(consensus.map((entry) => [scoreKey(entry.projectId, entry.track), entry]))
+  // A per-track run has one consensus per project and track; an older run has
+  // a single project-level consensus, used as the fallback.
+  const lookup = (projectId: string, track?: string): ProjectConsensus | undefined =>
+    byId.get(scoreKey(projectId, track)) ?? byId.get(projectId)
   const groups = new Map<string, ProjectInput[]>()
   for (const project of projects) {
     const keys = scope === 'global' ? ['all'] : projectTracks(project)
@@ -155,15 +168,16 @@ export function rankProjects(
   }
 
   return [...groups.entries()].map(([track, entries]) => {
+    const scopedTrack = scope === 'global' ? undefined : track
     const sorted = [...entries].sort((left, right) => {
-      const leftConsensus = byId.get(left.id)
-      const rightConsensus = byId.get(right.id)
+      const leftConsensus = lookup(left.id, scopedTrack)
+      const rightConsensus = lookup(right.id, scopedTrack)
       if (!leftConsensus || !rightConsensus) return 0
       return compareByRubric(leftConsensus, rightConsensus, rubric)
     })
 
     const ranked: RankedProject[] = sorted.map((project, index) => {
-      const projectConsensus = byId.get(project.id)
+      const projectConsensus = lookup(project.id, scopedTrack)
       const rank = index + 1
       // A supplied rank belongs to the primary track only; award and secondary
       // tracks are ranked from the scores alone.

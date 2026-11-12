@@ -16,6 +16,13 @@ export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
 const EVERY_EFFORT = REASONING_EFFORTS
 const LOW_TO_HIGH: readonly ReasoningEffort[] = ['low', 'medium', 'high']
 const LOW_TO_XHIGH: readonly ReasoningEffort[] = ['low', 'medium', 'high', 'xhigh']
+/**
+ * DeepSeek V4.1 on Runware is served by a vLLM template that only accepts
+ * these four levels as a string (or an integer in [1, 100] inside its own
+ * `chat_template_kwargs`, which the gateway does not expose). `medium`,
+ * `minimal` and `none` are rejected upstream, so they are clamped here.
+ */
+const DEEPSEEK_V41_EFFORTS: readonly ReasoningEffort[] = ['low', 'high', 'xhigh', 'max']
 
 /**
  * What each direct provider actually accepts. Anything outside the list is
@@ -57,6 +64,7 @@ export function reasoningEffortsFor(provider: ProviderId, model?: string): reado
     // OpenAI-compatible names returned by `/v1/models`
     // (`anthropic-claude-...`); both start with the family.
     const family = model.match(/^([a-z0-9]+)[:\-]/i)?.[1]?.toLowerCase() ?? ''
+    if (family === 'deepseek' && /v4[.\-]1/i.test(model)) return DEEPSEEK_V41_EFFORTS
     return RUNWARE_BY_FAMILY[family] ?? LOW_TO_HIGH
   }
   return BY_PROVIDER[provider]

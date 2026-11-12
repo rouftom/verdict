@@ -24,3 +24,12 @@ export function projectTracks(project: ProjectInput): string[] {
 export function primaryTrack(project: ProjectInput): string {
   return projectTracks(project)[0] ?? DEFAULT_TRACK
 }
+
+/**
+ * Identity of one per-track scoring record. Scores, consensus and
+ * verifications are produced once per project and track, so the track must be
+ * part of every lookup key.
+ */
+export function scoreKey(projectId: string, track?: string): string {
+  return track ? `${projectId}:${track}` : projectId
+}

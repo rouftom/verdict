@@ -28,6 +28,12 @@ export interface StructuredOptions<T> {
   videoUrl?: string
   /** Human-readable JSON contract used by the text fallback. */
   jsonContract?: string
+  /**
+   * Reject a parsed answer that is structurally valid but unusable, for
+   * example an evaluation with no criterion scores. The text fallback and the
+   * correction round then get the exact reason instead of returning zeros.
+   */
+  validate?: (value: T) => void
   /** Abort the in-flight model call when the run is cancelled. */
   signal?: AbortSignal
   /** Per-call ceiling. Overridable so a test does not have to wait minutes. */
@@ -194,6 +200,36 @@ function contractOf<T>(options: StructuredOptions<T>): string {
 }
 
 /**
+ * A provider that rejects a request option names the parameter in its error.
+ * The run drops only the rejected option and retries, rather than losing the
+ * whole evaluation because one gateway wants a default temperature or cannot
+ * parse a reasoning level.
+ */
+const REASONING_OPTION_ERROR = /reasoning_effort|chat_template_kwargs/i
+const TEMPERATURE_ERROR = /unsupported value: 'temperature'|temperature.*(?:not support|unsupported|only the default)/i
+
+/** Walk the error chain: SDK wrappers nest the provider body several levels. */
+function matchesErrorPattern(error: unknown, pattern: RegExp): boolean {
+  const seen = new Set<unknown>()
+  const stack: unknown[] = [error]
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (!current || seen.has(current)) continue
+    seen.add(current)
+    if (typeof current === 'string') {
+      if (pattern.test(current)) return true
+      continue
+    }
+    if (typeof current !== 'object') continue
+    const record = current as Record<string, unknown>
+    for (const key of ['message', 'responseBody', 'body', 'data', 'cause', 'error']) {
+      if (record[key] !== undefined) stack.push(record[key])
+    }
+  }
+  return false
+}
+
+/**
  * Structured generation with a JSON fallback. Some OpenAI-compatible gateways
  * do not implement tool/JSON mode; when the text fallback is invalid or does
  * not match the schema, one short correction round-trip gives the model the
@@ -208,7 +244,9 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
     options.modelRef.reasoningEffort,
     options.modelRef.model,
   )
-  const temperature = supportsTemperature(options.modelRef) ? options.temperature : undefined
+  let temperature = supportsTemperature(options.modelRef) ? options.temperature : undefined
+  let keepReasoning = Boolean(providerOptions)
+  const abortSignal = callSignal(options.signal, options.timeoutMs)
 
   const messages: ModelMessage[] | undefined = nativeVideo
     ? [
@@ -222,57 +260,118 @@ export async function generateStructured<T>(options: StructuredOptions<T>): Prom
       ]
     : undefined
 
-  const common = {
+  const buildCallOptions = () => ({
     model,
     ...(temperature !== undefined ? { temperature } : {}),
-    ...(providerOptions ? { providerOptions } : {}),
+    ...(keepReasoning && providerOptions ? { providerOptions } : {}),
     maxOutputTokens,
     maxRetries: 1,
-    abortSignal: callSignal(options.signal, options.timeoutMs),
+    abortSignal,
+  })
+  // The fallback and correction calls reuse `common`. Dropping the rejected
+  // option here also fixes every later call of this round.
+  let common = buildCallOptions()
+
+  /** Drop the options the provider just rejected; false means nothing to retry. */
+  const dropRejectedOptions = (error: unknown): boolean => {
+    let dropped = false
+    if (temperature !== undefined && matchesErrorPattern(error, TEMPERATURE_ERROR)) {
+      temperature = undefined
+      dropped = true
+    }
+    if (keepReasoning && matchesErrorPattern(error, REASONING_OPTION_ERROR)) {
+      keepReasoning = false
+      dropped = true
+    }
+    if (dropped) common = buildCallOptions()
+    return dropped
   }
 
-  try {
-    const result = await generateObject({
-      ...common,
+  // Some OpenAI-compatible gateways only honour `response_format: json_object`
+  // when the messages name JSON. A gateway may also ignore the schema entirely,
+  // so the contract travels in the prompt as well: without it a model invents
+  // its own keys and Zod silently defaults every score away.
+  const objectSystem = `${system}\n\nReturn exactly one JSON object that matches this contract. No markdown, no prose:\n${contractOf(options)}`
+
+  const objectCall = (callOptions: typeof common) =>
+    generateObject({
+      ...callOptions,
       schema,
-      system,
-      ...(messages ? { messages } : { prompt }),
-    })
-    return { object: result.object as T, usage: usageOf(result.usage), mode: 'object' }
-  } catch (objectError) {
-    const fallback = await generateText({
-      ...common,
-      system: `${system}\n\nReturn only one JSON object that matches this contract. No markdown, no prose:\n${contractOf(options)}`,
+      system: objectSystem,
       ...(messages ? { messages } : { prompt }),
     })
 
-    let usage = usageOf(fallback.usage)
+  const validate = (value: T) => options.validate?.(value)
+
+  let objectResult: Awaited<ReturnType<typeof objectCall>> | undefined
+  let objectError: unknown
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const parsed = schema.parse(JSON.parse(extractJson(fallback.text)))
-      return { object: parsed, usage, mode: 'json' }
-    } catch (jsonError) {
-      const reason = jsonError instanceof Error ? jsonError.message : String(jsonError)
-      const correction = await generateText({
-        ...common,
-        system: `${system}\n\nYou repair invalid JSON. Return one complete JSON object only, with no markdown and no prose, matching this contract:\n${contractOf(options)}`,
-        prompt: [
-          'The previous answer was rejected.',
-          `Reason: ${reason.slice(0, 400)}`,
-          'Return the corrected object. Every required field must be present and every array must be closed.',
-          '',
-          'Previous answer:',
-          fallback.text.slice(0, MAX_REPAIR_CHARS),
-        ].join('\n'),
+      const result = await objectCall(common)
+      validate(result.object as T)
+      objectResult = result
+      break
+    } catch (error) {
+      objectError = error
+      if (!dropRejectedOptions(error)) break
+    }
+  }
+
+  if (objectResult) {
+    return { object: objectResult.object as T, usage: usageOf(objectResult.usage), mode: 'object' }
+  }
+
+  const textCall = async (systemText: string, promptText?: string, keepMedia = true) => {
+    const build = (callOptions: typeof common) =>
+      generateText({
+        ...callOptions,
+        system: systemText,
+        ...(messages && keepMedia ? { messages } : { prompt: promptText ?? prompt }),
       })
-      usage = addUsage(usage, usageOf(correction.usage))
+    let textError: unknown
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const parsed = schema.parse(JSON.parse(extractJson(correction.text)))
-        return { object: parsed, usage, mode: 'json' }
-      } catch (repairError) {
-        const first = objectError instanceof Error ? objectError.message : String(objectError)
-        const second = repairError instanceof Error ? repairError.message : String(repairError)
-        throw new Error(`Structured generation failed: ${first} / JSON fallback: ${second}`)
+        return await build(common)
+      } catch (error) {
+        textError = error
+        if (!dropRejectedOptions(error)) throw error
       }
+    }
+    throw textError
+  }
+
+  const fallback = await textCall(
+    `${system}\n\nReturn only one JSON object that matches this contract. No markdown, no prose:\n${contractOf(options)}`,
+  )
+
+  let usage = usageOf(fallback.usage)
+  try {
+    const parsed = schema.parse(JSON.parse(extractJson(fallback.text)))
+    validate(parsed)
+    return { object: parsed, usage, mode: 'json' }
+  } catch (jsonError) {
+    const reason = jsonError instanceof Error ? jsonError.message : String(jsonError)
+    const correction = await textCall(
+      `${system}\n\nYou repair invalid JSON. Return one complete JSON object only, with no markdown and no prose, matching this contract:\n${contractOf(options)}`,
+      [
+        'The previous answer was rejected.',
+        `Reason: ${reason.slice(0, 400)}`,
+        'Return the corrected object. Every required field must be present and every array must be closed.',
+        '',
+        'Previous answer:',
+        fallback.text.slice(0, MAX_REPAIR_CHARS),
+      ].join('\n'),
+      false,
+    )
+    usage = addUsage(usage, usageOf(correction.usage))
+    try {
+      const parsed = schema.parse(JSON.parse(extractJson(correction.text)))
+      validate(parsed)
+      return { object: parsed, usage, mode: 'json' }
+    } catch (repairError) {
+      const first = objectError instanceof Error ? objectError.message : String(objectError)
+      const second = repairError instanceof Error ? repairError.message : String(repairError)
+      throw new Error(`Structured generation failed: ${first} / JSON fallback: ${second}`)
     }
   }
 }

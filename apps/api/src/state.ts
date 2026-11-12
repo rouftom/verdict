@@ -17,7 +17,9 @@ import {
   type StageOneResult,
 } from '@verdict/shared'
 import { runEvaluation } from '@verdict/eval'
+import type { OfflineHarvest } from '@verdict/harvest'
 import { listProviders, modelPool, type ModelRef } from '@verdict/providers'
+import { prepareOfflineHarvest } from './offline'
 
 export interface CreateRunInput {
   manifestText: string
@@ -119,6 +121,21 @@ export async function createRun(input: CreateRunInput): Promise<RunSnapshot> {
     if (oldest) runs.delete(oldest.id)
   }
 
+  let offline: OfflineHarvest | undefined
+  if (options.offline) {
+    const prepared = await prepareOfflineHarvest(
+      options.offline.id,
+      parsed.manifest,
+      options.offline.mapping ?? {},
+    )
+    offline = prepared.harvest
+    parsed.warnings.push(...prepared.warnings)
+    const matched = Object.keys(offline.projects).length
+    parsed.warnings.push(
+      `Offline bundle${options.offline.label ? ` "${options.offline.label}"` : ''}: ${matched} of ${parsed.manifest.length} project(s) have a matching repository or video.`,
+    )
+  }
+
   const now = new Date().toISOString()
   const snapshot: RunSnapshot = {
     id: randomUUID(),
@@ -139,7 +156,7 @@ export async function createRun(input: CreateRunInput): Promise<RunSnapshot> {
     warnings: parsed.warnings,
   }
   runs.set(snapshot.id, snapshot)
-  void execute(snapshot, evaluatorModels, verifierModels)
+  void execute(snapshot, evaluatorModels, verifierModels, offline)
   return snapshot
 }
 
@@ -162,7 +179,12 @@ function upsert<T extends { projectId: string }>(items: T[], next: T): void {
   else items.push(next)
 }
 
-async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verifierModels: ModelRef[]): Promise<void> {
+async function execute(
+  snapshot: RunSnapshot,
+  evaluatorModels: ModelRef[],
+  verifierModels: ModelRef[],
+  offline?: OfflineHarvest,
+): Promise<void> {
   const controller = new AbortController()
   controllers.set(snapshot.id, controller)
   const gate = createGate()
@@ -180,6 +202,7 @@ async function execute(snapshot: RunSnapshot, evaluatorModels: ModelRef[], verif
       signal: controller.signal,
       warnings: snapshot.warnings,
       waitForResume: (signal) => gate.wait(signal),
+      ...(offline ? { offline } : {}),
       onEvent: (event) => {
         // Once the run is aborted, late events from an in-flight model call must
         // not flip the status back to an active stage.

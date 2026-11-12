@@ -60,7 +60,8 @@ function flatten(providers: ProviderInfo[]): FlatModel[] {
     )
 }
 
-function modelGroups(providers: ProviderInfo[]): SearchSelectGroup[] {
+/** Grouped model options shared by the model slots and the offline processor. */
+export function modelGroups(providers: ProviderInfo[]): SearchSelectGroup[] {
   return providers
     .filter((provider) => provider.configured && provider.models.length > 0)
     .map((provider) => ({

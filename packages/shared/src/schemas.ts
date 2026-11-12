@@ -23,6 +23,21 @@ export const modelRefSchema = z.object({
   reasoningEffort: reasoningEffortSchema.optional(),
 })
 
+export const offlineBundleRefSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().max(255).optional(),
+  /** Manual matches: project id to bundle-relative repository and video paths. */
+  mapping: z
+    .record(
+      z.string(),
+      z.object({
+        repository: z.string().max(1_024).optional(),
+        video: z.string().max(1_024).optional(),
+      }),
+    )
+    .optional(),
+})
+
 export const runOptionsSchema = z.object({
   evaluatorModels: z.array(modelRefSchema).default([]),
   verifierModels: z.array(modelRefSchema).default([]),
@@ -35,6 +50,8 @@ export const runOptionsSchema = z.object({
   concurrency: z.number().int().min(1).max(8).default(2),
   maxVideoMinutes: z.number().min(1).max(120).default(20),
   frameIntervalSeconds: z.number().min(2).max(120).default(20),
+  /** A cached offline bundle: every source comes from it, never the network. */
+  offline: offlineBundleRefSchema.optional(),
 })
 
 export const runRequestSchema = z.object({

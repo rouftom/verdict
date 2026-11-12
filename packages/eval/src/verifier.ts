@@ -1,7 +1,8 @@
-import { createLanguageModel, modelRefKey, type ModelRef } from '@verdict/providers'
+import { createLanguageModel, modelRefKey, modelRefLabel, type ModelRef } from '@verdict/providers'
 import {
   bordaCount,
   rankingOutputSchema,
+  scoreKey,
   verificationOutputSchema,
   weightedOverall,
   type ProjectConsensus,
@@ -24,6 +25,8 @@ function clamp(value: number, rubric: Rubric): number {
 
 export interface VerifyProjectArgs {
   project: ProjectInput
+  /** Track this verification scores. */
+  track?: string
   evidence: ProjectEvidence
   evaluations: ProjectEvaluation[]
   consensus: ProjectConsensus
@@ -36,13 +39,13 @@ export interface VerifyProjectArgs {
 }
 
 export async function verifyProject(args: VerifyProjectArgs): Promise<{ verification: ProjectVerification; usage: UsageTotals }> {
-  const { project, evidence, evaluations, consensus, rubric, rulesText, agent, modelRef, temperature, signal } = args
+  const { project, track, evidence, evaluations, consensus, rubric, rulesText, agent, modelRef, temperature, signal } = args
   const result = await generateStructured({
     model: createLanguageModel(modelRef),
     modelRef,
     schema: verificationOutputSchema,
     system: verifierSystem(agent, rubric, rulesText),
-    prompt: verifierPrompt(project, buildDossier(project, evidence), evaluations, consensus),
+    prompt: verifierPrompt(project, buildDossier(project, evidence), evaluations, consensus, track),
     temperature,
     jsonContract: `{
   "projectId": "${project.id}",
@@ -84,6 +87,7 @@ export async function verifyProject(args: VerifyProjectArgs): Promise<{ verifica
   return {
     verification: {
       projectId: project.id,
+      ...(track !== undefined ? { track } : {}),
       verifierId: agent.id,
       verifierName: agent.name,
       model: modelRefKey(modelRef),
@@ -124,15 +128,19 @@ export async function verifyRanking(args: VerifyRankingArgs): Promise<VerifyRank
   const { track, projects, consensus, verifications, evidence, rubric, modelRefs, temperature, onLog, signal } = args
   const usage: UsageTotals = { inputTokens: 0, outputTokens: 0, calls: 0 }
   const ids = new Set(projects.map((project) => project.id))
-  const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
+  const byId = new Map(consensus.map((entry) => [scoreKey(entry.projectId, entry.track), entry]))
+  const lookup = (projectId: string): ProjectConsensus | undefined =>
+    byId.get(scoreKey(projectId, track)) ?? byId.get(projectId)
   const fallback = [...projects]
-    .sort((left, right) => (byId.get(right.id)?.overall ?? 0) - (byId.get(left.id)?.overall ?? 0))
+    .sort((left, right) => (lookup(right.id)?.overall ?? 0) - (lookup(left.id)?.overall ?? 0))
     .map((project) => project.id)
   if (projects.length <= 1) return { track, order: fallback, borda: {}, usage, failures: 0 }
 
-  const packets = projects.map((project) => compactDossier(project, byId.get(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
+  const packets = projects.map((project) => compactDossier(project, lookup(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
   const scoreLines = projects.map((project) => {
-    const projectVerifications = verifications.filter((verification) => verification.projectId === project.id)
+    const projectVerifications = verifications.filter(
+      (verification) => verification.projectId === project.id && (verification.track === undefined || verification.track === track),
+    )
     return `${project.id} (${project.name}): ${projectVerifications.map((verification) => `${verification.verifierName} overall ${verification.finalOverall}`).join(' · ')}`
   })
   const orders: string[][] = []
@@ -164,7 +172,7 @@ export async function verifyRanking(args: VerifyRankingArgs): Promise<VerifyRank
         for (const id of fallback) if (!seen.has(id)) order.push(id)
         return { order, usage: result.usage }
       } catch (error) {
-        onLog?.(`[${track}] verifier ranking ${modelRefKey(modelRef)} failed: ${error instanceof Error ? error.message : String(error)}`)
+        onLog?.(`[${track}] verifier ranking [${modelRefLabel(modelRef)}] failed: ${error instanceof Error ? error.message : String(error)}`)
         return null
       }
     }),

@@ -1,8 +1,9 @@
-import { createLanguageModel, modelRefKey, type ModelRef } from '@verdict/providers'
+import { createLanguageModel, modelRefKey, modelRefLabel, type ModelRef } from '@verdict/providers'
 import {
   bordaCount,
   primaryTrack,
   rankingOutputSchema,
+  scoreKey,
   type ProjectConsensus,
   type ProjectEvidence,
   type ProjectInput,
@@ -63,15 +64,22 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
   const allConsensus = args.allConsensus ?? consensus
   const usage: UsageTotals = { inputTokens: 0, outputTokens: 0, calls: 0 }
   const ids = new Set(projects.map((project) => project.id))
-  const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
-  const allById = new Map(allConsensus.map((entry) => [entry.projectId, entry]))
+  const byId = new Map(consensus.map((entry) => [scoreKey(entry.projectId, entry.track), entry]))
+  const lookup = (projectId: string): ProjectConsensus | undefined =>
+    byId.get(scoreKey(projectId, track)) ?? byId.get(projectId)
+  const allById = new Map(allConsensus.map((entry) => [scoreKey(entry.projectId, entry.track), entry]))
+  const lookupAnyTrack = (projectId: string): ProjectConsensus | undefined => {
+    const project = allProjects.find((entry) => entry.id === projectId)
+    if (project) return allById.get(scoreKey(projectId, primaryTrack(project))) ?? allById.get(projectId)
+    return allById.get(projectId)
+  }
   const fallback = [...projects]
-    .sort((left, right) => (byId.get(right.id)?.overall ?? 0) - (byId.get(left.id)?.overall ?? 0))
+    .sort((left, right) => (lookup(right.id)?.overall ?? 0) - (lookup(left.id)?.overall ?? 0))
     .map((project) => project.id)
 
   if (projects.length <= 1) return { track, order: fallback, borda: {}, usage, failures: 0 }
 
-  const packets = projects.map((project) => compactDossier(project, byId.get(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
+  const packets = projects.map((project) => compactDossier(project, lookup(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
   const trackAnchors = anchors.filter((id) => ids.has(id))
   // An anchor in another track is still a calibration point: give its packet to
   // the ranking pass, but never put it in this track's order.
@@ -79,7 +87,7 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
     .filter((id) => !ids.has(id))
     .map((id) => allProjects.find((project) => project.id === id))
     .filter((project): project is ProjectInput => Boolean(project))
-    .map((project) => compactDossier(project, allById.get(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
+    .map((project) => compactDossier(project, lookupAnyTrack(project.id), evidence.get(project.id) ?? { projectId: project.id, errors: [] }, rubric))
   // Ranks are shown to this pass only, after every criterion score is fixed.
   // A supplied rank belongs to the primary track; other tracks never see it.
   const suppliedRanks = showProvidedRanks
@@ -108,7 +116,7 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
         })
         return { order: normaliseOrder(result.object.order, ids, fallback), usage: result.usage }
       } catch (error) {
-        onLog?.(`[${track}] ranking model ${modelRefKey(modelRef)} failed: ${error instanceof Error ? error.message : String(error)}`)
+        onLog?.(`[${track}] ranking model [${modelRefLabel(modelRef)}] failed: ${error instanceof Error ? error.message : String(error)}`)
         return null
       }
     }),
@@ -130,7 +138,7 @@ export async function rankTrack(args: RankTrackArgs): Promise<RankTrackResult> {
   const order = [...ids].sort((left, right) => {
     const delta = (borda[right] ?? 0) - (borda[left] ?? 0)
     if (delta !== 0) return delta
-    return (byId.get(right)?.overall ?? 0) - (byId.get(left)?.overall ?? 0)
+    return (lookup(right)?.overall ?? 0) - (lookup(left)?.overall ?? 0)
   })
   return { track, order, borda, usage, failures }
 }

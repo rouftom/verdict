@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@verdict/ui'
@@ -166,6 +167,45 @@ function useCopyLog(events: RunEvent[], origin?: string) {
   return { copied, copy }
 }
 
+/**
+ * The stream indicator sits between the two last lines: a hairline bar hangs
+ * from the bottom of the previous line, a light runs down it, and the wind toy
+ * waits at its foot, in front of the last line. Same motion language as the
+ * assistant chat, so a live run reads as one continuous stream.
+ */
+function StreamBridge() {
+  const { t } = useTranslation()
+  const reduce = useReducedMotion()
+  return (
+    <div
+      className="flex flex-col items-start gap-0 border-l-2 border-transparent px-2 py-0 font-mono"
+      aria-live="polite"
+      aria-label={t('log.streaming')}
+      data-testid="stream-indicator"
+    >
+      <span className="relative -mb-px block h-1.5 w-px overflow-hidden rounded-full bg-brand-primary/20">
+        {reduce ? null : (
+          <motion.span
+            className="absolute inset-x-0 h-1/2 w-px rounded-full bg-gradient-to-b from-transparent via-brand-primary to-transparent"
+            initial={{ top: '-50%' }}
+            animate={{ top: ['-50%', '100%'] }}
+            transition={{ duration: 1.6, ease: 'easeInOut', repeat: Infinity }}
+            style={{ boxShadow: '0 0 8px 1px var(--primary)' }}
+          />
+        )}
+      </span>
+      <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+        <motion.span
+          className="absolute inset-[-3px] rounded-full bg-brand-primary/30 blur-[5px]"
+          animate={reduce ? undefined : { opacity: [0.25, 0.9, 0.25], scale: [0.85, 1.15, 0.85] }}
+          transition={{ duration: 1.8, ease: 'easeInOut', repeat: Infinity }}
+        />
+        <SpiralStream className="relative h-3 w-3 text-brand-primary" />
+      </span>
+    </div>
+  )
+}
+
 function EventLine({ event, origin }: { event: RunEvent; origin?: string }) {
   const { t } = useTranslation()
   const tone = toneOf(event)
@@ -208,7 +248,7 @@ export function EventLog({
   className?: string
   /** Timestamp of the run's first event, used for the elapsed column. */
   origin?: string
-  /** Shows the spiral stream indicator at the foot of the log while a run streams. */
+  /** Shows the stream indicator between the two last lines while a run streams. */
   streaming?: boolean
 }) {
   const { t } = useTranslation()
@@ -344,7 +384,14 @@ export function EventLog({
       </CardHeader>
       <CardContent className="min-h-0 flex-1 p-0">
         {events.length === 0 ? (
-          <p className="p-2 text-[11px] text-muted-foreground">{t('log.empty')}</p>
+          <p className="p-2 text-[11px] text-muted-foreground">
+            {t('log.empty')}
+            {streaming ? (
+              <span className="ml-1.5 inline-flex items-center gap-1 align-middle" aria-live="polite" data-testid="stream-indicator">
+                <SpiralStream className="h-3 w-3 text-brand-primary" />
+              </span>
+            ) : null}
+          </p>
         ) : (
           <Virtuoso
             ref={listRef}
@@ -355,16 +402,15 @@ export function EventLog({
             className="h-full"
             followOutput="auto"
             initialTopMostItemIndex={{ index: Math.max(0, events.length - 1), align: 'end' }}
-            itemContent={(_index, event) => <EventLine event={event} origin={origin} />}
+            itemContent={(index, event) => (
+              <div>
+                {streaming && index === events.length - 1 ? <StreamBridge /> : null}
+                <EventLine event={event} origin={origin} />
+              </div>
+            )}
           />
         )}
       </CardContent>
-      {streaming ? (
-        <div className="flex shrink-0 items-center gap-1.5 border-t border-border px-2 py-1" aria-live="polite" data-testid="stream-indicator">
-          <SpiralStream className="h-4 w-4 text-brand-primary" />
-          <span className="text-[10px] font-medium text-muted-foreground">{t('log.streaming')}</span>
-        </div>
-      ) : null}
     </Card>
   )
 }

@@ -61,9 +61,10 @@ ${EVIDENCE_RULES}
 Return every criterion exactly once. A red flag is a concrete disqualifier or contradiction, not a stylistic dislike.`
 }
 
-export function evaluatorPrompt(project: ProjectInput, dossier: string): string {
+export function evaluatorPrompt(project: ProjectInput, dossier: string, track?: string): string {
+  const trackLine = track ? `\nTRACK: ${track}\nScore this project only for that track. A project entered in several tracks is scored separately in each one, so do not reuse another track's expectations.\n` : ''
   return `Evaluate the project below.
-
+${trackLine}
 PROJECT ID: ${project.id}
 
 ${dossier}
@@ -84,8 +85,9 @@ export function revisionSystem(agent: AgentDefinition, rubric: Rubric, rulesText
 You are now in the cross-review round. You see the other evaluators' anonymised scores and rationales. Revise your own evaluation only when the evidence justifies it. Mark changed=true and explain the change. Do not converge for social reasons; disagreement is useful.`
 }
 
-export function revisionPrompt(project: ProjectInput, dossier: string, own: ProjectEvaluation, peers: string): string {
+export function revisionPrompt(project: ProjectInput, dossier: string, own: ProjectEvaluation, peers: string, track?: string): string {
   return `PROJECT ID: ${project.id}
+${track ? `TRACK: ${track}` : ''}
 
 YOUR PREVIOUS EVALUATION
 overall: ${own.overall}
@@ -157,6 +159,7 @@ export function verifierPrompt(
   dossier: string,
   evaluations: ProjectEvaluation[],
   consensus: ProjectConsensus,
+  track?: string,
 ): string {
   const disagreements = new Set(consensus.disagreements)
   const consensusLines = consensus.criteria
@@ -179,7 +182,7 @@ export function verifierPrompt(
     .join('\n\n')
 
   return `PROJECT ID: ${project.id}
-
+${track ? `TRACK: ${track}\n` : ''}
 CONSENSUS
 overall: ${consensus.overall} · dispersion: ${consensus.dispersion} · status: ${consensus.status}
 ${consensusLines}
