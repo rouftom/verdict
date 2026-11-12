@@ -29,6 +29,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Swiper, SwiperSlide } from 'swiper/react'
+import { Virtuoso } from 'react-virtuoso'
 import { A11y } from 'swiper/modules'
 import type { Swiper as SwiperClass } from 'swiper'
 import 'swiper/css'
@@ -68,7 +69,15 @@ interface StageData extends Record<string, unknown> {
   duration?: string
   metrics?: StageMetric[]
   rows?: StageRow[]
+  /** A long list (Stage One projects) is virtualised instead of truncated. */
+  virtualRows?: boolean
 }
+
+/** Virtuoso scroller with the console's thin scrollbar. */
+const VirtuosoScroller = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => <div ref={ref} className={cn('custom-scrollbar', className)} {...props} />,
+)
+VirtuosoScroller.displayName = 'VirtuosoScroller'
 
 export interface CriterionMeta {
   id: string
@@ -154,14 +163,31 @@ function StageNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
       <div className="flex items-center gap-1.5">
         <StatusIcon status={stage.status} />
-        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{stage.title}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{stage.title}</span>
         {stage.duration ? (
-          <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground">{stage.duration}</span>
+          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">{stage.duration}</span>
         ) : null}
       </div>
-      <p className="mt-0.5 truncate pl-5 text-[10px] leading-tight text-muted-foreground">{stage.detail}</p>
+      <p className="mt-0.5 truncate pl-5 text-[11px] leading-tight text-muted-foreground">{stage.detail}</p>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
     </button>
+  )
+}
+
+/** One Stage One / revision / consensus row. Borderless in the compact list. */
+function StageRowView({ row, bordered = false }: { row: StageRow; bordered?: boolean }) {
+  return (
+    <div className={cn('flex items-center gap-2 text-[11px]', bordered ? 'border-b border-border/60 px-2 py-1.5 last:border-b-0' : 'gap-2')}>
+      {row.ok === undefined ? (
+        <Circle className="h-2.5 w-2.5 shrink-0 text-muted-foreground/60" />
+      ) : row.ok ? (
+        <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" />
+      ) : (
+        <XCircle className="h-3 w-3 shrink-0 text-destructive" />
+      )}
+      <span className="min-w-0 flex-1 truncate">{row.label}</span>
+      <span className="shrink-0 tabular-nums text-muted-foreground">{row.value}</span>
+    </div>
   )
 }
 
@@ -177,20 +203,20 @@ function StageCard({ data }: { data: StageData }) {
           <Workflow className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-semibold leading-tight">{data.title}</p>
-          <p className="text-[10px] text-muted-foreground">{data.detail}</p>
+          <p className="truncate text-[13px] font-semibold leading-tight">{data.title}</p>
+          <p className="text-[11px] text-muted-foreground">{data.detail}</p>
         </div>
         <Badge tone={tone}>{t(`pipeline.stageState.${data.status}`)}</Badge>
       </div>
 
       {data.duration ? (
-        <Badge tone="neutral" className="w-fit font-mono text-[10px] tabular-nums">
+        <Badge tone="neutral" className="w-fit font-mono text-[11px] tabular-nums">
           {data.duration}
         </Badge>
       ) : null}
 
       {data.status === 'active' ? (
-        <p className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2 py-1.5 text-[10px] text-muted-foreground">
+        <p className="flex items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2 py-1.5 text-[11px] text-muted-foreground">
           <NodeLoader className="h-3 w-3" />
           {t('pipeline.cardRunning')}
         </p>
@@ -200,33 +226,35 @@ function StageCard({ data }: { data: StageData }) {
         <div className="grid grid-cols-2 gap-1.5">
           {data.metrics.map((metric) => (
             <div key={metric.label} className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-              <p className="text-[9px] text-muted-foreground">{metric.label}</p>
-              <p className="text-[12px] font-semibold tabular-nums">{metric.value}</p>
+              <p className="text-[10px] text-muted-foreground">{metric.label}</p>
+              <p className="text-[13px] font-semibold tabular-nums">{metric.value}</p>
             </div>
           ))}
         </div>
       ) : null}
 
       {data.rows?.length ? (
-        <div className="flex flex-col gap-1">
-          {data.rows.map((row) => (
-            <div key={`${row.label}-${row.value}`} className="flex items-center gap-2 text-[10px]">
-              {row.ok === undefined ? (
-                <Circle className="h-2.5 w-2.5 shrink-0 text-muted-foreground/60" />
-              ) : row.ok ? (
-                <CheckCircle2 className="h-2.5 w-2.5 shrink-0 text-emerald-500" />
-              ) : (
-                <XCircle className="h-2.5 w-2.5 shrink-0 text-destructive" />
-              )}
-              <span className="min-w-0 flex-1 truncate">{row.label}</span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">{row.value}</span>
-            </div>
-          ))}
-        </div>
+        data.virtualRows ? (
+          <div className="rounded-md border border-border" style={{ height: Math.min(226, data.rows.length * 30 + 2) }}>
+            <Virtuoso
+              data={data.rows}
+              components={{ Scroller: VirtuosoScroller }}
+              className="h-full"
+              computeItemKey={(_index, row) => `${row.label}-${row.value}`}
+              itemContent={(_index, row) => <StageRowView row={row} bordered />}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {data.rows.map((row) => (
+              <StageRowView key={`${row.label}-${row.value}`} row={row} />
+            ))}
+          </div>
+        )
       ) : null}
 
       {!hasDetail && data.status !== 'active' ? (
-        <p className="rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
+        <p className="rounded-md border border-dashed border-border bg-muted/20 p-2 text-[11px] text-muted-foreground">
           {t('pipeline.cardWaiting')}
         </p>
       ) : null}
@@ -274,16 +302,16 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
   return (
     <div className="custom-scrollbar flex max-h-[48vh] flex-col gap-2 overflow-y-auto px-7 pb-1">
       <div className="flex items-center gap-1.5">
-        <p className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={entry.projectName}>
+        <p className="min-w-0 flex-1 truncate text-[13px] font-semibold" title={entry.projectName}>
           {entry.projectName}
         </p>
         {entry.revision ? (
-          <Badge tone="warning" className="text-[9px]">
+          <Badge tone="warning" className="text-[10px]">
             {t('pipeline.revised', { round: entry.revision.round })}
           </Badge>
         ) : null}
         {entry.verification ? (
-          <Badge tone={entry.verification.approved ? 'success' : 'danger'} className="text-[9px]">
+          <Badge tone={entry.verification.approved ? 'success' : 'danger'} className="text-[10px]">
             {entry.verification.approved ? t('pipeline.approved') : t('pipeline.flagged')}
           </Badge>
         ) : null}
@@ -294,7 +322,7 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
         <>
           <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5">
             <div className="min-w-0 flex-1">
-              <p className="text-[9px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 {entry.verification
                   ? t('pipeline.verifierFinalScore')
                   : confidence !== undefined
@@ -302,7 +330,7 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
                     : t('pipeline.evaluatorScore')}
               </p>
             </div>
-            <span className="min-w-0 truncate text-[10px] tabular-nums text-muted-foreground">
+            <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
               {data.model ? data.model.model : t('pipeline.modelNotSet')}
             </span>
           </div>
@@ -311,7 +339,7 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
             {data.criteria.map((criterion) => {
               const score = criteriaScores.get(criterion.id)
               return (
-                <div key={criterion.id} className="flex items-center gap-2 text-[10px]">
+                <div key={criterion.id} className="flex items-center gap-2 text-[12px]">
                   <span className="min-w-0 flex-1 truncate">{criterion.label}</span>
                   <span className={cn('w-8 text-right font-semibold tabular-nums', score ? scoreClass(score.score) : 'text-muted-foreground')}>
                     {score ? score.score.toFixed(0) : '-'}
@@ -323,17 +351,17 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
 
           {summary ? (
             <div className="rounded-md border border-border bg-muted/20 p-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.synthesis')}</p>
-              <p className="mt-0.5 text-[10px] leading-snug text-foreground">{summary}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.synthesis')}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-foreground">{summary}</p>
             </div>
           ) : null}
 
           {redFlags.length > 0 ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
-              <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-destructive">
+              <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-destructive">
                 <Flag className="h-2.5 w-2.5" /> {t('pipeline.redFlags')}
               </p>
-              <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
+              <ul className="mt-0.5 list-inside list-disc text-[11px] leading-snug text-muted-foreground">
                 {redFlags.slice(0, 6).map((flag) => (
                   <li key={flag}>{flag}</li>
                 ))}
@@ -343,8 +371,8 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
 
           {entry.verification && entry.verification.adjustments.length > 0 ? (
             <div className="rounded-md border border-border p-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.adjustments')}</p>
-              <ul className="mt-0.5 list-inside list-disc text-[10px] leading-snug text-muted-foreground">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('pipeline.adjustments')}</p>
+              <ul className="mt-0.5 list-inside list-disc text-[11px] leading-snug text-muted-foreground">
                 {entry.verification.adjustments.map((adjustment) => (
                   <li key={adjustment.criterionId}>
                     {adjustment.criterionId}: {adjustment.from} → {adjustment.to}
@@ -355,7 +383,7 @@ function AgentReturnView({ data, entry }: { data: AgentData; entry: AgentReturn 
           ) : null}
         </>
       ) : (
-        <p className="flex items-start gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
+        <p className="flex items-start gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-2 text-[11px] text-muted-foreground">
           {data.status === 'active' ? <NodeLoader className="mt-0.5 h-3 w-3" /> : null}
           <span>{t('pipeline.waiting')}</span>
         </p>
@@ -382,16 +410,16 @@ function AgentCard({ data }: { data: AgentData }) {
   }
 
   return (
-    <div className="flex max-h-[70vh] flex-col gap-2">
+    <div className="custom-scrollbar flex max-h-[70vh] flex-col gap-2 overflow-y-auto pr-1">
       <div className="flex items-start gap-2">
         <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-brand-primary/10 text-brand-primary">
           {data.role === 'evaluator' ? <UserRound className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-semibold leading-tight">
+          <p className="truncate text-[13px] font-semibold leading-tight">
             {t(`agents.${data.agent.id}.name`, { defaultValue: data.agent.name })}
           </p>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             {t(`agents.${data.agent.id}.lens`, { defaultValue: data.agent.lens })}
           </p>
         </div>
@@ -401,22 +429,22 @@ function AgentCard({ data }: { data: AgentData }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge tone="neutral" className="max-w-full truncate font-mono text-[10px]">
+        <Badge tone="neutral" className="max-w-full truncate font-mono text-[11px]">
           {modelName(data.model, t('pipeline.modelNotSet'))}
         </Badge>
         {data.model?.reasoningEffort ? (
-          <Badge tone="brand" className="text-[10px]">
+          <Badge tone="brand" className="text-[11px]">
             {t('pipeline.effort', { effort: data.model.reasoningEffort })}
           </Badge>
         ) : null}
         {data.duration ? (
-          <Badge tone="neutral" className="font-mono text-[10px] tabular-nums">
+          <Badge tone="neutral" className="font-mono text-[11px] tabular-nums">
             {data.duration}
           </Badge>
         ) : null}
       </div>
 
-      <p className="text-[10px] leading-tight text-muted-foreground">
+      <p className="text-[11px] leading-tight text-muted-foreground">
         {t(`agents.${data.agent.id}.focus`, { defaultValue: data.agent.focus })}
       </p>
 
@@ -481,13 +509,13 @@ function AgentCard({ data }: { data: AgentData }) {
           ) : null}
         </div>
       ) : (
-        <p className="flex items-start gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-2 text-[10px] text-muted-foreground">
+        <p className="flex items-start gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-2 text-[11px] text-muted-foreground">
           {data.status === 'active' ? <NodeLoader className="mt-0.5 h-3 w-3" /> : null}
           <span>{t('pipeline.waiting')}</span>
         </p>
       )}
 
-      <p className="flex items-center gap-1 text-[9px] text-muted-foreground">
+      <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
         <Activity className="h-2.5 w-2.5" />
         {t('pipeline.resultCount', { count: data.count })}
       </p>
@@ -545,7 +573,7 @@ function AgentNode({ data }: NodeProps) {
         popover.open(agent.nodeId, event.currentTarget.getBoundingClientRect())
       }}
       className={cn(
-        'nodrag nopan cursor-pointer w-[172px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
+        'nodrag nopan cursor-pointer w-[184px] rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors',
         'hover:border-brand-primary/60 hover:bg-brand-primary/5',
         agent.status === 'active' && 'border-brand-primary ring-2 ring-brand-primary/20',
         agent.status === 'done' && 'border-emerald-500/40',
@@ -556,21 +584,21 @@ function AgentNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
       <div className="flex items-center gap-1.5">
         <StatusIcon status={agent.status} className="h-3 w-3" />
-        <span className="truncate text-[11px] font-semibold">
+        <span className="truncate text-[12px] font-semibold">
           {t(`agents.${agent.agent.id}.name`, { defaultValue: agent.agent.name })}
         </span>
         {overall !== undefined ? (
-          <span className={cn('ml-auto text-[10px] font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
+          <span className={cn('ml-auto text-[11px] font-bold tabular-nums', scoreClass(overall))}>{overall.toFixed(1)}</span>
         ) : null}
       </div>
       <div className="mt-0.5 flex items-center gap-1 pl-[18px]">
-        <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted-foreground">
           {modelName(agent.model, t('pipeline.modelNotSet'))}
         </span>
         {agent.duration ? (
-          <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground">{agent.duration}</span>
+          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">{agent.duration}</span>
         ) : null}
-        {agent.count > 1 ? <span className="text-[9px] tabular-nums text-muted-foreground">×{agent.count}</span> : null}
+        {agent.count > 1 ? <span className="text-[10px] tabular-nums text-muted-foreground">×{agent.count}</span> : null}
       </div>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
     </button>
@@ -769,28 +797,37 @@ export function PipelineGraph({
     [closeNode, openNode, panel?.id],
   )
   const panelRef = React.useRef<HTMLDivElement | null>(null)
-  // Close on Escape or resize. A scroll only closes the card when it happens
-  // outside it: the card has its own scrollable content, and closing it while
-  // the reader scrolls a long synthesis made the panel feel unstable.
+  // Close on Escape or resize. Scrolling no longer dismisses the card: the
+  // graph keeps updating during a live run, and a card that vanished on every
+  // scroll felt unstable.
   React.useEffect(() => {
     if (!panel) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setPanel(null)
     }
     const close = () => setPanel(null)
-    const onScroll = (event: Event) => {
-      if (event.target instanceof Node && panelRef.current?.contains(event.target)) return
-      setPanel(null)
-    }
     window.addEventListener('keydown', onKey)
     window.addEventListener('resize', close)
-    window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', onScroll, true)
     }
   }, [panel])
+  // Keep the card inside the viewport once its real height is known: a Stage
+  // One card can be much taller than the anchor's initial estimate.
+  React.useEffect(() => {
+    const element = panelRef.current
+    if (!panel || !element) return
+    const place = () => {
+      const maxTop = Math.max(PANEL_MARGIN, window.innerHeight - element.offsetHeight - PANEL_MARGIN)
+      setPanel((current) => (current && current.y > maxTop ? { ...current, y: maxTop } : current))
+    }
+    place()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(place)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [panel?.id])
   const projectNames = React.useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects])
   const live = Boolean(current && !['done', 'failed', 'cancelled'].includes(current))
   const now = useNow(live)
@@ -889,7 +926,7 @@ export function PipelineGraph({
 
     const stageRows = (id: (typeof STAGES)[number]['id']): StageRow[] | undefined => {
       if (id === 'stageOne') {
-        return stageOne.slice(0, 10).map((result) => ({
+        return stageOne.map((result) => ({
           label: projectNames.get(result.projectId) ?? result.projectId,
           value: result.passed ? t('pipeline.passed') : t('pipeline.failed'),
           ok: result.passed,
@@ -990,6 +1027,7 @@ export function PipelineGraph({
           ...(duration ? { duration } : {}),
           ...(metrics.length > 0 ? { metrics } : {}),
           ...(rows && rows.length > 0 ? { rows } : {}),
+          ...(stage.id === 'stageOne' && rows && rows.length > 0 ? { virtualRows: true } : {}),
         } satisfies StageData,
       }
     })
@@ -1001,7 +1039,7 @@ export function PipelineGraph({
       return {
         id: `agent-${summary.agent.id}`,
         type: 'agent',
-        position: { x: 200 + column * 188, y: row * 74 },
+        position: { x: 200 + column * 196, y: row * 74 },
         // React Flow disables pointer events on nodes when the canvas is not
         // selectable or draggable. The agent cards must stay clickable.
         style: { pointerEvents: 'all' as const },
@@ -1019,7 +1057,7 @@ export function PipelineGraph({
       return {
         id: `agent-${summary.agent.id}`,
         type: 'agent',
-        position: { x: 200 + index * 188, y: 232 },
+        position: { x: 200 + index * 196, y: 232 },
         style: { pointerEvents: 'all' as const },
         data: {
           ...summary,
@@ -1153,7 +1191,6 @@ export function PipelineGraph({
             fitView
             fitViewOptions={{ padding: 0.16 }}
             minZoom={0.35}
-            onlyRenderVisibleElements
             panOnDrag
             zoomOnScroll={false}
             zoomOnPinch={false}

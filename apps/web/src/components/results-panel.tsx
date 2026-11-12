@@ -52,6 +52,12 @@ import {
 } from '@verdict/shared'
 import { formatDate, formatTokens, pct, scoreTone } from '@/lib/format'
 
+/** Virtuoso scroller with the same thin scrollbar as the rest of the console. */
+const VirtuosoScroller = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => <div ref={ref} className={cn('custom-scrollbar', className)} {...props} />,
+)
+VirtuosoScroller.displayName = 'VirtuosoScroller'
+
 export interface ResultsPanelProps {
   report?: Report
   rubric?: Rubric
@@ -125,7 +131,7 @@ function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: b
 
   if (compact) {
     return (
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1 font-semibold text-foreground">
           <Coins className="h-3 w-3 text-brand-primary" /> {t('results.pipelineUsage')}
         </span>
@@ -143,8 +149,8 @@ function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: b
     <div className="rounded-md border border-border">
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
         <Coins className="h-3.5 w-3.5 text-brand-primary" />
-        <span className="text-[11px] font-semibold">{t('results.pipelineUsage')}</span>
-        <span className="ml-auto flex flex-wrap gap-3 text-[10px] tabular-nums text-muted-foreground">
+        <span className="text-[12px] font-semibold">{t('results.pipelineUsage')}</span>
+        <span className="ml-auto flex flex-wrap gap-3 text-[11px] tabular-nums text-muted-foreground">
           <span>{t('results.calls', { count: usage.total.calls })}</span>
           <span>{t('results.tokensIn', { value: formatTokens(usage.total.inputTokens) })}</span>
           <span>{t('results.tokensOut', { value: formatTokens(usage.total.outputTokens) })}</span>
@@ -152,10 +158,10 @@ function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: b
       </div>
       <div className="grid gap-3 p-2 sm:grid-cols-2">
         <div>
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.costPerAgent')}</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.costPerAgent')}</p>
           <ul className="flex flex-col gap-0.5">
             {usage.byAgent.map((agent) => (
-              <li key={`${agent.role}:${agent.agentId}`} className="flex items-center gap-1.5 text-[10px]">
+              <li key={`${agent.role}:${agent.agentId}`} className="flex items-center gap-1.5 text-[11px]">
                 {agent.role === 'verifier' ? (
                   <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-600" />
                 ) : (
@@ -171,17 +177,17 @@ function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: b
           </ul>
         </div>
         <div>
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.costPerStage')}</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.costPerStage')}</p>
           <ul className="flex flex-col gap-0.5">
             {usage.byStage.map((stage) => (
-              <li key={stage.stage} className="flex items-center gap-1.5 text-[10px]">
+              <li key={stage.stage} className="flex items-center gap-1.5 text-[11px]">
                 <span className="min-w-0 flex-1 truncate">{t(STAGE_KEYS[stage.stage])}</span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">{stage.calls}×</span>
                 <span className="w-10 shrink-0 text-right tabular-nums">{formatTokens(stage.inputTokens + stage.outputTokens)}</span>
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-[9px] leading-tight text-muted-foreground">{t('results.costNote')}</p>
+          <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{t('results.costNote')}</p>
         </div>
       </div>
     </div>
@@ -287,6 +293,7 @@ function RankingList({
       ref={listRef}
       data={rows}
       className="h-full"
+      components={{ Scroller: VirtuosoScroller }}
       rangeChanged={({ startIndex, endIndex }) => {
         rangeRef.current = { start: startIndex, end: endIndex }
       }}
@@ -305,10 +312,10 @@ function RankingList({
             <div className="px-2 pb-1 pt-3">
               <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-destructive">
                 <XCircle className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide">
+                <span className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide">
                   {t('results.stageOneFailedGroup')}
                 </span>
-                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[9px] tabular-nums">
+                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] tabular-nums">
                   {t('results.trackProjects', { count: row.count })}
                 </span>
               </div>
@@ -331,12 +338,12 @@ function RankingList({
               {selected === key ? (
                 <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-brand-primary" />
               ) : null}
-              <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground">-</span>
+              <span className="w-5 shrink-0 text-center text-[12px] font-bold tabular-nums text-muted-foreground">-</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-medium">
+                <span className="block truncate text-[13px] font-medium">
                   {names.get(row.result.projectId) ?? row.result.projectId}
                 </span>
-                <span className="block truncate text-[10px] text-muted-foreground" title={row.result.rationale}>
+                <span className="block truncate text-[11px] text-muted-foreground" title={row.result.rationale}>
                   {row.result.rationale}
                 </span>
               </span>
@@ -353,8 +360,8 @@ function RankingList({
             <div className={cn('px-2 pb-1', row.first ? 'pt-2' : 'pt-3')}>
               <div className={cn('flex items-center gap-2 rounded-md border px-2 py-1.5', trackTone(row.track))}>
                 <Layers className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-wide">{row.track}</span>
-                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[9px] tabular-nums">
+                <span className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide">{row.track}</span>
+                <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] tabular-nums">
                   {t('results.trackProjects', { count: row.count })}
                 </span>
               </div>
@@ -377,16 +384,16 @@ function RankingList({
               <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-brand-primary" />
             ) : null}
             <span
-              className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground"
+              className="w-5 shrink-0 text-center text-[12px] font-bold tabular-nums text-muted-foreground"
               title={`${row.track} #${row.entry.rank}`}
             >
               {row.entry.rank}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] font-medium">{row.entry.name}</span>
-              <span className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="block truncate text-[13px] font-medium">{row.entry.name}</span>
+              <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                 {showTrack ? (
-                  <span className={cn('inline-flex items-center rounded-full border px-1.5 py-0 text-[9px] font-medium', trackTone(row.track))}>
+                  <span className={cn('inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium', trackTone(row.track))}>
                     {row.track}
                   </span>
                 ) : null}
@@ -402,7 +409,7 @@ function RankingList({
                     <DeltaPill delta={row.entry.rankDelta} />
                   </>
                 ) : null}
-                <Badge tone="success" className="px-1 py-0 text-[9px]">
+                <Badge tone="success" className="px-1 py-0 text-[10px]">
                   {t('results.stageOnePassed')}
                 </Badge>
               </span>
@@ -427,12 +434,12 @@ function StageOneNote({ result }: { result: StageOneResult }) {
         result.passed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-destructive/30 bg-destructive/5',
       )}
     >
-      <p className={cn('flex items-center gap-1 text-[10px] font-semibold', result.passed ? 'text-emerald-600' : 'text-destructive')}>
+      <p className={cn('flex items-center gap-1 text-[11px] font-semibold', result.passed ? 'text-emerald-600' : 'text-destructive')}>
         {result.passed ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
         {result.passed ? t('results.stageOnePassed') : t('results.stageOneFailed')}
       </p>
-      <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{result.rationale}</p>
-      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
+      <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{result.rationale}</p>
+      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
         <span>
           {t('results.stageOneTheme')}: {result.themeFit ? t('results.stageOneMet') : t('results.stageOneNotMet')}
         </span>
@@ -440,7 +447,7 @@ function StageOneNote({ result }: { result: StageOneResult }) {
           {t('results.stageOneTooling')}: {result.toolingUse ? t('results.stageOneMet') : t('results.stageOneNotMet')}
         </span>
       </p>
-      {!result.passed ? <p className="mt-1 text-[10px] font-medium text-destructive">{t('results.stageOneNotScored')}</p> : null}
+      {!result.passed ? <p className="mt-1 text-[11px] font-medium text-destructive">{t('results.stageOneNotScored')}</p> : null}
     </div>
   )
 }
@@ -557,7 +564,7 @@ export function ResultsPanel({
         ) : null}
         {trackNames.length > 1 ? (
           <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
-            <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.track')}</span>
+            <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">{t('results.track')}</span>
             <Select
               value={activeTrack}
               onValueChange={setTrackFilter}
@@ -567,7 +574,7 @@ export function ResultsPanel({
                 ...trackNames.map((name) => ({ value: name, label: name })),
               ]}
               className="min-w-0 flex-1"
-              triggerClassName="h-6 text-[10px]"
+              triggerClassName="h-6 text-[11px]"
             />
           </div>
         ) : null}
@@ -584,7 +591,7 @@ export function ResultsPanel({
         <CardHeader className="border-b border-border">
           <CardTitle className="truncate">{selectedProject?.name ?? t('results.projectDetail')}</CardTitle>
           {selectedTrack ? (
-            <span className={cn('shrink-0 rounded-full border px-1.5 py-0 text-[9px] font-medium', trackTone(selectedTrack))}>
+            <span className={cn('shrink-0 rounded-full border px-1.5 py-0 text-[10px] font-medium', trackTone(selectedTrack))}>
               {selectedTrack}
             </span>
           ) : null}
@@ -618,9 +625,9 @@ export function ResultsPanel({
             ) : null}
           </div>
         </CardHeader>
-        <CardContent ref={detailRef} className="min-h-0 flex-1 overflow-auto">
+        <CardContent ref={detailRef} className="custom-scrollbar min-h-0 flex-1 overflow-auto">
           {!selected ? (
-            <p className="text-xs text-muted-foreground">{t('results.selectProject')}</p>
+            <p className="text-[13px] text-muted-foreground">{t('results.selectProject')}</p>
           ) : (
             <div className="flex flex-col gap-3">
               {report?.usage ? <CostSummary usage={report.usage} /> : null}
@@ -629,22 +636,22 @@ export function ResultsPanel({
                 <>
               <div className="flex flex-wrap items-start gap-3">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.finalOverall')}</p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('results.finalOverall')}</p>
                   <p className="text-2xl font-bold tabular-nums">{finalOverall.toFixed(1)}</p>
                 </div>
                 {selectedConsensus ? (
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.consensus')}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('results.consensus')}</p>
                     <p className="text-lg font-semibold tabular-nums">{selectedConsensus.overall.toFixed(1)}</p>
                   </div>
                 ) : null}
                 {selectedConsensus ? (
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.dispersion')}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('results.dispersion')}</p>
                     <p className="text-lg font-semibold tabular-nums">{selectedConsensus.dispersion.toFixed(1)}</p>
                   </div>
                 ) : null}
-                <div className="ml-auto flex gap-2 text-[10px] text-muted-foreground">
+                <div className="ml-auto flex gap-2 text-[11px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <FileCode2 className="h-3 w-3" /> {t('results.files', { count: selectedReport?.evidence.repoFiles ?? 0 })}
                   </span>
@@ -654,8 +661,8 @@ export function ResultsPanel({
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full border-collapse text-[11px]">
+              <div className="custom-scrollbar overflow-x-auto rounded-md border border-border">
+                <table className="w-full border-collapse text-[12px]">
                   <thead>
                     <tr className="bg-muted/50 text-left">
                       <th className="px-2 py-1 font-semibold">{t('results.criterion')}</th>
@@ -684,8 +691,8 @@ export function ResultsPanel({
               </div>
 
               {selectedEvaluations.length > 0 ? (
-                <div className="overflow-x-auto rounded-md border border-border">
-                  <table className="w-full border-collapse text-[10px]">
+                <div className="custom-scrollbar overflow-x-auto rounded-md border border-border">
+                  <table className="w-full border-collapse text-[11px]">
                     <thead>
                       <tr className="bg-muted/50">
                         <th className="sticky left-0 bg-muted/50 px-2 py-1 text-left font-semibold">{t('results.evaluator')}</th>
@@ -723,18 +730,18 @@ export function ResultsPanel({
 
               {selectedVerifications.length > 0 ? (
                 <div className="flex flex-col gap-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.verifierAudit')}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('results.verifierAudit')}</p>
                   {selectedVerifications.map((verification) => (
                     <div key={`${verification.verifierId}-${verification.model}`} className="rounded-md border border-border p-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium">{verification.verifierName}</span>
+                        <span className="text-[12px] font-medium">{verification.verifierName}</span>
                         <Badge tone={verification.approved ? 'success' : 'danger'}>
                           {verification.approved ? t('results.approved') : t('results.flagged')}
                         </Badge>
-                        <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{verification.finalOverall.toFixed(1)}</span>
+                        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{verification.finalOverall.toFixed(1)}</span>
                       </div>
                       {verification.adjustments.length > 0 ? (
-                        <ul className="mt-1 list-inside list-disc text-[10px] text-muted-foreground">
+                        <ul className="mt-1 list-inside list-disc text-[11px] text-muted-foreground">
                           {verification.adjustments.map((adjustment) => (
                             <li key={adjustment.criterionId}>
                               {adjustment.criterionId}: {adjustment.from} → {adjustment.to}: {adjustment.reason}
@@ -742,7 +749,7 @@ export function ResultsPanel({
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-1 text-[10px] text-muted-foreground">{t('results.noAdjustment')}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{t('results.noAdjustment')}</p>
                       )}
                     </div>
                   ))}
@@ -751,10 +758,10 @@ export function ResultsPanel({
 
               {selectedConsensus && selectedConsensus.disagreements.length > 0 ? (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
-                  <p className="flex items-center gap-1 text-[10px] font-semibold text-amber-600">
+                  <p className="flex items-center gap-1 text-[11px] font-semibold text-amber-600">
                     <Flag className="h-3 w-3" /> {t('results.disagreement')}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{selectedConsensus.disagreements.join(', ')}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{selectedConsensus.disagreements.join(', ')}</p>
                 </div>
               ) : null}
                 </>
@@ -762,8 +769,8 @@ export function ResultsPanel({
 
               {selectedReport?.evidence.errors.length ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
-                  <p className="text-[10px] font-semibold text-destructive">{t('results.harvestErrors')}</p>
-                  <ul className="mt-0.5 list-inside list-disc text-[10px] text-muted-foreground">
+                  <p className="text-[11px] font-semibold text-destructive">{t('results.harvestErrors')}</p>
+                  <ul className="mt-0.5 list-inside list-disc text-[11px] text-muted-foreground">
                     {selectedReport.evidence.errors.map((error) => (
                       <li key={error}>{error}</li>
                     ))}
@@ -772,7 +779,7 @@ export function ResultsPanel({
               ) : null}
 
               {report ? (
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   {t('results.reportGenerated', {
                     date: formatDate(report.createdAt),
                     evaluators: report.models.evaluators.length,

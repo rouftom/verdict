@@ -168,8 +168,9 @@ rewrites its generated file, leave it alone.
 - The pipeline appears only after a run starts. Ranking and project detail
   appear as soon as results arrive. One bottom-bar toggle switches between the
   pipeline view and the results view, so only one is on screen at a time.
-- Large lists stay virtualised: `react-virtuoso` for the run log and ranking,
-  `onlyRenderVisibleElements` for React Flow.
+- Large lists stay virtualised: `react-virtuoso` for the run log, the ranking
+  and the Stage One project list in its node card. React Flow keeps every node
+  mounted, so a live update never drops a node card or its open panel.
 - Calibration anchors cap at three and show the `n/3` count. Long names are
   truncated in the chip, the chip list scrolls instead of pushing the section
   taller, and above three projects a small case-insensitive field filters the
