@@ -415,6 +415,14 @@ export function modelRefKey(ref: ModelRef): string {
   return `${ref.provider}:${ref.model}`
 }
 
+/**
+ * Short `provider | model` tag for the run log, so a failure names the model
+ * that produced it instead of leaving the operator to guess.
+ */
+export function modelRefLabel(ref: ModelRef): string {
+  return `${ref.provider} | ${ref.model}`
+}
+
 export function parseModelRef(value: string): ModelRef | null {
   const trimmed = value.trim()
   const separator = trimmed.indexOf(':')

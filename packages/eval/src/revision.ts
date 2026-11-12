@@ -9,7 +9,7 @@ import {
 } from '@verdict/shared'
 import type { AgentDefinition } from './agents'
 import { anonymisedEvaluations, buildDossier } from './dossier'
-import { normaliseEvaluation } from './normalise'
+import { assertReadableScores, normaliseRevision } from './normalise'
 import { revisionPrompt, revisionSystem } from './prompts'
 import { generateStructured, type UsageTotals } from './structured'
 
@@ -24,6 +24,8 @@ const JSON_CONTRACT = `{
 
 export interface ReviseArgs {
   project: ProjectInput
+  /** Track this revision scores. */
+  track?: string
   evidence: ProjectEvidence
   rubric: Rubric
   rulesText: string
@@ -37,7 +39,7 @@ export interface ReviseArgs {
 }
 
 export async function reviseEvaluation(args: ReviseArgs): Promise<{ revision: ProjectRevision; usage: UsageTotals }> {
-  const { project, evidence, rubric, rulesText, agent, modelRef, temperature, own, all, round, signal } = args
+  const { project, track, evidence, rubric, rulesText, agent, modelRef, temperature, own, all, round, signal } = args
   const peers = anonymisedEvaluations(all, agent.id)
   const dossier = buildDossier(project, evidence)
   const result = await generateStructured({
@@ -45,20 +47,28 @@ export async function reviseEvaluation(args: ReviseArgs): Promise<{ revision: Pr
     modelRef,
     schema: revisionOutputSchema,
     system: revisionSystem(agent, rubric, rulesText),
-    prompt: revisionPrompt(project, dossier, own, peers),
+    prompt: revisionPrompt(project, dossier, own, peers, track),
     temperature,
     jsonContract: JSON_CONTRACT,
+    // A revision is a delta, so an omitted criterion is not an error: it keeps
+    // the agent's previous score. Only unreadable numbers are sent back.
+    validate: (output) => assertReadableScores(output),
     ...(signal ? { signal } : {}),
     ...(project.youtube ? { videoUrl: project.youtube } : {}),
   })
 
-  const evaluation = normaliseEvaluation(result.object, {
-    projectId: project.id,
-    agentId: agent.id,
-    agentName: agent.name,
-    model: modelRefKey(modelRef),
-    rubric,
-  })
+  const evaluation = normaliseRevision(
+    result.object,
+    {
+      projectId: project.id,
+      ...(track !== undefined ? { track } : {}),
+      agentId: agent.id,
+      agentName: agent.name,
+      model: modelRefKey(modelRef),
+      rubric,
+    },
+    own,
+  )
 
   return {
     revision: {

@@ -1,7 +1,7 @@
 import { mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { FrameEvidence, VideoArtifact } from '@verdict/shared'
-import { cookiesFile, env, ffmpegPath, hasYtdlp, temporaryDirectory, removeDirectory, ytdlpPath } from './env'
+import { cookiesFile, env, ffmpegPath, ffprobePath, hasYtdlp, temporaryDirectory, removeDirectory, ytdlpPath } from './env'
 import { run } from './proc'
 import { transcribeVideo } from './transcribe'
 import { createSessionCache, videoCacheKey } from './cache'
@@ -321,6 +321,102 @@ export async function harvestVideo(value: string, options: HarvestVideoOptions =
   return artifact
 }
 
+export interface LocalVideoOptions {
+  maxMinutes?: number
+  frameIntervalSeconds?: number
+  maxFrames?: number
+  /** Known duration in seconds; probed with ffprobe when omitted. */
+  duration?: number
+  title?: string
+  uploader?: string
+  thumbnail?: string
+  /** Logical source URL used in frame references; defaults to the file path. */
+  sourceUrl?: string
+  signal?: AbortSignal
+}
+
+async function probeDuration(filePath: string, signal?: AbortSignal): Promise<number | undefined> {
+  try {
+    const result = await run(
+      ffprobePath(),
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath],
+      { timeoutMs: 30_000, ...(signal ? { signal } : {}) },
+    )
+    const seconds = Number(result.stdout.trim())
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Extract keyframes and a transcript from a video already on disk. Shared by
+ * the online download and the offline bundle so both produce the same artifact.
+ */
+export async function buildVideoArtifactFromFile(filePath: string, options: LocalVideoOptions = {}): Promise<VideoArtifact> {
+  const frameInterval = Math.max(2, options.frameIntervalSeconds ?? 20)
+  const maxFrames = Math.max(1, options.maxFrames ?? Number(env('FRAME_MAX') || 24))
+  if (options.maxMinutes !== undefined && options.maxMinutes > 0) {
+    const duration = options.duration ?? (await probeDuration(filePath, options.signal))
+    if (duration !== undefined && duration > options.maxMinutes * 60) {
+      throw new Error(`Video is ${Math.round(duration / 60)} min, above the ${options.maxMinutes} min cap.`)
+    }
+  }
+
+  const workspace = await temporaryDirectory('verdict-video-local')
+  try {
+    const framesDirectory = join(workspace, 'frames')
+    await mkdir(framesDirectory, { recursive: true })
+    const frameCommand = (args: string[]) =>
+      run(ffmpegPath(), args, { timeoutMs: 10 * 60_000, ...(options.signal ? { signal: options.signal } : {}) })
+    let framesResult = await frameCommand([
+      '-y',
+      '-i', filePath,
+      '-vf', `fps=1/${frameInterval},scale=640:-2`,
+      '-frames:v', String(maxFrames),
+      '-q:v', '3',
+      join(framesDirectory, 'frame-%03d.jpg'),
+    ])
+    // A clip shorter than the sampling interval samples zero frames. Take its
+    // first frame instead of losing the visual evidence for a short demo.
+    if (framesResult.code !== 0) {
+      framesResult = await frameCommand([
+        '-y',
+        '-i', filePath,
+        '-frames:v', '1',
+        '-q:v', '3',
+        join(framesDirectory, 'frame-000.jpg'),
+      ])
+    }
+    if (framesResult.code !== 0) throw new Error(`FFmpeg frame extraction failed: ${framesResult.stderr.slice(-300)}`)
+
+    const frameFiles = (await readdir(framesDirectory)).filter((name) => name.endsWith('.jpg')).sort()
+    const sourceUrl = options.sourceUrl ?? filePath
+    const frames: FrameEvidence[] = frameFiles.map((name, index) => ({
+      index,
+      atSeconds: index * frameInterval,
+      // Logical reference: the pixel files live in the ephemeral workspace.
+      path: `${sourceUrl}#frame-${index}@${index * frameInterval}s`,
+      caption: `Keyframe at ${index * frameInterval}s (${name}).`,
+    }))
+
+    const transcription = await transcribeVideo(filePath, workspace, undefined, options.signal)
+
+    return {
+      url: sourceUrl,
+      ...(options.title ? { title: options.title } : {}),
+      ...(options.duration !== undefined ? { duration: options.duration } : {}),
+      ...(options.uploader ? { uploader: options.uploader } : {}),
+      ...(options.thumbnail ? { thumbnail: options.thumbnail } : {}),
+      ...(transcription.transcript ? { transcript: transcription.transcript } : {}),
+      frames,
+      fetchedAt: new Date().toISOString(),
+    }
+  } finally {
+    await removeDirectory(workspace)
+  }
+}
+
 async function harvestVideoUncached(ref: YouTubeRef, settings: VideoSettings, options: HarvestVideoOptions): Promise<VideoArtifact> {
   const { maxMinutes, frameIntervalSeconds: frameInterval, maxFrames, maxHeight } = settings
   if (!(await hasYtdlp())) {
@@ -397,43 +493,16 @@ async function harvestVideoUncached(ref: YouTubeRef, settings: VideoSettings, op
     if (!videoFile) throw new Error('yt-dlp produced no video file.')
     const videoPath = join(workspace, videoFile)
 
-    const framesDirectory = join(workspace, 'frames')
-    await mkdir(framesDirectory, { recursive: true })
-    const framesResult = await run(
-      ffmpegPath(),
-      [
-        '-y',
-        '-i', videoPath,
-        '-vf', `fps=1/${frameInterval},scale=640:-2`,
-        '-frames:v', String(maxFrames),
-        '-q:v', '3',
-        join(framesDirectory, 'frame-%03d.jpg'),
-      ],
-      { timeoutMs: 10 * 60_000, ...(options.signal ? { signal: options.signal } : {}) },
-    )
-    if (framesResult.code !== 0) throw new Error(`FFmpeg frame extraction failed: ${framesResult.stderr.slice(-300)}`)
-
-    const frameFiles = (await readdir(framesDirectory)).filter((name) => name.endsWith('.jpg')).sort()
-    const frames: FrameEvidence[] = frameFiles.map((name, index) => ({
-      index,
-      atSeconds: index * frameInterval,
-      // Logical reference: the pixel files live in the ephemeral workspace.
-      path: `${ref.url}#frame-${index}@${index * frameInterval}s`,
-      caption: `Keyframe at ${index * frameInterval}s (${name}).`,
-    }))
-
-    const transcription = await transcribeVideo(videoPath, workspace, undefined, options.signal)
-
-    return {
-      url: ref.url,
-      ...(meta?.title ? { title: meta.title } : {}),
+    return buildVideoArtifactFromFile(videoPath, {
+      frameIntervalSeconds: frameInterval,
+      maxFrames,
       ...(typeof meta?.duration === 'number' ? { duration: meta.duration } : {}),
+      ...(meta?.title ? { title: meta.title } : {}),
       ...(meta?.uploader ? { uploader: meta.uploader } : {}),
       ...(meta?.thumbnail ? { thumbnail: meta.thumbnail } : {}),
-      ...(transcription.transcript ? { transcript: transcription.transcript } : {}),
-      frames,
-      fetchedAt: new Date().toISOString(),
-    }
+      sourceUrl: ref.url,
+      ...(options.signal ? { signal: options.signal } : {}),
+    })
   } finally {
     // Frames are copied out by the caller before cleanup when it needs them;
     // the transcript and metadata are already in memory.

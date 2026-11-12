@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Virtuoso } from 'react-virtuoso'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import {
   ArrowDown,
   ArrowUp,
@@ -19,10 +19,25 @@ import {
   Trophy,
   XCircle,
 } from 'lucide-react'
-import { Badge, Card, CardContent, CardHeader, CardTitle, Select, cn } from '@verdict/ui'
 import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Select,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  cn,
+} from '@verdict/ui'
+import {
+  DEFAULT_RUBRIC,
   primaryTrack,
   projectTracks,
+  rankProjects,
+  scoreKey,
   type CriterionScore,
   type ProjectConsensus,
   type ProjectEvaluation,
@@ -45,8 +60,9 @@ export interface ResultsPanelProps {
   consensus: ProjectConsensus[]
   evaluations: ProjectEvaluation[]
   verifications: ProjectVerification[]
-  selectedId?: string
-  onSelect: (projectId: string) => void
+  /** Identity of the selected row, project plus track. */
+  selectedKey?: string
+  onSelect: (selection: { projectId: string; track?: string }) => void
 }
 
 interface CriterionMeta {
@@ -172,53 +188,22 @@ function CostSummary({ usage, compact = false }: { usage?: RunUsage; compact?: b
   )
 }
 
+/**
+ * Provisional rankings reuse the shared ranking rules so the list before a run
+ * and the final report cannot drift apart. Stage One failures are excluded once
+ * the gate has run, exactly as the orchestrator does after screening.
+ */
 function provisionalRankings(
   manifest: ProjectInput[],
   consensus: ProjectConsensus[],
   rubric?: Rubric,
   stageOne: StageOneResult[] = [],
 ): TrackRanking[] {
-  const byId = new Map(consensus.map((entry) => [entry.projectId, entry]))
   const passed = new Set(stageOne.filter((result) => result.passed).map((result) => result.projectId))
-  const scored = stageOne.length > 0 ? (project: ProjectInput) => passed.has(project.id) : () => true
-  const groups = new Map<string, ProjectInput[]>()
-  for (const project of manifest) {
-    for (const track of projectTracks(project)) {
-      groups.set(track, [...(groups.get(track) ?? []), project])
-    }
-  }
-  const tieBreakers = rubric?.ranking.tieBreakers ?? []
-  return [...groups.entries()].map(([track, projects]) => {
-    const sorted = projects
-      .filter(scored)
-      .sort((left, right) => {
-        const l = byId.get(left.id)
-        const r = byId.get(right.id)
-        const delta = (r?.overall ?? 0) - (l?.overall ?? 0)
-        if (delta !== 0) return delta
-        for (const criterionId of tieBreakers) {
-          const lc = l?.criteria.find((entry) => entry.criterionId === criterionId)?.score ?? 0
-          const rc = r?.criteria.find((entry) => entry.criterionId === criterionId)?.score ?? 0
-          if (rc !== lc) return rc - lc
-        }
-        return 0
-      })
-    return {
-      track,
-      entries: sorted.map((project, index) => ({
-        projectId: project.id,
-        name: project.name,
-        track,
-        rank: index + 1,
-        overall: byId.get(project.id)?.overall ?? 0,
-        ...(project.rank !== undefined && primaryTrack(project) === track
-          ? { providedRank: project.rank, rankDelta: project.rank - (index + 1) }
-          : {}),
-        confidence: byId.get(project.id)?.confidence ?? 0,
-        status: byId.get(project.id)?.status ?? 'escalated',
-      })),
-    }
-  })
+  const eligible = stageOne.length > 0 ? manifest.filter((project) => passed.has(project.id)) : manifest
+  // The orchestrator always ranks per track, so the provisional list must too,
+  // even when a rubric asks for a global scope.
+  return rankProjects(eligible, consensus, rubric ?? DEFAULT_RUBRIC, { scope: 'track' })
 }
 
 function averageVerifierScores(verifications: ProjectVerification[], criteria: CriterionMeta[]): Record<string, number> {
@@ -268,15 +253,43 @@ function RankingList({
   failed: StageOneResult[]
   names: Map<string, string>
   selected?: string
-  onSelect: (projectId: string) => void
+  onSelect: (selection: { projectId: string; track?: string }) => void
 }) {
   const { t } = useTranslation()
   const rows = React.useMemo(() => flattenRankings(rankings, failed), [failed, rankings])
+  const showTrack = rankings.length > 1
+  const listRef = React.useRef<VirtuosoHandle>(null)
+  // Only the mounted window is known, so the range is kept in a ref: the effect
+  // below must not re-run on every scroll, only when the data or selection
+  // changes and the selected row falls outside the visible window.
+  const rangeRef = React.useRef({ start: 0, end: 0 })
+
+  React.useEffect(() => {
+    if (!selected) return
+    const index = rows.findIndex((row) =>
+      row.kind === 'entry'
+        ? scoreKey(row.entry.projectId, row.track) === selected
+        : row.kind === 'failed'
+          ? scoreKey(row.result.projectId) === selected
+          : false,
+    )
+    if (index < 0) return
+    const { start, end } = rangeRef.current
+    if (end > start && index >= start && index <= end) return
+    const frame = window.requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ index, behavior: 'smooth', align: 'center' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [rows, selected])
 
   return (
     <Virtuoso
+      ref={listRef}
       data={rows}
       className="h-full"
+      rangeChanged={({ startIndex, endIndex }) => {
+        rangeRef.current = { start: startIndex, end: endIndex }
+      }}
       // A project can be ranked in several tracks, so the track has to be part
       // of the key. Without it Virtuoso saw duplicate keys, reused the wrong
       // row and made entries repeat or disappear while scrolling.
@@ -304,15 +317,20 @@ function RankingList({
         }
 
         if (row.kind === 'failed') {
+          const key = scoreKey(row.result.projectId)
           return (
             <button
               type="button"
-              onClick={() => onSelect(row.result.projectId)}
+              onClick={() => onSelect({ projectId: row.result.projectId })}
+              aria-current={selected === key ? 'true' : undefined}
               className={cn(
-                'flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-left hover:bg-muted/50',
-                selected === row.result.projectId && 'bg-brand-primary/5',
+                'relative flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-left transition-colors',
+                selected === key ? 'bg-brand-primary/10' : 'hover:bg-muted/50',
               )}
             >
+              {selected === key ? (
+                <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-brand-primary" />
+              ) : null}
               <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground">-</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12px] font-medium">
@@ -344,22 +362,37 @@ function RankingList({
           )
         }
 
+        const key = scoreKey(row.entry.projectId, row.track)
         return (
           <button
             type="button"
-            onClick={() => onSelect(row.entry.projectId)}
+            onClick={() => onSelect({ projectId: row.entry.projectId, track: row.track })}
+            aria-current={selected === key ? 'true' : undefined}
             className={cn(
-              'flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-left hover:bg-muted/50',
-              selected === row.entry.projectId && 'bg-brand-primary/5',
+              'relative flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-left transition-colors',
+              selected === key ? 'bg-brand-primary/10' : 'hover:bg-muted/50',
             )}
           >
-            <span className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground">
+            {selected === key ? (
+              <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-brand-primary" />
+            ) : null}
+            <span
+              className="w-5 shrink-0 text-center text-[11px] font-bold tabular-nums text-muted-foreground"
+              title={`${row.track} #${row.entry.rank}`}
+            >
               {row.entry.rank}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[12px] font-medium">{row.entry.name}</span>
               <span className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                <span>{t(`status.${row.entry.status}`, { defaultValue: row.entry.status })}</span>
+                {showTrack ? (
+                  <span className={cn('inline-flex items-center rounded-full border px-1.5 py-0 text-[9px] font-medium', trackTone(row.track))}>
+                    {row.track}
+                  </span>
+                ) : null}
+                <span title={row.entry.status === 'escalated' ? t('results.escalatedHint') : undefined}>
+                  {t(`status.${row.entry.status}`, { defaultValue: row.entry.status })}
+                </span>
                 <span>·</span>
                 <span>{t('results.conf', { value: pct(row.entry.confidence) })}</span>
                 {row.entry.providedRank !== undefined ? (
@@ -420,11 +453,23 @@ export function ResultsPanel({
   consensus,
   evaluations,
   verifications,
-  selectedId,
+  selectedKey,
   onSelect,
 }: ResultsPanelProps) {
   const { t } = useTranslation()
   const [trackFilter, setTrackFilter] = React.useState('all')
+  const detailRef = React.useRef<HTMLDivElement>(null)
+  const lastSelectedKey = React.useRef<string | undefined>(undefined)
+  // Bring the detail panel back to the top only when the selected row actually
+  // changes: clicking the row that is already selected must not scroll again.
+  React.useEffect(() => {
+    if (!selectedKey || lastSelectedKey.current === selectedKey) return
+    lastSelectedKey.current = selectedKey
+    const node = detailRef.current
+    if (!node) return
+    const frame = window.requestAnimationFrame(() => node.scrollTo({ top: 0, behavior: 'smooth' }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [selectedKey])
   const gate = report?.stageOne ?? stageOne ?? []
   const hasResults =
     Boolean(report) || gate.length > 0 || consensus.length > 0 || evaluations.length > 0 || verifications.length > 0
@@ -435,7 +480,7 @@ export function ResultsPanel({
   const failedResults = gate.filter((result) => !result.passed)
   const projectNames = new Map(manifest.map((project) => [project.id, project.name]))
   const projectsById = new Map(manifest.map((project) => [project.id, project]))
-  const reportsById = new Map((report?.projects ?? []).map((project) => [project.projectId, project]))
+  const reportsById = new Map((report?.projects ?? []).map((project) => [scoreKey(project.projectId, project.track), project]))
   // Multi-track runs rank every project in each of its tracks. The filter keeps
   // one track on screen at a time; a stale value falls back to every track.
   const trackNames = rankings.map((ranking) => ranking.track)
@@ -448,20 +493,51 @@ export function ResultsPanel({
           const project = projectsById.get(result.projectId)
           return project ? projectTracks(project).includes(activeTrack) : false
         })
-  const rankedIds = visibleRankings.flatMap((ranking) => ranking.entries.map((entry) => entry.projectId))
-  const selectable = new Set([...rankedIds, ...visibleFailed.map((result) => result.projectId)])
-  const fallbackId = rankedIds[0] ?? visibleFailed[0]?.projectId
-  const requested = selectedId ?? fallbackId
-  const selected = requested !== undefined && selectable.has(requested) ? requested : fallbackId
-  const selectedReport = selected ? reportsById.get(selected) : undefined
+  // Selection is keyed by project and track: the same project in two tracks is
+  // two rows with distinct scores.
+  const entrySelections = new Map<string, { projectId: string; track: string }>()
+  for (const ranking of visibleRankings) {
+    for (const entry of ranking.entries) {
+      entrySelections.set(scoreKey(entry.projectId, ranking.track), { projectId: entry.projectId, track: ranking.track })
+    }
+  }
+  const failedKeys = new Set(visibleFailed.map((result) => scoreKey(result.projectId)))
+  const firstRanked = visibleRankings[0]?.entries[0]
+  const firstFailed = visibleFailed[0]
+  const fallbackKey = firstRanked
+    ? scoreKey(firstRanked.projectId, visibleRankings[0]?.track)
+    : firstFailed
+      ? scoreKey(firstFailed.projectId)
+      : undefined
+  const requested = selectedKey ?? fallbackKey
+  const resolvedKey =
+    requested !== undefined && (entrySelections.has(requested) || failedKeys.has(requested)) ? requested : fallbackKey
+  const selection: { projectId: string; track?: string } | undefined = resolvedKey
+    ? entrySelections.get(resolvedKey) ?? (failedKeys.has(resolvedKey) ? { projectId: resolvedKey } : undefined)
+    : undefined
+  const selected = selection?.projectId
+  const selectedTrack = selection?.track
+  const trackScope = (recordTrack?: string): boolean =>
+    selectedTrack === undefined || recordTrack === undefined || recordTrack === selectedTrack
+  const selectedProject = manifest.find((project) => project.id === selected)
+  const selectedReport = selection
+    ? reportsById.get(scoreKey(selection.projectId, selection.track)) ??
+      reportsById.get(scoreKey(selection.projectId, selectedProject ? primaryTrack(selectedProject) : undefined)) ??
+      reportsById.get(selection.projectId)
+    : undefined
   const selectedGate = selected ? gate.find((result) => result.projectId === selected) : undefined
   const selectedFailed = selectedGate ? !selectedGate.passed : false
-  const selectedConsensus = selectedReport?.consensus ?? consensus.find((entry) => entry.projectId === selected)
-  const selectedEvaluations = evaluations.filter((evaluation) => evaluation.projectId === selected)
-  const selectedVerifications = selectedReport?.verifications ?? verifications.filter((verification) => verification.projectId === selected)
+  const selectedConsensus =
+    selectedReport?.consensus ??
+    (selected ? consensus.find((entry) => entry.projectId === selected && trackScope(entry.track)) : undefined)
+  const selectedEvaluations = selected
+    ? evaluations.filter((evaluation) => evaluation.projectId === selected && trackScope(evaluation.track))
+    : []
+  const selectedVerifications =
+    selectedReport?.verifications ??
+    (selected ? verifications.filter((verification) => verification.projectId === selected && trackScope(verification.track)) : [])
   const finalScores = selectedReport?.finalScores ?? averageVerifierScores(selectedVerifications, criteria)
   const finalOverall = selectedReport?.finalOverall ?? selectedConsensus?.overall ?? 0
-  const selectedProject = manifest.find((project) => project.id === selected)
   const sourceOfRanks = report ? 'final' : 'provisional'
 
   return (
@@ -499,7 +575,7 @@ export function ResultsPanel({
           {manifest.length === 0 ? (
             <p className="p-4 text-xs text-muted-foreground">{t('results.uploadManifest')}</p>
           ) : (
-            <RankingList rankings={visibleRankings} failed={visibleFailed} names={projectNames} selected={selected} onSelect={onSelect} />
+            <RankingList rankings={visibleRankings} failed={visibleFailed} names={projectNames} selected={resolvedKey} onSelect={onSelect} />
           )}
         </CardContent>
       </Card>
@@ -507,6 +583,11 @@ export function ResultsPanel({
       <Card className="flex min-h-0 flex-col overflow-hidden">
         <CardHeader className="border-b border-border">
           <CardTitle className="truncate">{selectedProject?.name ?? t('results.projectDetail')}</CardTitle>
+          {selectedTrack ? (
+            <span className={cn('shrink-0 rounded-full border px-1.5 py-0 text-[9px] font-medium', trackTone(selectedTrack))}>
+              {selectedTrack}
+            </span>
+          ) : null}
           <div className="ml-auto flex shrink-0 items-center gap-1">
             {selectedGate ? (
               <Badge tone={selectedGate.passed ? 'success' : 'danger'}>
@@ -514,13 +595,30 @@ export function ResultsPanel({
               </Badge>
             ) : null}
             {!selectedFailed && selectedConsensus ? (
-              <Badge tone={selectedConsensus.status === 'consensus' ? 'success' : 'warning'}>
-                {t(`status.${selectedConsensus.status}`, { defaultValue: selectedConsensus.status })}
-              </Badge>
+              selectedConsensus.status === 'escalated' ? (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`${t('status.escalated')}: ${t('results.escalatedHint')}`}
+                        className="inline-flex cursor-help rounded-full bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                      >
+                        <Badge tone="warning">{t('status.escalated')}</Badge>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[16rem] text-[11px] leading-snug">
+                      {t('results.escalatedHint')}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Badge tone="success">{t(`status.${selectedConsensus.status}`, { defaultValue: selectedConsensus.status })}</Badge>
+              )
             ) : null}
           </div>
         </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-auto">
+        <CardContent ref={detailRef} className="min-h-0 flex-1 overflow-auto">
           {!selected ? (
             <p className="text-xs text-muted-foreground">{t('results.selectProject')}</p>
           ) : (
@@ -529,7 +627,7 @@ export function ResultsPanel({
               {selectedGate ? <StageOneNote result={selectedGate} /> : null}
               {selectedFailed ? null : (
                 <>
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-wrap items-start gap-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('results.finalOverall')}</p>
                   <p className="text-2xl font-bold tabular-nums">{finalOverall.toFixed(1)}</p>

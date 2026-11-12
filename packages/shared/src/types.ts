@@ -258,6 +258,8 @@ export interface CriterionScore {
 
 export interface ProjectEvaluation {
   projectId: string
+  /** Track this evaluation was produced for. Absent on runs scored before per-track scoring. */
+  track?: string
   agentId: string
   agentName: string
   model: string
@@ -283,6 +285,8 @@ export interface ConsensusCriterion {
 
 export interface ProjectConsensus {
   projectId: string
+  /** Track this consensus belongs to. Absent on runs scored before per-track scoring. */
+  track?: string
   criteria: ConsensusCriterion[]
   overall: number
   dispersion: number
@@ -300,6 +304,8 @@ export interface VerificationAdjustment {
 
 export interface ProjectVerification {
   projectId: string
+  /** Track this verification belongs to. Absent on runs verified before per-track scoring. */
+  track?: string
   verifierId: string
   verifierName: string
   model: string
@@ -392,6 +398,23 @@ export type RunStatus =
   | 'failed'
   | 'cancelled'
 
+/** A manual project-to-source match, both paths relative to the bundle root. */
+export interface OfflineMatch {
+  repository?: string
+  video?: string
+}
+
+/** Manual matches keyed by project id; they win over the automatic matching. */
+export type OfflineMapping = Record<string, OfflineMatch>
+
+/** A zip archive previously uploaded to the API and cached on disk. */
+export interface OfflineBundleRef {
+  id: string
+  label?: string
+  /** Sources chosen by hand or by the matching agent, keyed by project id. */
+  mapping?: OfflineMapping
+}
+
 export interface RunOptions {
   evaluatorModels: ModelRef[]
   verifierModels: ModelRef[]
@@ -404,6 +427,11 @@ export interface RunOptions {
   concurrency: number
   maxVideoMinutes: number
   frameIntervalSeconds: number
+  /**
+   * When set, the run uses the cached bundle for every source and never
+   * fetches a repository or video from the network.
+   */
+  offline?: OfflineBundleRef
 }
 
 export type RunEventType =

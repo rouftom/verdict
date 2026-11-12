@@ -2,6 +2,7 @@ import type {
   AgentPool,
   ManifestParseResult,
   ModelRef,
+  OfflineMapping,
   ProjectInput,
   ProviderInfo,
   RunEvent,
@@ -39,7 +40,94 @@ export interface RunRequest {
     concurrency: number
     maxVideoMinutes: number
     frameIntervalSeconds: number
+    /** Attached zip already cached by the API; the run never fetches a source. */
+    offline?: { id: string; label?: string; mapping?: OfflineMapping }
   }
+}
+
+export interface OfflineInputsPayload {
+  manifestText?: string
+  manifestFilename?: string
+  rulesText?: string
+  rulesFilename?: string
+  rubricText?: string
+  rubricFilename?: string
+}
+
+/** A repository or video the picker can choose, addressed by a bundle path. */
+export interface OfflineCandidate {
+  path: string
+  label: string
+}
+
+export interface OfflineUploadResponse {
+  id: string
+  label: string
+  bytes: number
+  files: number
+  repos: number
+  videos: number
+  inputs: OfflineInputsPayload | null
+  detected: { manifest: boolean; rules: boolean; rubric: boolean }
+  projects: Array<{ id: string; name: string }>
+  candidates: { repositories: OfflineCandidate[]; videos: OfflineCandidate[] }
+  mapping: OfflineMapping
+  warnings: string[]
+}
+
+export interface OfflineMatchResponse {
+  mapping: OfflineMapping
+  /** The agent's short summary of what it read and decided. */
+  notes: string
+  warnings: string[]
+}
+
+/** Ask the chosen model to read the bundle and match its projects. */
+export function matchOfflineBundle(
+  id: string,
+  manifestText: string,
+  model?: ModelRef,
+): Promise<OfflineMatchResponse> {
+  return request<OfflineMatchResponse>(`/offline/bundles/${encodeURIComponent(id)}/match`, {
+    method: 'POST',
+    body: JSON.stringify({ manifestText, ...(model ? { model } : {}) }),
+  })
+}
+
+/**
+ * Upload the bundle with XHR, not fetch: upload progress is only observable on
+ * the former, and a multi-gigabyte zip needs a visible progress bar.
+ */
+export function uploadOfflineBundle(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<OfflineUploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE}/offline/bundles?filename=${encodeURIComponent(file.name)}`)
+    xhr.setRequestHeader('Content-Type', file.type || 'application/zip')
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100))
+      }
+    }
+    xhr.onload = () => {
+      let body: (OfflineUploadResponse & { error?: string }) | null = null
+      try {
+        body = JSON.parse(xhr.responseText) as OfflineUploadResponse & { error?: string }
+      } catch {
+        body = null
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body) {
+        resolve(body)
+        return
+      }
+      reject(new Error(body?.error ?? `Upload failed (${xhr.status}).`))
+    }
+    xhr.onerror = () => reject(new Error('Upload failed: the API could not be reached.'))
+    xhr.onabort = () => reject(new Error('Upload cancelled.'))
+    xhr.send(file)
+  })
 }
 
 export interface PreviewResponse {

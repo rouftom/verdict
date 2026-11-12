@@ -93,10 +93,11 @@ export function reasoningProviderOptions(
 }
 
 /**
- * Some models refuse a temperature (Claude 5.5 through the Runware gateway
- * rejects it). The caller omits the field instead of sending a bad request.
+ * Some models refuse a temperature: Claude 5.5 through the Runware gateway
+ * rejects it, and GPT-6 Luna only accepts its default. The caller omits the
+ * field instead of sending a bad request.
  */
 export function supportsTemperature(ref: { provider: ProviderId; model: string }): boolean {
   if (ref.provider !== 'runware') return true
-  return !/^anthropic[:\-]claude/i.test(ref.model)
+  return !/^anthropic[:\-]claude/i.test(ref.model) && !/^openai[:\-]gpt-6/i.test(ref.model)
 }

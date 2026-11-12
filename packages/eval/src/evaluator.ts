@@ -2,7 +2,7 @@ import { createLanguageModel, modelRefKey, type ModelRef } from '@verdict/provid
 import { evaluationOutputSchema, type ProjectEvaluation, type ProjectEvidence, type ProjectInput, type Rubric } from '@verdict/shared'
 import type { AgentDefinition } from './agents'
 import { buildDossier } from './dossier'
-import { normaliseEvaluation } from './normalise'
+import { assertCompleteEvaluation, normaliseEvaluation } from './normalise'
 import { evaluatorPrompt, evaluatorSystem } from './prompts'
 import { generateStructured, type UsageTotals } from './structured'
 
@@ -24,6 +24,8 @@ const JSON_CONTRACT = `{
 
 export interface EvaluateArgs {
   project: ProjectInput
+  /** Track this evaluation scores. */
+  track?: string
   evidence: ProjectEvidence
   rubric: Rubric
   rulesText: string
@@ -34,16 +36,17 @@ export interface EvaluateArgs {
 }
 
 export async function evaluateProject(args: EvaluateArgs): Promise<{ evaluation: ProjectEvaluation; usage: UsageTotals }> {
-  const { project, evidence, rubric, rulesText, agent, modelRef, temperature, signal } = args
+  const { project, track, evidence, rubric, rulesText, agent, modelRef, temperature, signal } = args
   const dossier = buildDossier(project, evidence)
   const result = await generateStructured({
     model: createLanguageModel(modelRef),
     modelRef,
     schema: evaluationOutputSchema,
     system: evaluatorSystem(agent, rubric, rulesText),
-    prompt: evaluatorPrompt(project, dossier),
+    prompt: evaluatorPrompt(project, dossier, track),
     temperature,
     jsonContract: JSON_CONTRACT,
+    validate: (output) => assertCompleteEvaluation(output, rubric),
     ...(signal ? { signal } : {}),
     ...(project.youtube ? { videoUrl: project.youtube } : {}),
   })
@@ -51,6 +54,7 @@ export async function evaluateProject(args: EvaluateArgs): Promise<{ evaluation:
   return {
     evaluation: normaliseEvaluation(result.object, {
       projectId: project.id,
+      ...(track !== undefined ? { track } : {}),
       agentId: agent.id,
       agentName: agent.name,
       model: modelRefKey(modelRef),

@@ -4,12 +4,14 @@ import { z } from 'zod'
 import { EVALUATORS, VERIFIERS } from '@verdict/eval'
 import { listProviders, modelPool } from '@verdict/providers'
 import {
+  modelRefSchema,
   parseManifestText,
   parseRubricText,
   runRequestSchema,
   type RunEvent,
 } from '@verdict/shared'
 import { config } from './config'
+import { ingestOfflineBundle, suggestOfflineMatches } from './offline'
 import { cancelRun, createRun, getRun, listRuns, parseInputs, pauseRun, resumeRun, subscribe } from './state'
 
 const app = Fastify({
@@ -21,6 +23,13 @@ await app.register(cors, {
   origin: config.webOrigin.split(',').map((origin) => origin.trim()).filter(Boolean),
   methods: ['GET', 'POST', 'OPTIONS'],
 })
+
+// Zip archives are streamed to disk by the route; buffering a multi-gigabyte
+// bundle in memory would be unsafe. The route enforces OFFLINE_MAX_BYTES.
+app.addContentTypeParser(
+  ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+  (_request, payload, done) => done(null, payload),
+)
 
 app.get('/health', async () => ({
   ok: true,
@@ -66,6 +75,51 @@ app.post('/parse/rubric', async (request, reply) => {
   if (!body.success) return reply.code(400).send({ error: 'Expected { text: string, filename?: string }.' })
   try {
     return parseRubricText(body.data.text, body.data.filename)
+  } catch (error) {
+    return reply.code(422).send({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+/**
+ * Upload one zip holding every project repository and video. The archive is
+ * unzipped and cached, then the manifest, rules and rubric are detected so the
+ * workspace inputs can be filled automatically.
+ */
+app.post<{ Querystring: { filename?: string } }>('/offline/bundles', async (request, reply) => {
+  const body = request.body as unknown
+  if (!body || typeof (body as AsyncIterable<unknown>)[Symbol.asyncIterator] !== 'function') {
+    return reply.code(400).send({ error: 'Expected a zip archive body.' })
+  }
+  try {
+    const result = await ingestOfflineBundle(
+      body as AsyncIterable<Buffer | Uint8Array | string>,
+      request.query.filename ?? 'bundle.zip',
+    )
+    return reply.code(201).send(result)
+  } catch (error) {
+    return reply.code(422).send({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+/**
+ * Ask the configured model to match the projects the automatic pass left
+ * without a source. The answer is a suggestion: the run still applies it only
+ * when the workspace sends it back as a manual match.
+ */
+app.post<{ Params: { id: string } }>('/offline/bundles/:id/match', async (request, reply) => {
+  const body = z
+    .object({
+      manifestText: z.string().min(2).max(8 * 1024 * 1024),
+      /** Model chosen in the workspace for the bundle analysis. */
+      model: modelRefSchema.optional(),
+    })
+    .safeParse(request.body)
+  if (!body.success) {
+    return reply.code(400).send({ error: 'Invalid match request: manifestText is required.' })
+  }
+  try {
+    const result = await suggestOfflineMatches(request.params.id, body.data.manifestText, body.data.model)
+    return reply.code(200).send(result)
   } catch (error) {
     return reply.code(422).send({ error: error instanceof Error ? error.message : String(error) })
   }

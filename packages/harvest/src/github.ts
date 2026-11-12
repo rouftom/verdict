@@ -66,14 +66,15 @@ function extensionOf(path: string): string {
   return index >= 0 ? path.slice(index).toLowerCase() : ''
 }
 
-interface WalkResult {
+export interface WalkResult {
   files: FileEntry[]
   loc: number
   readme: string
   keyFiles: Array<{ path: string; content: string }>
 }
 
-async function walkRepository(root: string): Promise<WalkResult> {
+/** Repository indexing, shared by the online tarball and an offline directory. */
+export async function walkRepository(root: string): Promise<WalkResult> {
   const files: FileEntry[] = []
   const text = new Map<string, string>()
   let loc = 0
@@ -144,6 +145,101 @@ async function walkRepository(root: string): Promise<WalkResult> {
     readme,
     keyFiles: [...chosen.entries()].map(([path, content]) => ({ path, content })),
   }
+}
+
+const LANGUAGE_BY_EXT: Record<string, string> = {
+  '.ts': 'TypeScript',
+  '.tsx': 'TypeScript',
+  '.js': 'JavaScript',
+  '.jsx': 'JavaScript',
+  '.mjs': 'JavaScript',
+  '.cjs': 'JavaScript',
+  '.py': 'Python',
+  '.go': 'Go',
+  '.rs': 'Rust',
+  '.java': 'Java',
+  '.kt': 'Kotlin',
+  '.rb': 'Ruby',
+  '.php': 'PHP',
+  '.cs': 'C#',
+  '.swift': 'Swift',
+  '.c': 'C',
+  '.h': 'C',
+  '.cpp': 'C++',
+  '.hpp': 'C++',
+  '.sql': 'SQL',
+  '.css': 'CSS',
+  '.scss': 'SCSS',
+  '.html': 'HTML',
+  '.md': 'Markdown',
+  '.mdx': 'Markdown',
+  '.json': 'JSON',
+  '.yaml': 'YAML',
+  '.yml': 'YAML',
+  '.toml': 'TOML',
+  '.sh': 'Shell',
+}
+
+/** Language totals for a directory harvest, which has no GitHub languages API. */
+export function languagesFromFiles(files: FileEntry[]): Record<string, number> {
+  const totals: Record<string, number> = {}
+  for (const file of files) {
+    const language = LANGUAGE_BY_EXT[file.ext]
+    if (!language) continue
+    totals[language] = (totals[language] ?? 0) + file.size
+  }
+  return totals
+}
+
+export interface RepoArtifactMeta {
+  url?: string
+  owner?: string
+  repo?: string
+  defaultBranch?: string
+  description?: string
+  license?: string
+  stars?: number
+  languages?: Record<string, number>
+  commits?: CommitInfo[]
+  firstCommitAt?: string
+  lastCommitAt?: string
+  fetchedAt?: string
+}
+
+/**
+ * Turn an indexed directory into the artifact the evaluators consume. Kept
+ * separate from the network harvest so a local zip produces the same shape.
+ */
+export function repoArtifactFromWalk(walked: WalkResult, meta: RepoArtifactMeta): RepoArtifact {
+  return {
+    url: meta.url ?? '',
+    owner: meta.owner ?? 'offline',
+    repo: meta.repo ?? 'repository',
+    ...(meta.defaultBranch ? { defaultBranch: meta.defaultBranch } : {}),
+    ...(meta.description ? { description: meta.description } : {}),
+    ...(meta.license ? { license: meta.license } : {}),
+    ...(typeof meta.stars === 'number' ? { stars: meta.stars } : {}),
+    files: walked.files,
+    tree: walked.files
+      .slice(0, 400)
+      .map((file) => `${file.path} (${humanBytes(file.size)})`)
+      .join('\n'),
+    readme: walked.readme,
+    keyFiles: walked.keyFiles,
+    filesCount: walked.files.length,
+    loc: walked.loc,
+    languages: meta.languages ?? languagesFromFiles(walked.files),
+    commits: meta.commits ?? [],
+    ...(meta.firstCommitAt ? { firstCommitAt: meta.firstCommitAt } : {}),
+    ...(meta.lastCommitAt ? { lastCommitAt: meta.lastCommitAt } : {}),
+    fetchedAt: meta.fetchedAt ?? new Date().toISOString(),
+  }
+}
+
+/** Index a repository already present on disk, without touching the network. */
+export async function buildRepoArtifactFromDirectory(root: string, meta: RepoArtifactMeta = {}): Promise<RepoArtifact> {
+  const walked = await walkRepository(root)
+  return repoArtifactFromWalk(walked, meta)
 }
 
 interface RepoMeta {
@@ -252,7 +348,7 @@ async function harvestRepoUncached(ref: RepoRef, maxBytes: number, options: Harv
       ...(entry.commit?.author?.name ? { author: entry.commit.author.name } : {}),
     }))
 
-    return {
+    return repoArtifactFromWalk(walked, {
       url: ref.url,
       owner: ref.owner,
       repo: ref.repo,
@@ -260,21 +356,12 @@ async function harvestRepoUncached(ref: RepoRef, maxBytes: number, options: Harv
       ...(meta?.description ? { description: meta.description } : {}),
       ...(meta?.license?.spdx_id || meta?.license?.name ? { license: meta.license.spdx_id ?? meta.license.name } : {}),
       ...(typeof meta?.stargazers_count === 'number' ? { stars: meta.stargazers_count } : {}),
-      files: walked.files,
-      tree: walked.files
-        .slice(0, 400)
-        .map((file) => `${file.path} (${humanBytes(file.size)})`)
-        .join('\n'),
-      readme: walked.readme,
-      keyFiles: walked.keyFiles,
-      filesCount: walked.files.length,
-      loc: walked.loc,
       languages,
       commits,
       ...(meta?.created_at ? { firstCommitAt: meta.created_at } : {}),
       ...(meta?.pushed_at ? { lastCommitAt: meta.pushed_at } : {}),
       fetchedAt: new Date().toISOString(),
-    }
+    })
   } finally {
     await removeDirectory(workspace)
   }
