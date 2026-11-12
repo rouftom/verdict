@@ -1422,6 +1422,7 @@ export function VerdictWorkspace() {
               slots={6}
               onChange={setEvaluatorModels}
               idPrefix="eval"
+              agents={agents?.evaluators}
               compact
               loading={providers.length === 0 && !providersError}
             />
@@ -1438,6 +1439,7 @@ export function VerdictWorkspace() {
               slots={2}
               onChange={setVerifierModels}
               idPrefix="verify"
+              agents={agents?.verifiers}
               compact
               loading={providers.length === 0 && !providersError}
             />
