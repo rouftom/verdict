@@ -15,6 +15,100 @@
     "square": "直角",
     "rounded": "圆角"
   },
+  "arena": {
+    "open": "竞技场",
+    "openAria": "打开项目竞技场",
+    "title": "项目竞技场",
+    "tagline": "独立智能体实时投票，每个选择都有理由",
+    "close": "关闭竞技场",
+    "mode": "形式",
+    "duel": "1 对 1",
+    "grid": "网格",
+    "duelHint": "两个项目正面交锋。",
+    "gridHint": "两到八个项目同台。",
+    "liveStage": "实时舞台",
+    "emptyTitle": "布置舞台",
+    "emptyBody": "上传项目清单和规则，选择候选项目，再配置投票智能体。智能体逐个实时投票。",
+    "inputs": "竞技场输入",
+    "inputsHint": "与工作区相同的文件",
+    "reading": "正在读取规则...",
+    "candidates": "候选项目",
+    "needInputs": "上传项目清单以填充舞台。",
+    "candidateNeed": "至少选择两个项目。",
+    "population": "投票群体",
+    "populationHint": "设置每个模型对应多少智能体。视角会在群体中轮换。",
+    "agents": "智能体",
+    "model": "模型",
+    "modelPlaceholder": "选择模型",
+    "addModel": "添加模型",
+    "removeRow": "移除此模型行",
+    "decrease": "减少一个智能体",
+    "increase": "增加一个智能体",
+    "totalTooMany": "最多 24 个投票者。",
+    "temperature": "温度",
+    "start": "开始投票",
+    "starting": "正在开始...",
+    "cancel": "停止投票",
+    "reset": "新建竞技场",
+    "status": {
+      "idle": "就绪",
+      "queued": "排队中",
+      "running": "投票中",
+      "done": "已结束",
+      "failed": "失败",
+      "cancelled": "已停止"
+    },
+    "tally": "实时计票",
+    "ballots": "{{count}} / {{total}} 张票",
+    "ballotsShort": "票",
+    "meanConfidence": "平均置信度 {{value}}%",
+    "leading": "领先",
+    "tie": "平局",
+    "noStage": "舞台为空。请在左侧选择候选项目。",
+    "noVotes": "还没有选票。每个投票者会选择一个项目并说明其他项目落选的原因。",
+    "winner": "{{name}} 赢得竞技场",
+    "winnerHint": "共 {{votes}} / {{total}} 张票，平均置信度 {{confidence}}%。",
+    "feed": "选票流",
+    "feedEmpty": "智能体完成后，选票会显示在这里。",
+    "chose": "投票给 {{name}}",
+    "against": "为何不选其他项目",
+    "agentsRail": "智能体轨道",
+    "agentsRailHint": "滑动查看投票者",
+    "agentPosition": "第 {{index}} / {{total}} 位智能体",
+    "previousAgent": "上一个智能体",
+    "nextAgent": "下一个智能体",
+    "railEmpty": "投票开始后轨道会填充。",
+    "waiting": "等待发言。卡片会实时更新。",
+    "stalled": "投票结束前该智能体未提交选票。",
+    "thinking": "正在阅读规则和候选项目。",
+    "failed": "该投票者未提交选票。",
+    "personas": {
+      "evidence": {
+        "name": "证据审查者",
+        "lens": "证据"
+      },
+      "impact": {
+        "name": "影响与用户",
+        "lens": "影响"
+      },
+      "craft": {
+        "name": "技术工艺",
+        "lens": "技术"
+      },
+      "demo": {
+        "name": "演示与叙事",
+        "lens": "演示"
+      },
+      "rules": {
+        "name": "规则合规",
+        "lens": "规则"
+      },
+      "edge": {
+        "name": "差异化",
+        "lens": "差异化"
+      }
+    }
+  },
   "inputs": {
     "title": "输入",
     "projectCount_other": "{{count}} 个项目",

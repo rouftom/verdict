@@ -4,12 +4,15 @@ import { z } from 'zod'
 import { EVALUATORS, VERIFIERS } from '@verdict/eval'
 import { listProviders, modelPool } from '@verdict/providers'
 import {
+  arenaRequestSchema,
   modelRefSchema,
   parseManifestText,
   parseRubricText,
   runRequestSchema,
+  type ArenaEvent,
   type RunEvent,
 } from '@verdict/shared'
+import { cancelArena, createArena, getArena, listArenas, subscribe as subscribeArena } from './arena'
 import { config } from './config'
 import { ingestOfflineBundle, suggestOfflineMatches } from './offline'
 import { cancelRun, createRun, getRun, listRuns, parseInputs, pauseRun, resumeRun, subscribe } from './state'
@@ -36,6 +39,7 @@ app.get('/health', async () => ({
   service: 'verdict-api',
   uptimeSeconds: Math.round(process.uptime()),
   runs: listRuns().length,
+  arenas: listArenas().length,
 }))
 
 app.get('/providers', async (request) => {
@@ -292,6 +296,129 @@ app.post<{ Params: { id: string } }>('/runs/:id/resume', async (request, reply) 
   const result = resumeRun(run.id)
   if (!result) return reply.code(409).send({ error: 'Run is not active.' })
   return { paused: result.paused, status: run.status }
+})
+
+app.post('/arenas', async (request, reply) => {
+  const body = arenaRequestSchema.safeParse(request.body)
+  if (!body.success) {
+    return reply.code(400).send({
+      error: 'Invalid arena request.',
+      issues: body.error.issues.slice(0, 8).map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`),
+    })
+  }
+  try {
+    const arena = await createArena(body.data)
+    return reply.code(201).send({
+      id: arena.id,
+      status: arena.status,
+      createdAt: arena.createdAt,
+      candidates: arena.candidates.length,
+      agents: arena.agents.length,
+      mode: arena.mode,
+    })
+  } catch (error) {
+    return reply.code(422).send({ error: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+app.get('/arenas', async () => ({
+  arenas: listArenas().map((arena) => ({
+    id: arena.id,
+    status: arena.status,
+    mode: arena.mode,
+    createdAt: arena.createdAt,
+    updatedAt: arena.updatedAt,
+    candidates: arena.candidates.length,
+    agents: arena.agents.length,
+    votes: arena.votes.length,
+    error: arena.error,
+  })),
+}))
+
+app.get<{ Params: { id: string } }>('/arenas/:id', async (request, reply) => {
+  const arena = getArena(request.params.id)
+  if (!arena) return reply.code(404).send({ error: 'Arena not found.' })
+  return arena
+})
+
+/**
+ * Live ballots. Recorded events replay first, so reopening the overlay after a
+ * reload still rebuilds every agent card and the tally.
+ */
+app.get<{ Params: { id: string } }>('/arenas/:id/events', (request, reply) => {
+  const arena = getArena(request.params.id)
+  if (!arena) {
+    void reply.code(404).send({ error: 'Arena not found.' })
+    return
+  }
+
+  const allowedOrigins = config.webOrigin
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+  const requestOrigin = request.headers.origin
+  const allowOrigin =
+    requestOrigin && (allowedOrigins.includes('*') || allowedOrigins.includes(requestOrigin))
+      ? requestOrigin
+      : allowedOrigins[0]
+
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+    ...(allowOrigin ? { 'Access-Control-Allow-Origin': allowOrigin, Vary: 'Origin' } : {}),
+  })
+
+  const terminal = ['done', 'failed', 'cancelled'].includes(arena.status)
+  let closed = false
+  let keepAlive: ReturnType<typeof setInterval> | undefined
+  let unsubscribe: () => void = () => {}
+
+  const finish = () => {
+    if (closed) return
+    closed = true
+    if (keepAlive) clearInterval(keepAlive)
+    unsubscribe()
+    try {
+      reply.raw.end()
+    } catch {
+      /* the socket may already be gone */
+    }
+  }
+
+  const send = (event: ArenaEvent) => {
+    if (closed) return
+    reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+    // A closing stage or a fatal error is the last useful frame of an arena.
+    if ((event.type === 'stage' && event.message === 'done') || (event.type === 'error' && !event.agentId)) {
+      setTimeout(finish, 50)
+    }
+  }
+
+  for (const event of arena.events) send(event)
+  if (terminal) {
+    setTimeout(finish, 50)
+    return
+  }
+  reply.raw.write(': connected\n\n')
+
+  unsubscribe = subscribeArena(arena.id, send)
+  keepAlive = setInterval(() => reply.raw.write(': ping\n\n'), 15_000)
+
+  request.raw.on('close', () => {
+    if (closed) return
+    closed = true
+    if (keepAlive) clearInterval(keepAlive)
+    unsubscribe()
+  })
+})
+
+app.post<{ Params: { id: string } }>('/arenas/:id/cancel', async (request, reply) => {
+  const arena = getArena(request.params.id)
+  if (!arena) return reply.code(404).send({ error: 'Arena not found.' })
+  const cancelled = cancelArena(arena.id)
+  return { cancelled, status: arena.status }
 })
 
 app.setErrorHandler((error, _request, reply) => {

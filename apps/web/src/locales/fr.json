@@ -15,6 +15,100 @@
     "square": "Carré",
     "rounded": "Arrondi"
   },
+  "arena": {
+    "open": "Arène",
+    "openAria": "Ouvrir l'arène des projets",
+    "title": "Arène des projets",
+    "tagline": "Des agents indépendants votent en direct, avec une raison pour chaque choix",
+    "close": "Fermer l'arène",
+    "mode": "Format",
+    "duel": "1v1",
+    "grid": "Grille",
+    "duelHint": "Deux projets s'affrontent.",
+    "gridHint": "Deux à huit projets sur la même scène.",
+    "liveStage": "Scène en direct",
+    "emptyTitle": "Préparez la scène",
+    "emptyBody": "Téléversez un manifeste et des règles, choisissez les candidats, puis la population votante. Les agents votent un par un, en direct.",
+    "inputs": "Entrées de l'arène",
+    "inputsHint": "les mêmes fichiers que l'atelier",
+    "reading": "Lecture des règles...",
+    "candidates": "Candidats",
+    "needInputs": "Téléversez un manifeste de projets pour remplir la scène.",
+    "candidateNeed": "Sélectionnez au moins deux projets.",
+    "population": "Population votante",
+    "populationHint": "Choisissez combien d'agents partagent chaque modèle. Les angles sont répartis dans la population.",
+    "agents": "Agents",
+    "model": "Modèle",
+    "modelPlaceholder": "Choisir un modèle",
+    "addModel": "Ajouter un modèle",
+    "removeRow": "Retirer cette ligne de modèle",
+    "decrease": "Un agent de moins",
+    "increase": "Un agent de plus",
+    "totalTooMany": "24 votants au maximum.",
+    "temperature": "Température",
+    "start": "Ouvrir le vote",
+    "starting": "Ouverture...",
+    "cancel": "Arrêter les votes",
+    "reset": "Nouvelle arène",
+    "status": {
+      "idle": "prêt",
+      "queued": "en attente",
+      "running": "vote",
+      "done": "clos",
+      "failed": "échec",
+      "cancelled": "arrêté"
+    },
+    "tally": "Décompte en direct",
+    "ballots": "{{count}} bulletins sur {{total}}",
+    "ballotsShort": "bulletins",
+    "meanConfidence": "{{value}} % de confiance moyenne",
+    "leading": "En tête",
+    "tie": "Égalité",
+    "noStage": "La scène est vide. Choisissez des candidats à gauche.",
+    "noVotes": "Aucun bulletin pour l'instant. Chaque votant choisira un projet et rejettera les autres.",
+    "winner": "{{name}} remporte l'arène",
+    "winnerHint": "{{votes}} bulletins sur {{total}}, avec une confiance moyenne de {{confidence}} %.",
+    "feed": "Fil des bulletins",
+    "feedEmpty": "Les bulletins apparaissent ici à mesure que les agents terminent.",
+    "chose": "A voté pour {{name}}",
+    "against": "Pourquoi pas les autres",
+    "agentsRail": "Rail des agents",
+    "agentsRailHint": "faites défiler les votants",
+    "agentPosition": "Agent {{index}} sur {{total}}",
+    "previousAgent": "Agent précédent",
+    "nextAgent": "Agent suivant",
+    "railEmpty": "Le rail se remplit dès l'ouverture du vote.",
+    "waiting": "En attente de la parole. La carte se remplit en direct.",
+    "stalled": "L'arène s'est close avant que ce vote n'arrive.",
+    "thinking": "Lecture des règles et des candidats.",
+    "failed": "Ce votant n'a pas rendu de bulletin.",
+    "personas": {
+      "evidence": {
+        "name": "Auditeur de preuves",
+        "lens": "Preuves"
+      },
+      "impact": {
+        "name": "Impact et usagers",
+        "lens": "Impact"
+      },
+      "craft": {
+        "name": "Artisanat technique",
+        "lens": "Technique"
+      },
+      "demo": {
+        "name": "Démo et récit",
+        "lens": "Démo"
+      },
+      "rules": {
+        "name": "Conformité aux règles",
+        "lens": "Règles"
+      },
+      "edge": {
+        "name": "Différenciation",
+        "lens": "Différenciation"
+      }
+    }
+  },
   "inputs": {
     "title": "Entrées",
     "projectCount_one": "{{count}} projet",

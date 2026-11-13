@@ -15,6 +15,100 @@
     "square": "Square",
     "rounded": "Rounded"
   },
+  "arena": {
+    "open": "Arena",
+    "openAria": "Open the project arena",
+    "title": "Project arena",
+    "tagline": "Independent agents vote live, with a reason for every choice",
+    "close": "Close arena",
+    "mode": "Format",
+    "duel": "1v1",
+    "grid": "Grid",
+    "duelHint": "Two projects face off.",
+    "gridHint": "Two to eight projects on one stage.",
+    "liveStage": "Live stage",
+    "emptyTitle": "Set the stage",
+    "emptyBody": "Upload a manifest and rules, pick the candidates, then choose the voting population. Agents vote one by one, live.",
+    "inputs": "Arena inputs",
+    "inputsHint": "same files as the workspace",
+    "reading": "Reading the rules...",
+    "candidates": "Candidates",
+    "needInputs": "Upload a project manifest to fill the stage.",
+    "candidateNeed": "Select at least two projects.",
+    "population": "Voting population",
+    "populationHint": "Set how many agents share each model. Lenses are assigned across the population.",
+    "agents": "Agents",
+    "model": "Model",
+    "modelPlaceholder": "Choose a model",
+    "addModel": "Add model",
+    "removeRow": "Remove this model row",
+    "decrease": "One fewer agent",
+    "increase": "One more agent",
+    "totalTooMany": "At most 24 voters.",
+    "temperature": "Temperature",
+    "start": "Open the vote",
+    "starting": "Opening...",
+    "cancel": "Stop votes",
+    "reset": "New arena",
+    "status": {
+      "idle": "ready",
+      "queued": "queued",
+      "running": "voting",
+      "done": "closed",
+      "failed": "failed",
+      "cancelled": "stopped"
+    },
+    "tally": "Live tally",
+    "ballots": "{{count}} of {{total}} ballots",
+    "ballotsShort": "ballots",
+    "meanConfidence": "{{value}}% mean confidence",
+    "leading": "Leading",
+    "tie": "Tie",
+    "noStage": "The stage is empty. Pick candidates in the left rail.",
+    "noVotes": "No ballot yet. Every voter will pick one project and reject the others.",
+    "winner": "{{name}} wins the arena",
+    "winnerHint": "{{votes}} ballots out of {{total}}, with a mean confidence of {{confidence}}%.",
+    "feed": "Ballot feed",
+    "feedEmpty": "Ballots appear here as agents finish.",
+    "chose": "Voted for {{name}}",
+    "against": "Why not the others",
+    "agentsRail": "Agent rail",
+    "agentsRailHint": "swipe through the voters",
+    "agentPosition": "Agent {{index}} of {{total}}",
+    "previousAgent": "Previous agent",
+    "nextAgent": "Next agent",
+    "railEmpty": "The rail fills as soon as the vote opens.",
+    "waiting": "Waiting for the floor. The card fills in live.",
+    "stalled": "The arena closed before this vote landed.",
+    "thinking": "Reading the rules and the candidates.",
+    "failed": "This voter did not return a ballot.",
+    "personas": {
+      "evidence": {
+        "name": "Evidence auditor",
+        "lens": "Evidence"
+      },
+      "impact": {
+        "name": "Impact and users",
+        "lens": "Impact"
+      },
+      "craft": {
+        "name": "Technical craft",
+        "lens": "Craft"
+      },
+      "demo": {
+        "name": "Demo and story",
+        "lens": "Demo"
+      },
+      "rules": {
+        "name": "Rule compliance",
+        "lens": "Rules"
+      },
+      "edge": {
+        "name": "Differentiation",
+        "lens": "Differentiation"
+      }
+    }
+  },
   "inputs": {
     "title": "Inputs",
     "projectCount_one": "{{count}} project",

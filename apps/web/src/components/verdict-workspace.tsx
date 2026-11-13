@@ -19,6 +19,7 @@ import {
   Settings2,
   Sparkles,
   Square,
+  Swords,
   Terminal,
   Trash2,
   X,
@@ -78,6 +79,7 @@ import { EventLog, LogPeek, type LogDock } from './event-log'
 import { AppearanceMenu } from './appearance-menu'
 import { LanguageMenu } from './language-menu'
 import { SectionCard } from './section-card'
+import { ArenaWorkspace } from './arena-workspace'
 
 const RUNNING: RunStatus[] = ['queued', 'parsing', 'harvesting', 'screening', 'evaluating', 'reviewing', 'consensus', 'verifying']
 
@@ -337,6 +339,7 @@ export function VerdictWorkspace() {
   const [history, setHistory] = React.useState<StoredRun[]>([])
   const [historyLoading, setHistoryLoading] = React.useState(true)
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [arenaOpen, setArenaOpen] = React.useState(false)
   const [inputsOpen, setInputsOpen] = React.useState(true)
   const [modelsOpen, setModelsOpen] = React.useState(true)
   const [logOpen, setLogOpen] = React.useState(false)
@@ -1028,6 +1031,17 @@ export function VerdictWorkspace() {
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant={arenaOpen ? 'primary' : 'outline'}
+            size="sm"
+            className="h-7"
+            aria-pressed={arenaOpen}
+            aria-label={t('arena.openAria')}
+            onClick={() => setArenaOpen(true)}
+          >
+            <Swords className="h-3.5 w-3.5" /> {t('arena.open')}
+          </Button>
           <Button type="button" variant="outline" size="sm" className="h-7" onClick={() => setHistoryOpen((value) => !value)}>
             <History className="h-3.5 w-3.5" /> {t('app.history')}
             {history.length > 0 ? <span className="tabular-nums text-muted-foreground">({history.length})</span> : null}
@@ -1058,7 +1072,7 @@ export function VerdictWorkspace() {
                 aria-pressed={offlineOpen}
                 aria-label={t('offline.toggleAria')}
                 onClick={() => setOfflineOpen((value) => !value)}
-                disabled={locked}
+                disabled={locked || matching}
               >
                 <FolderUp className="h-3 w-3" /> {offline ? t('offline.attached') : t('offline.toggle')}
               </Button>
@@ -1736,6 +1750,17 @@ export function VerdictWorkspace() {
           </div>
         </div>
       ) : null}
+
+      <ArenaWorkspace
+        open={arenaOpen}
+        onClose={() => setArenaOpen(false)}
+        manifestText={manifestText}
+        manifestFilename={manifestName}
+        rulesText={rulesText}
+        rulesFilename={rulesName}
+        providers={providers}
+        defaults={defaults.evaluators}
+      />
     </div>
   )
 }
