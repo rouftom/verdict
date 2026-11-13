@@ -560,7 +560,16 @@ export interface ArenaSnapshot {
   agents: ArenaAgent[]
   votes: ArenaVote[]
   events: ArenaEvent[]
+  /** Set when the candidates were read from an attached offline bundle. */
+  offline?: ArenaOfflineInfo
   error?: string
+}
+
+/** What the arena actually read from the bundle, for the live badge. */
+export interface ArenaOfflineInfo {
+  label?: string
+  /** Candidates with at least one source in the bundle. */
+  matched: number
 }
 
 /** What the workspace sends to open a new arena. */
@@ -573,4 +582,6 @@ export interface ArenaRequest {
   candidateIds: string[]
   agents: ArenaModelCount[]
   temperature?: number
+  /** Read repository and video evidence from this cached bundle, not the network. */
+  offline?: OfflineBundleRef
 }

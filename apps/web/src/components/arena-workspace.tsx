@@ -48,6 +48,7 @@ import {
 } from '@/lib/api'
 import { modelGroups } from '@/components/model-slots'
 import { UploadCard } from '@/components/upload-card'
+import { OfflineBundlePanel, type OfflinePanelValue } from '@/components/offline-bundle-panel'
 
 export interface ArenaWorkspaceProps {
   open: boolean
@@ -143,6 +144,9 @@ export function ArenaWorkspace({
 
   const [arena, setArena] = React.useState<ArenaSnapshot | null>(null)
   const [status, setStatus] = React.useState<ArenaStatus | 'idle'>('idle')
+  /** Which part of the run the stage is showing: bundle read, votes, closed. */
+  const [phase, setPhase] = React.useState<'idle' | 'reading' | 'voting' | 'done'>('idle')
+  const [offline, setOffline] = React.useState<OfflinePanelValue>({ bundle: null, mapping: {} })
   const [votes, setVotes] = React.useState<ArenaVote[]>([])
   const [started, setStarted] = React.useState<Record<string, boolean>>({})
   const [agentErrors, setAgentErrors] = React.useState<Record<string, string>>({})
@@ -235,43 +239,6 @@ export function ArenaWorkspace({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  const applyEvent = React.useCallback((event: ArenaEvent) => {
-    if (event.type === 'stage') {
-      if (event.message === 'voting') setStatus('running')
-      if (event.message === 'done') setStatus('done')
-      return
-    }
-    if (event.type === 'log' && event.agentId) {
-      setStarted((current) => ({ ...current, [event.agentId!]: true }))
-      return
-    }
-    if (event.type === 'vote' && event.data) {
-      const vote = event.data as ArenaVote
-      setStarted((current) => ({ ...current, [vote.agentId]: true }))
-      setVotes((current) => {
-        const index = current.findIndex((entry) => entry.agentId === vote.agentId)
-        if (index < 0) return [...current, vote]
-        const next = [...current]
-        next[index] = vote
-        return next
-      })
-      return
-    }
-    if (event.type === 'error') {
-      if (event.agentId) {
-        setAgentErrors((current) => ({ ...current, [event.agentId!]: event.message ?? t('arena.failed') }))
-        return
-      }
-      const message = event.message ?? t('arena.failed')
-      if (/cancelled|annul/i.test(message)) {
-        setStatus('cancelled')
-      } else {
-        setError(message)
-        setStatus('failed')
-      }
-    }
-  }, [t])
-
   const refresh = React.useCallback(async (id: string) => {
     try {
       const snapshot = await fetchArena(id)
@@ -287,6 +254,59 @@ export function ArenaWorkspace({
       /* the SSE stream is the primary path; a poll failure is transient */
     }
   }, [])
+
+  const applyEvent = React.useCallback(
+    (event: ArenaEvent) => {
+      if (event.type === 'stage') {
+        if (event.message === 'reading') {
+          setStatus('running')
+          setPhase('reading')
+        }
+        if (event.message === 'voting') {
+          setStatus('running')
+          setPhase('voting')
+        }
+        if (event.message === 'done') {
+          setStatus('done')
+          setPhase('done')
+          // The poll stops with the run: refresh once so the offline badge and
+          // the final snapshot land even when the arena closed between polls.
+          void refresh(event.arenaId)
+        }
+        return
+      }
+      if (event.type === 'log' && event.agentId) {
+        setStarted((current) => ({ ...current, [event.agentId!]: true }))
+        return
+      }
+      if (event.type === 'vote' && event.data) {
+        const vote = event.data as ArenaVote
+        setStarted((current) => ({ ...current, [vote.agentId]: true }))
+        setVotes((current) => {
+          const index = current.findIndex((entry) => entry.agentId === vote.agentId)
+          if (index < 0) return [...current, vote]
+          const next = [...current]
+          next[index] = vote
+          return next
+        })
+        return
+      }
+      if (event.type === 'error') {
+        if (event.agentId) {
+          setAgentErrors((current) => ({ ...current, [event.agentId!]: event.message ?? t('arena.failed') }))
+          return
+        }
+        const message = event.message ?? t('arena.failed')
+        if (/cancelled|annul/i.test(message)) {
+          setStatus('cancelled')
+        } else {
+          setError(message)
+          setStatus('failed')
+        }
+      }
+    },
+    [refresh, t],
+  )
 
   React.useEffect(() => {
     if (status !== 'running' && status !== 'queued') return
@@ -311,7 +331,14 @@ export function ArenaWorkspace({
     setAgentErrors({})
     setActiveAgent(0)
     setStatus('queued')
+    setPhase('idle')
     try {
+      const selected = new Set(selectedIds)
+      const mapping = Object.fromEntries(
+        Object.entries(offline.mapping).filter(
+          ([projectId, match]) => selected.has(projectId) && (match.repository || match.video),
+        ),
+      )
       const created = await createArena({
         mode,
         manifestText: manifest,
@@ -321,6 +348,15 @@ export function ArenaWorkspace({
         candidateIds: selectedIds,
         agents: population,
         temperature,
+        ...(offline.bundle
+          ? {
+              offline: {
+                id: offline.bundle.id,
+                label: offline.bundle.label,
+                ...(Object.keys(mapping).length > 0 ? { mapping } : {}),
+              },
+            }
+          : {}),
       })
       const snapshot = await fetchArena(created.id)
       setArena(snapshot)
@@ -360,6 +396,7 @@ export function ArenaWorkspace({
     setAgentErrors({})
     setError(null)
     setStatus('idle')
+    setPhase('idle')
     setActiveAgent(0)
   }
 
@@ -574,12 +611,41 @@ export function ArenaWorkspace({
                   <Loader2 className="h-3 w-3 animate-spin" /> {t('arena.reading')}
                 </p>
               ) : null}
+              <div className="mt-3 border-t border-border pt-2">
+                <OfflineBundlePanel
+                  manifestText={manifest}
+                  providers={providers}
+                  fallbackModel={modelFromKey(rows[0]?.model ?? '') ?? defaults[0]}
+                  projectIds={selectedIds}
+                  projectNames={new Map(projects.map((project) => [project.id, project.name]))}
+                  disabled={status === 'running' || status === 'queued'}
+                  onInputs={(inputs) => {
+                    if (inputs.manifestText) {
+                      setManifest(inputs.manifestText)
+                      setManifestName(inputs.manifestFilename ?? 'manifest.json')
+                    }
+                    if (inputs.rulesText) {
+                      setRules(inputs.rulesText)
+                      setRulesName(inputs.rulesFilename ?? 'rules.md')
+                    }
+                  }}
+                  onChange={setOffline}
+                />
+              </div>
             </section>
 
             <section className="rounded-xl border border-border bg-card p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Vote className="h-3.5 w-3.5 text-brand-primary" />
                 <h2 className="text-xs font-semibold">{t('arena.candidates')}</h2>
+                {arena?.offline ? (
+                  <Badge tone="brand" className="text-[9px]">
+                    {t('arena.offlineBadge', {
+                      matched: arena.offline.matched,
+                      total: arena.candidates.length,
+                    })}
+                  </Badge>
+                ) : null}
                 <Badge tone="neutral" className="ml-auto font-mono tabular-nums">
                   {selectedIds.length} / {limit}
                 </Badge>
@@ -775,9 +841,11 @@ export function ArenaWorkspace({
                           total: totalBallots,
                           confidence: Math.round(winner.confidence * 100),
                         })
-                      : arena
-                        ? t('arena.ballots', { count: totalBallots, total: arena.agents.length })
-                        : t('arena.emptyBody')}
+                      : arena && phase === 'reading'
+                        ? t('arena.readingBundle', { count: stageCandidates.length })
+                        : arena
+                          ? t('arena.ballots', { count: totalBallots, total: arena.agents.length })
+                          : t('arena.emptyBody')}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

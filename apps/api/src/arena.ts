@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { planArenaAgents, runArena } from '@verdict/eval'
+import { harvestProject } from '@verdict/harvest'
 import { listProviders } from '@verdict/providers'
 import {
   parseManifestText,
@@ -8,7 +9,13 @@ import {
   type ArenaRequest,
   type ArenaSnapshot,
   type ArenaVote,
+  type ProjectEvidence,
 } from '@verdict/shared'
+import { prepareOfflineHarvest } from './offline'
+
+/** Same caps as a full run: a bundle must not turn a quick vote into a crawl. */
+const OFFLINE_MAX_VIDEO_MINUTES = 20
+const OFFLINE_FRAME_INTERVAL_SECONDS = 20
 
 const arenas = new Map<string, ArenaSnapshot>()
 const subscribers = new Map<string, Set<(event: ArenaEvent) => void>>()
@@ -79,7 +86,56 @@ async function execute(snapshot: ArenaSnapshot, input: ArenaRequest): Promise<vo
   const controller = new AbortController()
   controllers.set(snapshot.id, controller)
   snapshot.status = 'running'
+  const emit = (event: Omit<ArenaEvent, 'arenaId'> & { arenaId?: string }) => {
+    if (controller.signal.aborted) return
+    pushEvent(snapshot, { ...event, arenaId: snapshot.id })
+  }
   try {
+    let evidence: Record<string, ProjectEvidence> | undefined
+    if (input.offline) {
+      emit({
+        type: 'stage',
+        at: new Date().toISOString(),
+        message: 'reading',
+        data: { candidates: snapshot.candidates.length, label: input.offline.label },
+      })
+      const prepared = await prepareOfflineHarvest(
+        input.offline.id,
+        snapshot.candidates,
+        input.offline.mapping ?? {},
+      )
+      for (const warning of prepared.warnings.slice(0, 8)) {
+        emit({ type: 'log', at: new Date().toISOString(), message: warning })
+      }
+      const read: Record<string, ProjectEvidence> = {}
+      let matched = 0
+      for (const project of snapshot.candidates) {
+        if (controller.signal.aborted) throw new Error('Arena cancelled.')
+        const item = await harvestProject(project, {
+          offline: prepared.harvest,
+          maxVideoMinutes: OFFLINE_MAX_VIDEO_MINUTES,
+          frameIntervalSeconds: OFFLINE_FRAME_INTERVAL_SECONDS,
+          signal: controller.signal,
+          onLog: (message) => emit({ type: 'log', at: new Date().toISOString(), message }),
+        })
+        read[project.id] = item
+        if (item.repo || item.video) matched += 1
+        for (const error of item.errors) {
+          emit({ type: 'log', at: new Date().toISOString(), message: `${project.name}: ${error}` })
+        }
+      }
+      evidence = read
+      snapshot.offline = {
+        ...(input.offline.label ? { label: input.offline.label } : {}),
+        matched,
+      }
+      emit({
+        type: 'log',
+        at: new Date().toISOString(),
+        message: `Offline bundle read for ${matched} of ${snapshot.candidates.length} candidate(s).`,
+      })
+    }
+
     const result = await runArena({
       arenaId: snapshot.id,
       mode: snapshot.mode,
@@ -88,6 +144,7 @@ async function execute(snapshot: ArenaSnapshot, input: ArenaRequest): Promise<vo
       rubric: parseRubricText('').rubric,
       agents: snapshot.agents,
       temperature: input.temperature ?? 0.4,
+      ...(evidence ? { evidence } : {}),
       signal: controller.signal,
       onEvent: (event) => {
         if (controller.signal.aborted) return

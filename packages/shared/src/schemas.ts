@@ -165,6 +165,8 @@ export const arenaRequestSchema = z
     candidateIds: z.array(z.string().min(1)).min(2).max(8),
     agents: z.array(arenaModelCountSchema).min(1).max(8),
     temperature: z.number().min(0).max(1).default(0.4),
+    /** Cached bundle: the arena reads every source from it, never the network. */
+    offline: offlineBundleRefSchema.optional(),
   })
   .superRefine((value, context) => {
     if (new Set(value.candidateIds).size !== value.candidateIds.length) {

@@ -69,6 +69,7 @@ import {
 } from '@/lib/api'
 import { deleteRun, listRuns, loadSettings, saveRun, saveSettings, type StoredRun } from '@/lib/idb'
 import { formatDate } from '@/lib/format'
+import { applyAgentMapping, formatBytes, sourceLabel, withMatch } from '@/lib/offline'
 import { useProcessingFavicon } from '@/hooks/use-processing-favicon'
 import { UploadCard } from './upload-card'
 import { FileUploader } from './file-uploader'
@@ -184,59 +185,6 @@ function modelFromKey(key: string): ModelRef | undefined {
   return { provider: key.slice(0, separator) as ModelRef['provider'], model: key.slice(separator + 1) }
 }
 
-/** One bundle path feeds one project, whether it was picked by hand or by the agent. */
-function withMatch(
-  mapping: OfflineMapping,
-  projectId: string,
-  kind: 'repository' | 'video',
-  path: string,
-): OfflineMapping {
-  const next: OfflineMapping = {}
-  for (const [id, match] of Object.entries(mapping)) next[id] = { ...match }
-  if (path) {
-    for (const [id, match] of Object.entries(next)) {
-      if (id !== projectId && match[kind] === path) delete match[kind]
-      if (!match.repository && !match.video) delete next[id]
-    }
-  }
-  const match = { ...(next[projectId] ?? {}) }
-  if (path) match[kind] = path
-  else delete match[kind]
-  if (match.repository || match.video) next[projectId] = match
-  else delete next[projectId]
-  return next
-}
-
-/**
- * The agent answers for the whole bundle; a hand-picked half still wins, and a
- * path picked by hand is never handed to a second project by the agent.
- */
-function applyAgentMapping(agent: OfflineMapping, manual: OfflineMapping): OfflineMapping {
-  const next: OfflineMapping = {}
-  for (const [id, match] of Object.entries(agent)) {
-    if (match.repository || match.video) next[id] = { ...match }
-  }
-  for (const [id, match] of Object.entries(manual)) {
-    next[id] = { ...(next[id] ?? {}), ...match }
-  }
-  const taken = { repository: new Set<string>(), video: new Set<string>() }
-  for (const match of Object.values(manual)) {
-    if (match.repository) taken.repository.add(match.repository)
-    if (match.video) taken.video.add(match.video)
-  }
-  for (const [id, match] of Object.entries(next)) {
-    const handPicked = manual[id] ?? {}
-    if (match.repository && taken.repository.has(match.repository) && handPicked.repository !== match.repository) {
-      delete match.repository
-    }
-    if (match.video && taken.video.has(match.video) && handPicked.video !== match.video) {
-      delete match.video
-    }
-    if (!match.repository && !match.video) delete next[id]
-  }
-  return next
-}
-
 function upsert<T>(items: T[], next: T, key: (entry: T) => string): T[] {
   const index = items.findIndex((entry) => key(entry) === key(next))
   if (index < 0) return [...items, next]
@@ -247,14 +195,6 @@ function upsert<T>(items: T[], next: T, key: (entry: T) => string): T[] {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
-  const value = bytes / 1024 ** index
-  return `${value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)} ${units[index]}`
 }
 
 interface OfflineBundle {
@@ -979,8 +919,6 @@ export function VerdictWorkspace() {
     ? offlinePairs.filter(({ project }) => !offlineLinkedIds.has(project.id)).map(({ project }) => project)
     : []
   const offlineStillMissing = offlineNeedsMapping.length
-  /** The last path segment reads better than a long bundle path. */
-  const sourceLabel = (path: string | undefined): string => (path ? (path.split('/').pop() || path) : '')
   const anchorNeedle = anchorQuery.trim().toLowerCase()
   const anchorMatches = anchorNeedle
     ? projects.filter((project) => project.name.toLowerCase().includes(anchorNeedle))

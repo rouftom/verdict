@@ -315,6 +315,7 @@ app.post('/arenas', async (request, reply) => {
       candidates: arena.candidates.length,
       agents: arena.agents.length,
       mode: arena.mode,
+      offline: arena.offline,
     })
   } catch (error) {
     return reply.code(422).send({ error: error instanceof Error ? error.message : String(error) })
@@ -331,6 +332,7 @@ app.get('/arenas', async () => ({
     candidates: arena.candidates.length,
     agents: arena.agents.length,
     votes: arena.votes.length,
+    offline: arena.offline,
     error: arena.error,
   })),
 }))
