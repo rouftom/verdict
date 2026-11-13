@@ -1033,13 +1033,13 @@ export function ArenaWorkspace({
                   <Crown className="h-3.5 w-3.5 text-brand-primary" />
                   <h2 className="text-xs font-semibold">{t('arena.tally')}</h2>
                   {arena ? (
-                    <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
+                    <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
                       {t('arena.ballots', { count: totalBallots, total: arena.agents.length })}
                     </span>
                   ) : null}
                 </div>
                 {stageCandidates.length === 0 ? (
-                  <p className="mt-2 rounded-md border border-dashed border-border px-2 py-4 text-center text-[11px] text-muted-foreground">
+                  <p className="mt-2 rounded-md border border-dashed border-border px-2 py-4 text-center text-xs text-muted-foreground">
                     {t('arena.noStage')}
                   </p>
                 ) : (
@@ -1060,27 +1060,27 @@ export function ArenaWorkspace({
                           )}
                         >
                           <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={entry.project.name}>
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold" title={entry.project.name}>
                               {entry.project.name}
                             </span>
                             {leading ? (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-brand-primary">
-                                <Crown className="h-2.5 w-2.5" /> {tied ? t('arena.tie') : t('arena.leading')}
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-primary">
+                                <Crown className="h-3 w-3" /> {tied ? t('arena.tie') : t('arena.leading')}
                               </span>
                             ) : null}
                           </div>
                           <div className="flex items-end gap-2">
                             <span className="text-2xl font-bold leading-none tabular-nums">{entry.votes}</span>
-                            <span className="pb-0.5 text-[10px] tabular-nums text-muted-foreground">
+                            <span className="pb-0.5 text-[11px] tabular-nums text-muted-foreground">
                               {Math.round(entry.share * 100)}%
                             </span>
-                            <span className="ml-auto pb-0.5 text-[9px] tabular-nums text-muted-foreground">
+                            <span className="ml-auto pb-0.5 text-[11px] tabular-nums text-muted-foreground">
                               {t('arena.meanConfidence', { value: Math.round(entry.confidence * 100) })}
                             </span>
                           </div>
                           <Progress value={entry.share * 100} />
                           {entry.project.description ? (
-                            <p className="line-clamp-2 text-[10px] leading-tight text-muted-foreground">{entry.project.description}</p>
+                            <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">{entry.project.description}</p>
                           ) : null}
                         </div>
                       )
@@ -1088,7 +1088,7 @@ export function ArenaWorkspace({
                   </div>
                 )}
                 {arena && totalBallots === 0 ? (
-                  <p className="mt-2 text-[10px] text-muted-foreground">{t('arena.noVotes')}</p>
+                  <p className="mt-2 text-[11px] text-muted-foreground">{t('arena.noVotes')}</p>
                 ) : null}
               </div>
 
@@ -1096,10 +1096,10 @@ export function ArenaWorkspace({
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Vote className="h-3.5 w-3.5 text-brand-primary" />
                   <h2 className="text-xs font-semibold">{t('arena.feed')}</h2>
-                  <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{totalBallots}</span>
+                  <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{totalBallots}</span>
                 </div>
                 {feed.length === 0 ? (
-                  <p className="mt-2 rounded-md border border-dashed border-border px-2 py-4 text-center text-[11px] text-muted-foreground">
+                  <p className="mt-2 rounded-md border border-dashed border-border px-2 py-4 text-center text-xs text-muted-foreground">
                     {t('arena.feedEmpty')}
                   </p>
                 ) : (
@@ -1110,25 +1110,25 @@ export function ArenaWorkspace({
                           <span className="grid h-5 w-5 place-items-center rounded-full bg-brand-primary/10 text-brand-primary">
                             <Vote className="h-3 w-3" />
                           </span>
-                          <span className="text-[11px] font-semibold">
+                          <span className="text-xs font-semibold">
                             {t(`arena.personas.${vote.personaId}.name`, { defaultValue: vote.agentName })}
                           </span>
-                          <Badge tone="brand" className="text-[9px]">
+                          <Badge tone="brand" className="text-[10px]">
                             {t(`arena.personas.${vote.personaId}.lens`, { defaultValue: vote.persona })}
                           </Badge>
-                          <span className="font-mono text-[9px] text-muted-foreground">{vote.model}</span>
-                          <span className="ml-auto text-[9px] tabular-nums text-muted-foreground">
+                          <span className="font-mono text-[10px] text-muted-foreground">{vote.model}</span>
+                          <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
                             {Math.round(vote.confidence * 100)}%
                           </span>
                         </div>
-                        <p className="mt-1 text-[11px] font-medium">
+                        <p className="mt-1 text-xs font-medium">
                           {t('arena.chose', { name: candidateNames.get(vote.chosenProjectId) ?? vote.chosenProjectId })}
                         </p>
-                        <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{vote.rationale}</p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{vote.rationale}</p>
                         {vote.rejections.length > 0 ? (
                           <ul className="mt-1 flex flex-col gap-0.5 border-t border-border/60 pt-1">
                             {vote.rejections.map((rejection) => (
-                              <li key={rejection.projectId} className="text-[10px] leading-snug text-muted-foreground">
+                              <li key={rejection.projectId} className="text-[11px] leading-snug text-muted-foreground">
                                 <span className="font-medium text-foreground/80">
                                   {candidateNames.get(rejection.projectId) ?? rejection.projectId}:
                                 </span>{' '}
