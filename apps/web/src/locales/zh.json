@@ -88,6 +88,17 @@
     "stalled": "投票结束前该智能体未提交选票。",
     "thinking": "正在阅读规则和候选项目。",
     "failed": "该投票者未提交选票。",
+    "queued": "等待轮次。",
+    "toasts": "竞技场通知",
+    "dismissToast": "关闭通知",
+    "railResize": "调整智能体轨道高度",
+    "toastStarted_other": "已为 {{count}} 个智能体开始投票。",
+    "toastReading_other": "正在读取 {{count}} 个候选项目的离线包。",
+    "toastVoting_other": "{{count}} 个智能体已上场。",
+    "toastVote": "{{name}} 投票给 {{candidate}}。",
+    "toastDone_other": "竞技场结束：{{count}} 张选票。",
+    "toastAgentError": "一位投票者未能提交选票。",
+    "toastStopped": "投票已停止。",
     "personas": {
       "evidence": {
         "name": "证据审查者",

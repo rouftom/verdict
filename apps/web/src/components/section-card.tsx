@@ -22,6 +22,8 @@ export interface SectionCardProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   className?: string
+  /** Override the inner Card, e.g. drop `h-full` in a scrolling column. */
+  cardClassName?: string
   contentClassName?: string
   children: React.ReactNode
 }
@@ -35,6 +37,7 @@ export function SectionCard({
   open,
   onOpenChange,
   className,
+  cardClassName,
   contentClassName,
   children,
 }: SectionCardProps) {
@@ -48,7 +51,7 @@ export function SectionCard({
 
   return (
     <Collapsible open={expanded} onOpenChange={change} className={cn('min-w-0', className)}>
-      <Card className="h-full min-w-0">
+      <Card className={cn('h-full min-w-0', cardClassName)}>
         <CardHeader className="gap-2">
           <CollapsibleTrigger asChild>
             <button
