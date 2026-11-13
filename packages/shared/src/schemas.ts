@@ -148,6 +148,55 @@ export const verificationOutputSchema = z.object({
   ranking: z.array(z.string()).default([]),
 })
 
+export const arenaModeSchema = z.enum(['duel', 'grid'])
+
+export const arenaModelCountSchema = z.object({
+  model: modelRefSchema,
+  count: z.number().int().min(1).max(12),
+})
+
+export const arenaRequestSchema = z
+  .object({
+    mode: arenaModeSchema.default('duel'),
+    manifestText: z.string().min(2).max(8 * 1024 * 1024),
+    manifestFilename: z.string().default('manifest.json'),
+    rulesText: z.string().max(4 * 1024 * 1024).default(''),
+    rulesFilename: z.string().default('rules.md'),
+    candidateIds: z.array(z.string().min(1)).min(2).max(8),
+    agents: z.array(arenaModelCountSchema).min(1).max(8),
+    temperature: z.number().min(0).max(1).default(0.4),
+    /** Cached bundle: the arena reads every source from it, never the network. */
+    offline: offlineBundleRefSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (new Set(value.candidateIds).size !== value.candidateIds.length) {
+      context.addIssue({ code: 'custom', path: ['candidateIds'], message: 'Candidate ids must be unique.' })
+    }
+    if (value.mode === 'duel' && value.candidateIds.length !== 2) {
+      context.addIssue({ code: 'custom', path: ['candidateIds'], message: 'A duel needs exactly two candidates.' })
+    }
+    const total = value.agents.reduce((sum, row) => sum + row.count, 0)
+    if (total > 24) {
+      context.addIssue({ code: 'custom', path: ['agents'], message: 'An arena holds at most 24 agents.' })
+    }
+  })
+
+export const arenaVoteOutputSchema = z.object({
+  chosenProjectId: z.string().min(1),
+  confidence: z.coerce.number().min(0).max(1).catch(0.6),
+  rationale: z.string().default(''),
+  rejections: z
+    .array(
+      z.object({
+        projectId: z.string().min(1),
+        reason: z.string().default(''),
+      }),
+    )
+    .default([]),
+})
+
+export type ArenaVoteOutput = z.infer<typeof arenaVoteOutputSchema>
+
 export type EvaluationOutput = z.infer<typeof evaluationOutputSchema>
 export type StageOneOutput = z.infer<typeof stageOneOutputSchema>
 export type RevisionOutput = z.infer<typeof revisionOutputSchema>

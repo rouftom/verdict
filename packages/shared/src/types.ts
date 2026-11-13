@@ -485,3 +485,103 @@ export interface UsageTotals {
   outputTokens: number
   calls: number
 }
+
+/** Arena format: two candidates face off, or a small grid of selected projects. */
+export type ArenaMode = 'duel' | 'grid'
+
+export type ArenaStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
+
+/** A fixed voting lens. One is assigned to every agent, cycling through the list. */
+export interface ArenaPersona {
+  id: string
+  name: string
+  lens: string
+  focus: string
+}
+
+/** One population row: how many agents share the same model. */
+export interface ArenaModelCount {
+  model: ModelRef
+  count: number
+}
+
+/** A voter resolved from the population rows, with its persona and model. */
+export interface ArenaAgent {
+  id: string
+  /** Persona id, so the UI can localise its name and lens. */
+  personaId: string
+  name: string
+  lens: string
+  focus: string
+  model: ModelRef
+}
+
+/** Why one agent rejected one of the other candidates. */
+export interface ArenaRejection {
+  projectId: string
+  reason: string
+}
+
+/** One agent's complete ballot: one winner, a rationale, and a reason per loser. */
+export interface ArenaVote {
+  agentId: string
+  agentName: string
+  personaId: string
+  persona: string
+  model: string
+  chosenProjectId: string
+  confidence: number
+  rationale: string
+  rejections: ArenaRejection[]
+  at: string
+}
+
+export type ArenaEventType = 'stage' | 'log' | 'vote' | 'error'
+
+export interface ArenaEvent {
+  type: ArenaEventType
+  arenaId: string
+  at: string
+  message?: string
+  agentId?: string
+  data?: unknown
+}
+
+export interface ArenaSnapshot {
+  id: string
+  createdAt: string
+  updatedAt: string
+  status: ArenaStatus
+  mode: ArenaMode
+  /** Only the projects selected for this arena, in manifest order. */
+  candidates: ProjectInput[]
+  rules: string
+  rubricName: string
+  agents: ArenaAgent[]
+  votes: ArenaVote[]
+  events: ArenaEvent[]
+  /** Set when the candidates were read from an attached offline bundle. */
+  offline?: ArenaOfflineInfo
+  error?: string
+}
+
+/** What the arena actually read from the bundle, for the live badge. */
+export interface ArenaOfflineInfo {
+  label?: string
+  /** Candidates with at least one source in the bundle. */
+  matched: number
+}
+
+/** What the workspace sends to open a new arena. */
+export interface ArenaRequest {
+  mode: ArenaMode
+  manifestText: string
+  manifestFilename: string
+  rulesText: string
+  rulesFilename: string
+  candidateIds: string[]
+  agents: ArenaModelCount[]
+  temperature?: number
+  /** Read repository and video evidence from this cached bundle, not the network. */
+  offline?: OfflineBundleRef
+}

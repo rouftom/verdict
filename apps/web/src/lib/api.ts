@@ -1,5 +1,9 @@
 import type {
   AgentPool,
+  ArenaEvent,
+  ArenaRequest,
+  ArenaSnapshot,
+  ArenaStatus,
   ManifestParseResult,
   ModelRef,
   OfflineMapping,
@@ -205,6 +209,65 @@ export function subscribeRun(id: string, onEvent: (event: RunEvent) => void, onE
   source.onmessage = (message) => {
     try {
       onEvent(JSON.parse(message.data) as RunEvent)
+    } catch {
+      /* ignore a malformed frame */
+    }
+  }
+  source.onerror = () => {
+    onError?.()
+    source.close()
+  }
+  return () => source.close()
+}
+
+export interface ArenaSummary {
+  id: string
+  status: ArenaStatus
+  mode: string
+  createdAt: string
+  updatedAt: string
+  candidates: number
+  agents: number
+  votes: number
+  error?: string
+}
+
+export interface ArenaCreated {
+  id: string
+  status: ArenaStatus
+  createdAt: string
+  candidates: number
+  agents: number
+  mode: string
+}
+
+export function createArena(input: ArenaRequest): Promise<ArenaCreated> {
+  return request('/arenas', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function fetchArena(id: string): Promise<ArenaSnapshot> {
+  return request(`/arenas/${encodeURIComponent(id)}`)
+}
+
+export function listArenas(): Promise<{ arenas: ArenaSummary[] }> {
+  return request('/arenas')
+}
+
+export function cancelArena(id: string): Promise<{ cancelled: boolean; status: ArenaStatus }> {
+  return request(`/arenas/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: '{}' })
+}
+
+/** Subscribe to an arena's SSE stream. Returns a disposer. */
+export function subscribeArena(
+  id: string,
+  onEvent: (event: ArenaEvent) => void,
+  onError?: () => void,
+): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const source = new EventSource(`${API_BASE}/arenas/${encodeURIComponent(id)}/events`)
+  source.onmessage = (message) => {
+    try {
+      onEvent(JSON.parse(message.data) as ArenaEvent)
     } catch {
       /* ignore a malformed frame */
     }
